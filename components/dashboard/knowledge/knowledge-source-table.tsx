@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Eye, Pencil, Trash2, Globe, HelpCircle, FileText, Upload, BookOpen } from "lucide-react";
 import { StatusBadge } from "./status-badge";
+import { ProcessWebsiteButton } from "./process-website-button";
+import { SourceMetadata } from "./source-metadata";
 import { KnowledgeSourceViewModal } from "./knowledge-source-view-modal";
 import { KnowledgeSourceEditModal } from "./knowledge-source-edit-modal";
 import { deleteKnowledgeSource } from "@/lib/actions/knowledge";
@@ -50,7 +52,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
               <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Title</th>
               <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Type</th>
               <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">Source</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">Details</th>
               <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">Added</th>
               <th className="text-right px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
@@ -65,19 +67,27 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                       <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-4 h-4 text-indigo-600" />
                       </div>
-                      <span className="text-sm font-bold text-slate-900 truncate max-w-[200px]">{source.title}</span>
+                      <div className="min-w-0">
+                        <span className="text-sm font-bold text-slate-900 truncate block max-w-[200px]">{source.title}</span>
+                        {source.source_url && (
+                          <span className="text-[10px] text-slate-400 truncate block max-w-[200px]">{source.source_url}</span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-4">
                     <span className="text-xs font-bold text-slate-500 capitalize bg-slate-50 px-2 py-1 rounded-lg">{source.type}</span>
                   </td>
                   <td className="px-4 py-4">
-                    <StatusBadge status={source.status} />
+                    <div className="flex flex-col gap-2">
+                      <StatusBadge status={source.status} />
+                      {source.type === "website" && (
+                        <ProcessWebsiteButton sourceId={source.id} status={source.status} />
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-4 hidden md:table-cell">
-                    <span className="text-xs text-slate-500 truncate max-w-[150px] block">
-                      {source.source_url || source.file_name || "—"}
-                    </span>
+                    <SourceMetadata source={source} />
                   </td>
                   <td className="px-4 py-4 hidden md:table-cell">
                     <span className="text-xs text-slate-500">{new Date(source.created_at).toLocaleDateString()}</span>

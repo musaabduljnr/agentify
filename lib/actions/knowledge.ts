@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { KnowledgeSource } from "@/lib/types";
+import { scrapeUrl } from "@/lib/scraper/scrape-url";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -195,4 +196,69 @@ export async function deleteKnowledgeSource(id: string) {
   if (error) return { error: error.message };
   revalidatePath("/dashboard/knowledge");
   return { success: true };
+}
+
+// ── Website Scraping ─────────────────────────────────────────────────────
+
+export async function processWebsiteSource(sourceId: string) {
+  const business = await getCurrentBusiness();
+  const supabase = await createClient();
+
+  // 1. Fetch the source and verify ownership
+  const { data: source, error: fetchError } = await supabase
+    .from("knowledge_sources")
+    .select("*")
+    .eq("id", sourceId)
+    .eq("business_id", business.id)
+    .single();
+
+  if (fetchError || !source) return { error: "Knowledge source not found." };
+  if (source.type !== "website") return { error: "Only website sources can be scraped." };
+  if (!source.source_url) return { error: "No URL to scrape." };
+
+  // 2. Set status to processing
+  await supabase
+    .from("knowledge_sources")
+    .update({ status: "processing", error_message: null })
+    .eq("id", sourceId);
+
+  revalidatePath("/dashboard/knowledge");
+
+  try {
+    // 3. Scrape the URL
+    const result = await scrapeUrl(source.source_url);
+
+    // 4. Save extracted content
+    const { error: updateError } = await supabase
+      .from("knowledge_sources")
+      .update({
+        content: result.text,
+        status: "trained",
+        word_count: result.wordCount,
+        character_count: result.characterCount,
+        scraped_at: new Date().toISOString(),
+        metadata: {
+          scraped_title: result.title,
+          scraped_description: result.description,
+        },
+      })
+      .eq("id", sourceId);
+
+    if (updateError) return { error: updateError.message };
+
+    revalidatePath("/dashboard/knowledge");
+    return { success: true, wordCount: result.wordCount };
+  } catch (err: any) {
+    // 5. Handle errors
+    await supabase
+      .from("knowledge_sources")
+      .update({
+        status: "failed",
+        error_message: err.message || "An unknown error occurred during scraping.",
+      })
+      .eq("id", sourceId);
+
+    revalidatePath("/dashboard/knowledge");
+    return { error: err.message || "Scraping failed." };
+  }
 }
