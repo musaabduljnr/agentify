@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Eye, Pencil, Trash2, Globe, HelpCircle, FileText, Upload, BookOpen } from "lucide-react";
 import { StatusBadge } from "./status-badge";
 import { ProcessWebsiteButton } from "./process-website-button";
+import { GenerateEmbeddingsButton } from "./generate-embeddings-button";
+import { EmbeddingStatusBadge } from "./embedding-status-badge";
 import { SourceMetadata } from "./source-metadata";
 import { KnowledgeSourceViewModal } from "./knowledge-source-view-modal";
 import { KnowledgeSourceEditModal } from "./knowledge-source-edit-modal";
@@ -84,10 +86,20 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                       {source.type === "website" && (
                         <ProcessWebsiteButton sourceId={source.id} status={source.status} />
                       )}
+                      <GenerateEmbeddingsButton 
+                        sourceId={source.id} 
+                        status={source.status} 
+                        isEmbedded={source.metadata?.embedded}
+                      />
                     </div>
                   </td>
                   <td className="px-4 py-4 hidden md:table-cell">
                     <SourceMetadata source={source} />
+                    <EmbeddingStatusBadge 
+                      isEmbedded={source.metadata?.embedded}
+                      chunkCount={source.metadata?.chunk_count}
+                      embeddedAt={source.metadata?.embedded_at}
+                    />
                   </td>
                   <td className="px-4 py-4 hidden md:table-cell">
                     <span className="text-xs text-slate-500">{new Date(source.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>

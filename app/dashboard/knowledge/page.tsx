@@ -1,10 +1,12 @@
 import { KnowledgeTabs } from "@/components/dashboard/knowledge/knowledge-tabs";
 import { KnowledgeSourceTable } from "@/components/dashboard/knowledge/knowledge-source-table";
-import { getKnowledgeSources } from "@/lib/actions/knowledge";
+import { TestKnowledgeSearch } from "@/components/dashboard/knowledge/test-knowledge-search";
+import { getKnowledgeSources, getCurrentBusiness } from "@/lib/actions/knowledge";
 import { BrainCircuit } from "lucide-react";
 
 export default async function KnowledgeBasePage() {
   const sources = await getKnowledgeSources();
+  const business = await getCurrentBusiness();
 
   return (
     <>
@@ -33,6 +35,11 @@ export default async function KnowledgeBasePage() {
         </div>
         <KnowledgeSourceTable sources={sources} />
       </div>
+
+      {/* Test Search Section */}
+      {sources.some(s => s.metadata?.embedded) && (
+        <TestKnowledgeSearch businessId={business.id} />
+      )}
     </>
   );
 }

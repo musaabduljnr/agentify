@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { KnowledgeSource } from "@/lib/types";
 import { scrapeUrl } from "@/lib/scraper/scrape-url";
+import { generateEmbedding } from "@/lib/vertex/embeddings";
+import { chunkText, estimateTokens } from "@/lib/embeddings/chunker";
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -260,5 +262,93 @@ export async function processWebsiteSource(sourceId: string) {
 
     revalidatePath("/dashboard/knowledge");
     return { error: err.message || "Scraping failed." };
+  }
+}
+
+// ── Vector Embeddings ────────────────────────────────────────────────────
+
+export async function generateEmbeddingsForSource(sourceId: string) {
+  try {
+    const business = await getCurrentBusiness();
+    const supabase = await createClient();
+
+    // 1. Fetch source
+    const { data: source, error: fetchError } = await supabase
+      .from("knowledge_sources")
+      .select("*")
+      .eq("id", sourceId)
+      .eq("business_id", business.id)
+      .single();
+
+    if (fetchError || !source) return { error: "Knowledge source not found." };
+    if (source.status !== "trained") return { error: "Source must be 'trained' before generating embeddings." };
+    if (!source.content) return { error: "Source has no content to embed." };
+
+    // 2. Delete existing chunks
+    await supabase.from("knowledge_chunks").delete().eq("source_id", sourceId);
+
+    // 3. Chunk text
+    const chunks = chunkText(source.content);
+    
+    // 4. Generate embeddings and insert
+    for (let i = 0; i < chunks.length; i++) {
+      const content = chunks[i];
+      const embedding = await generateEmbedding(content);
+      
+      const { error: insertError } = await supabase.from("knowledge_chunks").insert({
+        business_id: business.id,
+        source_id: sourceId,
+        content: content,
+        embedding: embedding,
+        chunk_index: i,
+        token_estimate: estimateTokens(content),
+        metadata: {
+          source_type: source.type,
+          source_title: source.title
+        }
+      });
+
+      if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
+    }
+
+    // 5. Update source metadata
+    const updatedMetadata = {
+      ...(source.metadata || {}),
+      embedded: true,
+      embedded_at: new Date().toISOString(),
+      chunk_count: chunks.length
+    };
+
+    await supabase
+      .from("knowledge_sources")
+      .update({ metadata: updatedMetadata })
+      .eq("id", sourceId);
+
+    revalidatePath("/dashboard/knowledge");
+    return { success: true, chunkCount: chunks.length };
+  } catch (err: any) {
+    console.error("Embedding generation failed:", err);
+    return { error: err.message || "Failed to generate embeddings." };
+  }
+}
+
+export async function searchKnowledge(query: string, businessId: string) {
+  try {
+    // Generate query embedding
+    const queryEmbedding = await generateEmbedding(query);
+
+    const supabase = await createClient();
+    
+    // Call RPC
+    const { data, error } = await supabase.rpc("match_knowledge_chunks", {
+      query_embedding: queryEmbedding,
+      match_business_id: businessId,
+      match_count: 5
+    });
+
+    if (error) throw new Error(error.message);
+    return { success: true, matches: data };
+  } catch (err: any) {
+    return { error: err.message || "Search failed." };
   }
 }
