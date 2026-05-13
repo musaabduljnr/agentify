@@ -50,7 +50,7 @@ export function KnowledgeSourceViewModal({
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Added</p>
               <span className="text-sm font-medium text-slate-700">
-                {new Date(source.created_at).toLocaleDateString()}
+                {new Date(source.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
               </span>
             </div>
           </div>

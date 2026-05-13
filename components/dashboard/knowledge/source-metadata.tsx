@@ -21,7 +21,7 @@ export function SourceMetadata({ source }: { source: KnowledgeSource }) {
       {scrapedAt && (
         <div className="flex items-center gap-1 text-xs text-slate-500">
           <Clock className="w-3 h-3" />
-          <span className="font-medium">Scraped {new Date(scrapedAt).toLocaleDateString()}</span>
+          <span className="font-medium">Scraped {new Date(scrapedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>
         </div>
       )}
       {meta?.scraped_title && (

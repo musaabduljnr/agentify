@@ -90,7 +90,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                     <SourceMetadata source={source} />
                   </td>
                   <td className="px-4 py-4 hidden md:table-cell">
-                    <span className="text-xs text-slate-500">{new Date(source.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs text-slate-500">{new Date(source.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center justify-end gap-1">
