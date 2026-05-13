@@ -102,6 +102,7 @@ export async function completeOnboarding(data: OnboardingData) {
 
   if (subError) return { error: subError.message };
 
+  revalidatePath("/", "layout");
   revalidatePath("/dashboard", "layout");
   return { success: true };
 }

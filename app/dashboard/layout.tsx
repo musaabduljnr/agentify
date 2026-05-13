@@ -18,13 +18,14 @@ export default async function DashboardLayout({
   }
 
   // Check for business and onboarding status
-  const { data: business } = await supabase
+  const { data: businesses } = await supabase
     .from("businesses")
     .select("onboarding_completed")
-    .eq("owner_id", user.id)
-    .single();
+    .eq("owner_id", user.id);
 
-  if (!business || !business.onboarding_completed) {
+  const isCompleted = businesses?.some((b) => b.onboarding_completed);
+
+  if (!isCompleted) {
     return redirect("/onboarding");
   }
 
