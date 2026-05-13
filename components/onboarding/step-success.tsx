@@ -2,9 +2,15 @@
 
 import { CheckCircle2, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export function StepSuccess() {
+  const router = useRouter();
+
+  const handleGoToDashboard = () => {
+    window.location.href = "/dashboard";
+  };
+
   return (
     <div className="text-center py-10 animate-in zoom-in duration-500">
       <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8">
@@ -19,11 +25,12 @@ export function StepSuccess() {
         Your business profile and AI assistant have been created successfully. You can now access your dashboard to start training your assistant.
       </p>
 
-      <Link href="/dashboard">
-        <Button className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-lg shadow-xl shadow-indigo-200">
-          Go to Dashboard
-        </Button>
-      </Link>
+      <Button 
+        onClick={handleGoToDashboard}
+        className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-lg shadow-xl shadow-indigo-200"
+      >
+        Go to Dashboard
+      </Button>
     </div>
   );
 }
