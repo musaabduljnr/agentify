@@ -17,6 +17,17 @@ export default async function DashboardLayout({
     return redirect("/login");
   }
 
+  // Check for business and onboarding status
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("onboarding_completed")
+    .eq("owner_id", user.id)
+    .single();
+
+  if (!business || !business.onboarding_completed) {
+    return redirect("/onboarding");
+  }
+
   return (
     <DashboardLayoutClient user={user}>
       {children}
