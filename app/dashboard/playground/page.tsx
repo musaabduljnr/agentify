@@ -12,22 +12,21 @@ import { redirect } from "next/navigation";
 
 export default async function PlaygroundPage() {
   const business = await getCurrentBusiness();
-  
-  if (!business) {
-    redirect("/onboarding");
-  }
-
-  const assistant = await getAssistant(business.id);
+  const assistant = business ? await getAssistant(business.id) : null;
   
   const supabase = await createClient();
   
-  // Check if there is any embedded knowledge
-  const { count, error: countError } = await supabase
-    .from("knowledge_chunks")
-    .select("*", { count: "exact", head: true })
-    .eq("business_id", business.id);
-
-  const hasKnowledge = (count || 0) > 0;
+  let hasKnowledge = false;
+  
+  if (business) {
+    // Check if there is any embedded knowledge
+    const { count } = await supabase
+      .from("knowledge_chunks")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", business.id);
+    
+    hasKnowledge = (count || 0) > 0;
+  }
 
   return (
     <div className="flex flex-col gap-6 h-full overflow-hidden">

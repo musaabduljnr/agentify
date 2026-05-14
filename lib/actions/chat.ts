@@ -30,10 +30,63 @@ export async function getAssistant(businessId: string) {
     .select("*")
     .eq("business_id", businessId)
     .eq("is_active", true)
-    .single();
+    .maybeSingle();
 
-  if (error || !assistant) return null;
   return assistant;
+}
+
+export async function updateAssistant(data: {
+  id?: string;
+  name: string;
+  tone: string;
+  welcome_message: string;
+  business_description?: string;
+}) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    // Also update business description if provided
+    if (data.business_description) {
+      await supabase
+        .from("businesses")
+        .update({ description: data.business_description })
+        .eq("id", business.id);
+    }
+
+    if (data.id) {
+      // Update existing
+      const { error } = await supabase
+        .from("assistants")
+        .update({
+          name: data.name,
+          tone: data.tone,
+          welcome_message: data.welcome_message,
+        })
+        .eq("id", data.id)
+        .eq("business_id", business.id);
+
+      if (error) throw new Error(error.message);
+    } else {
+      // Create new
+      const { error } = await supabase.from("assistants").insert({
+        business_id: business.id,
+        name: data.name,
+        tone: data.tone,
+        welcome_message: data.welcome_message,
+      });
+
+      if (error) throw new Error(error.message);
+    }
+
+    revalidatePath("/dashboard/assistant");
+    revalidatePath("/dashboard/playground");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to update assistant" };
+  }
 }
 
 export async function sendDashboardTestMessage({
