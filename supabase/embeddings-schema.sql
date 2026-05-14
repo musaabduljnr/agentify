@@ -7,7 +7,7 @@ create table if not exists public.knowledge_chunks (
   business_id uuid not null references public.businesses(id) on delete cascade,
   source_id uuid not null references public.knowledge_sources(id) on delete cascade,
   content text not null,
-  embedding vector(768), -- Default Gemini embedding dimension is 768, user requested 3072 but gemini-embedding-001 is 768. I will use 768 unless user specifically wants to pad or use different model. Actually, the user specifically asked for vector(3072). I will stick to 3072 as requested, although Gemini usually uses 768.
+  embedding vector(768),
   chunk_index integer not null,
   token_estimate integer default 0,
   metadata jsonb default '{}'::jsonb,
@@ -56,7 +56,7 @@ using (
 
 -- Vector Search RPC Function
 create or replace function public.match_knowledge_chunks(
-  query_embedding vector(3072),
+  query_embedding vector(768),
   match_business_id uuid,
   match_count int default 5
 )

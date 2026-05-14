@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: "Create a custom AI assistant trained on your business data. Embed it on your site in minutes and start converting visitors into leads automatically.",
 };
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,6 +21,7 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.variable} ${outfit.variable} font-sans antialiased text-slate-900`}>
         {children}
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );

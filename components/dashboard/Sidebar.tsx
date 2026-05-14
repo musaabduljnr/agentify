@@ -13,7 +13,8 @@ import {
   CreditCard, 
   Settings,
   X,
-  LogOut
+  LogOut,
+  Sparkles
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -21,6 +22,7 @@ import { createClient } from "@/utils/supabase/client";
 const menuItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
   { icon: BrainCircuit, label: "AI Assistant", href: "/dashboard/assistant" },
+  { icon: Sparkles, label: "AI Playground", href: "/dashboard/playground" },
   { icon: MessageSquare, label: "Knowledge Base", href: "/dashboard/knowledge" },
   { icon: Users, label: "Conversations", href: "/dashboard/conversations" },
   { icon: Users, label: "Leads", href: "/dashboard/leads" },

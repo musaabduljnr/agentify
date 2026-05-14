@@ -38,7 +38,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       }
     ],
     parameters: {
-      outputDimensionality: 3072 // Requested dimension
+      outputDimensionality: 768 // Requested dimension
     }
   };
 
@@ -61,6 +61,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
   if (!embedding || !Array.isArray(embedding)) {
     throw new Error("Invalid response format from Vertex AI.");
+  }
+
+  if (embedding.length !== 768) {
+    throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
   }
 
   return embedding;
