@@ -11,7 +11,7 @@ export async function getCurrentBusiness() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
+  if (!user) return null;
 
   const { data: business, error } = await supabase
     .from("businesses")
@@ -19,7 +19,7 @@ export async function getCurrentBusiness() {
     .eq("owner_id", user.id)
     .single();
 
-  if (error || !business) throw new Error("No business found");
+  if (error || !business) return null;
   return business;
 }
 
@@ -45,6 +45,8 @@ export async function sendDashboardTestMessage({
 }) {
   try {
     const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found. Please complete onboarding.");
+    
     const assistant = await getAssistant(business.id);
     
     if (!assistant) {
@@ -136,6 +138,7 @@ export async function sendDashboardTestMessage({
 
 export async function getDashboardConversation(conversationId: string) {
   const business = await getCurrentBusiness();
+  if (!business) throw new Error("No business found");
   const supabase = await createClient();
 
   const { data: messages, error } = await supabase
@@ -151,6 +154,7 @@ export async function getDashboardConversation(conversationId: string) {
 
 export async function getBusinessConversations() {
   const business = await getCurrentBusiness();
+  if (!business) return [];
   const supabase = await createClient();
 
   const { data, error } = await supabase

@@ -8,8 +8,15 @@ export const metadata: Metadata = {
   description: "Test your AI business assistant in a private environment.",
 };
 
+import { redirect } from "next/navigation";
+
 export default async function PlaygroundPage() {
   const business = await getCurrentBusiness();
+  
+  if (!business) {
+    redirect("/onboarding");
+  }
+
   const assistant = await getAssistant(business.id);
   
   const supabase = await createClient();
