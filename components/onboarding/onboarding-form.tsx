@@ -12,18 +12,28 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { completeOnboarding, OnboardingData } from "@/lib/actions/onboarding";
 
-export function OnboardingForm() {
+export function OnboardingForm({ initialData }: { initialData: Partial<OnboardingData> }) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isValid } } = useForm<OnboardingData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<OnboardingData>({
     mode: "onChange",
     defaultValues: {
-      primaryColor: "#4f46e5",
-      position: "bottom-right",
-      assistantTone: "Friendly",
-      suggestedQuestions: ["How much does it cost?", "What are your hours?"]
+      businessName: initialData.businessName || "",
+      industry: initialData.industry || "",
+      websiteUrl: initialData.websiteUrl || "",
+      description: initialData.description || "",
+      contactEmail: initialData.contactEmail || "",
+      phone: initialData.phone || "",
+      whatsapp: initialData.whatsapp || "",
+      address: initialData.address || "",
+      assistantName: initialData.assistantName || "",
+      assistantTone: initialData.assistantTone || "Friendly",
+      welcomeMessage: initialData.welcomeMessage || "Hello! I'm your AI assistant. How can I help you today?",
+      primaryColor: initialData.primaryColor || "#4f46e5",
+      position: (initialData.position as any) || "bottom-right",
+      suggestedQuestions: initialData.suggestedQuestions || ["How much does it cost?", "What are your hours?"]
     }
   });
 

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { generateEmbedding } from "@/lib/vertex/embeddings";
 import { generateGeminiResponse } from "@/lib/vertex/gemini";
 import { buildBusinessPrompt } from "@/lib/ai/build-business-prompt";
+import { requireCompleteBusinessSetup } from "@/lib/queries/business";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -89,6 +90,44 @@ export async function updateAssistant(data: {
   }
 }
 
+export async function updateBusinessSettings(data: {
+  name: string;
+  website_url: string;
+  contact_email: string;
+  phone: string;
+  address: string;
+  industry?: string;
+  description?: string;
+}) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("businesses")
+      .update({
+        name: data.name,
+        website_url: data.website_url,
+        contact_email: data.contact_email,
+        phone: data.phone,
+        address: data.address,
+        industry: data.industry,
+        description: data.description,
+      })
+      .eq("id", business.id);
+
+    if (error) throw new Error(error.message);
+
+    revalidatePath("/dashboard/settings");
+    revalidatePath("/dashboard", "layout");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to update business settings" };
+  }
+}
+
 export async function sendDashboardTestMessage({
   message,
   conversationId,
@@ -97,13 +136,11 @@ export async function sendDashboardTestMessage({
   conversationId?: string;
 }) {
   try {
-    const business = await getCurrentBusiness();
-    if (!business) throw new Error("No business found. Please complete onboarding.");
-    
-    const assistant = await getAssistant(business.id);
+    const setup = await requireCompleteBusinessSetup();
+    const { business, assistant } = setup;
     
     if (!assistant) {
-      throw new Error("No active AI assistant found for your business. Please complete the assistant setup.");
+      throw new Error("Assistant setup is incomplete. Please complete onboarding again.");
     }
 
     const supabase = await createClient();
