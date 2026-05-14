@@ -10,12 +10,7 @@ export const metadata: Metadata = {
 
 export default async function AssistantPage() {
   const business = await getCurrentBusiness();
-  
-  if (!business) {
-    redirect("/onboarding");
-  }
-
-  const assistant = await getAssistant(business.id);
+  const assistant = business ? await getAssistant(business.id) : null;
 
   return (
     <AssistantEditor 

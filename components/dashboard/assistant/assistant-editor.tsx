@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bot, Save, Wand2, ArrowRight, Loader2 } from "lucide-react";
+import { Bot, Save, Wand2, ArrowRight, Loader2, ShieldAlert } from "lucide-react";
 import { updateAssistant } from "@/lib/actions/chat";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -40,6 +40,21 @@ export function AssistantEditor({ initialBusiness, initialAssistant }: Assistant
       setLoading(false);
     }
   };
+
+  if (!initialBusiness) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-center p-6 bg-muted/10 rounded-2xl border-2 border-dashed">
+        <ShieldAlert size={48} className="text-yellow-500 mb-4" />
+        <h2 className="text-xl font-bold mb-2">Business Profile Missing</h2>
+        <p className="text-muted-foreground max-w-md mb-6">
+          You need to set up your business profile before you can configure your AI assistant.
+        </p>
+        <Button asChild>
+          <Link href="/onboarding">Complete Onboarding</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>
