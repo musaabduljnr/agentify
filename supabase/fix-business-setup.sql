@@ -1,4 +1,15 @@
--- 1. Ensure businesses.owner_id is unique (one business per user for MVP)
+-- 1. Cleanup: Remove duplicate businesses per owner, keeping only the most recent one
+-- This is necessary before we can add the unique constraint.
+delete from public.businesses a using (
+      select min(ctid) as keep_ctid, owner_id
+      from public.businesses
+      group by owner_id
+      having count(*) > 1
+    ) b
+where a.owner_id = b.owner_id
+and a.ctid != b.keep_ctid;
+
+-- 2. Ensure businesses.owner_id is unique (one business per user for MVP)
 do $$
 begin
   if not exists (
