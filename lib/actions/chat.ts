@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/service";
 import { revalidatePath } from "next/cache";
 import { generateEmbedding } from "@/lib/vertex/embeddings";
 import { generateGeminiResponse } from "@/lib/vertex/gemini";
@@ -128,6 +129,130 @@ export async function updateBusinessSettings(data: {
   }
 }
 
+export async function runBusinessChat({
+  message,
+  businessId,
+  conversationId,
+  visitorId,
+  source = "widget",
+}: {
+  message: string;
+  businessId: string;
+  conversationId?: string;
+  visitorId?: string;
+  source?: string;
+}) {
+  const supabase = createServiceClient();
+
+  // 1. Fetch business and assistant
+  const { data: business, error: bErr } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("id", businessId)
+    .single();
+  
+  if (bErr || !business) throw new Error("Business not found");
+
+  const { data: assistant, error: aErr } = await supabase
+    .from("assistants")
+    .select("*")
+    .eq("business_id", businessId)
+    .eq("is_active", true)
+    .single();
+
+  if (aErr || !assistant) throw new Error("Assistant not found");
+
+  let currentConversationId = conversationId;
+
+  // 2. Create/Fetch conversation
+  if (!currentConversationId) {
+    const { data: conv, error: convError } = await supabase
+      .from("conversations")
+      .insert({
+        business_id: businessId,
+        source: source,
+        status: "open",
+        visitor_id: visitorId,
+      })
+      .select()
+      .single();
+
+    if (convError) throw new Error(`Failed to create conversation: ${convError.message}`);
+    currentConversationId = conv.id;
+  }
+
+  // 3. Save user message
+  const { error: userMsgError } = await supabase.from("messages").insert({
+    conversation_id: currentConversationId,
+    business_id: businessId,
+    role: "user",
+    content: message,
+  });
+
+  if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
+
+  // 4. RAG: Search knowledge base
+  const queryEmbedding = await generateEmbedding(message);
+  const { data: matchedChunks, error: rpcError } = await supabase.rpc("match_knowledge_chunks", {
+    query_embedding: queryEmbedding,
+    match_business_id: businessId,
+    match_count: 5,
+  });
+
+  if (rpcError) throw new Error(`Knowledge search failed: ${rpcError.message}`);
+
+  // 5. Fetch Conversation History
+  const { data: historyMsgs } = await supabase
+    .from("messages")
+    .select("role, content")
+    .eq("conversation_id", currentConversationId)
+    .order("created_at", { ascending: true }) // chronological order
+    .limit(20);
+
+  const history = (historyMsgs || [])
+    .filter(m => m.role !== "system")
+    .map(m => ({
+      role: m.role === "assistant" ? "model" as const : "user" as const,
+      content: m.content
+    }));
+
+  // 6. Build Prompt & Generate AI Response
+  const systemPrompt = buildBusinessPrompt({
+    business,
+    assistant,
+    contextChunks: matchedChunks || [],
+  });
+
+  const assistantResponse = await generateGeminiResponse({
+    systemInstruction: systemPrompt,
+    userMessage: message,
+    history: history,
+    temperature: Number(assistant.temperature) || 0.4,
+  });
+
+  // 6. Save assistant message
+  const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: currentConversationId,
+      business_id: businessId,
+      role: "assistant",
+      content: assistantResponse,
+      retrieved_chunks: matchedChunks || [],
+    })
+    .select()
+    .single();
+
+  if (assistantMsgError) throw new Error(`Failed to save assistant response: ${assistantMsgError.message}`);
+
+  return {
+    success: true,
+    conversationId: currentConversationId,
+    reply: assistantResponse,
+    assistantMessage: savedAssistantMsg,
+  };
+}
+
 export async function sendDashboardTestMessage({
   message,
   conversationId,
@@ -137,88 +262,21 @@ export async function sendDashboardTestMessage({
 }) {
   try {
     const setup = await requireCompleteBusinessSetup();
-    const { business, assistant } = setup;
+    const { business } = setup;
     
-    if (!assistant) {
-      throw new Error("Assistant setup is incomplete. Please complete onboarding again.");
-    }
-
-    const supabase = await createClient();
-    let currentConversationId = conversationId;
-
-    // 1. Create conversation if not exists
-    if (!currentConversationId) {
-      const { data: conv, error: convError } = await supabase
-        .from("conversations")
-        .insert({
-          business_id: business.id,
-          source: "dashboard_test",
-          status: "open",
-          visitor_name: "Dashboard Tester",
-        })
-        .select()
-        .single();
-
-      if (convError) throw new Error(`Failed to create conversation: ${convError.message}`);
-      currentConversationId = conv.id;
-    }
-
-    // 2. Save user message
-    const { error: userMsgError } = await supabase.from("messages").insert({
-      conversation_id: currentConversationId,
-      business_id: business.id,
-      role: "user",
-      content: message,
+    const result = await runBusinessChat({
+      message,
+      businessId: business.id,
+      conversationId,
+      source: "dashboard_test",
     });
-
-    if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
-
-    // 3. RAG: Search knowledge base
-    const queryEmbedding = await generateEmbedding(message);
-    const { data: matchedChunks, error: rpcError } = await supabase.rpc("match_knowledge_chunks", {
-      query_embedding: queryEmbedding,
-      match_business_id: business.id,
-      match_count: 5,
-    });
-
-    if (rpcError) throw new Error(`Knowledge search failed: ${rpcError.message}`);
-
-    // 4. Build Prompt & Generate AI Response
-    const systemPrompt = buildBusinessPrompt({
-      business,
-      assistant,
-      contextChunks: matchedChunks || [],
-    });
-
-    const assistantResponse = await generateGeminiResponse({
-      systemInstruction: systemPrompt,
-      userMessage: message,
-      temperature: Number(assistant.temperature) || 0.4,
-    });
-
-    // 5. Save assistant message
-    const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
-      .from("messages")
-      .insert({
-        conversation_id: currentConversationId,
-        business_id: business.id,
-        role: "assistant",
-        content: assistantResponse,
-        retrieved_chunks: matchedChunks || [],
-      })
-      .select()
-      .single();
-
-    if (assistantMsgError) throw new Error(`Failed to save assistant response: ${assistantMsgError.message}`);
 
     revalidatePath("/dashboard/playground");
     revalidatePath("/dashboard/conversations");
 
     return {
-      success: true,
-      conversationId: currentConversationId,
-      assistantMessage: savedAssistantMsg,
-      retrievedChunks: matchedChunks || [],
+      ...result,
+      retrievedChunks: result.assistantMessage.retrieved_chunks,
     };
   } catch (err: any) {
     console.error("Chat Action Error:", err);

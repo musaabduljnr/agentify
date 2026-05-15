@@ -70,6 +70,29 @@ export function SettingsForm({ initialBusiness }: SettingsFormProps) {
         </h3>
         
         <div className="space-y-8">
+          <div className="space-y-2">
+            <label className="text-sm font-bold text-slate-700 ml-1">Business ID</label>
+            <div className="flex items-center gap-3">
+              <code className="bg-slate-50 text-slate-600 px-4 py-3 rounded-2xl flex-1 border border-slate-200 font-mono text-sm">
+                {initialBusiness?.id || "N/A"}
+              </code>
+              <Button 
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (initialBusiness?.id) {
+                    navigator.clipboard.writeText(initialBusiness.id);
+                    toast.success("Business ID copied to clipboard!");
+                  }
+                }}
+                className="rounded-2xl h-[46px] px-6 font-bold text-slate-600 hover:text-slate-900 bg-white"
+              >
+                Copy ID
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 ml-1 mt-2">Use this ID to connect the chat widget to your website.</p>
+          </div>
+
           <div className="flex flex-col md:flex-row gap-8">
             <div className="flex-1 space-y-2">
               <label className="text-sm font-bold text-slate-700 ml-1">Business Name</label>

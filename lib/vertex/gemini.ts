@@ -1,84 +1,57 @@
-import { GoogleAuth } from "google-auth-library";
+import { GoogleGenAI } from "@google/genai";
 
 /**
- * Generates a response from Gemini using Vertex AI.
+ * Generates a response from Gemini using the @google/genai SDK.
  */
 export async function generateGeminiResponse({
   systemInstruction,
   userMessage,
+  history = [],
   temperature = 0.4,
 }: {
   systemInstruction: string;
   userMessage: string;
+  history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
 }): Promise<string> {
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  const model = process.env.GOOGLE_GEMINI_MODEL || "gemini-2.5-flash";
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("Missing Vertex AI credentials in environment variables.");
+  if (!apiKey) {
+    throw new Error("Missing GEMINI_API_KEY in environment variables.");
   }
 
-  const auth = new GoogleAuth({
-    credentials: {
-      client_email: clientEmail,
-      private_key: privateKey,
+  const ai = new GoogleGenAI({ apiKey });
+  const model = process.env.GOOGLE_GEMINI_MODEL || "gemini-2.0-flash"; // Use stable 2.0 flash
+
+  // Map history to Google AI format
+  const contents = [
+    ...history.map((msg) => ({
+      role: msg.role,
+      parts: [{ text: msg.content }],
+    })),
+    {
+      role: "user",
+      parts: [{ text: userMessage }],
     },
-    scopes: "https://www.googleapis.com/auth/cloud-platform",
-  });
+  ];
 
-  const client = await auth.getClient();
-  const accessToken = await client.getAccessToken();
-
-  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/${model}:generateContent`;
-
-  const payload = {
-    systemInstruction: {
-      parts: [
-        {
-          text: systemInstruction,
-        },
-      ],
-    },
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: userMessage,
-          },
-        ],
+  try {
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: contents,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: temperature,
+        maxOutputTokens: 800,
       },
-    ],
-    generationConfig: {
-      temperature: temperature,
-      maxOutputTokens: 800,
-    },
-  };
+    });
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+    if (!response.text) {
+      throw new Error("Invalid response format from Gemini.");
+    }
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Vertex AI Gemini API Error: ${JSON.stringify(errorData)}`);
+    return response.text;
+  } catch (error: any) {
+    throw new Error(`Gemini API Error: ${error.message || JSON.stringify(error)}`);
   }
-
-  const data = await response.json();
-  const assistantText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!assistantText) {
-    throw new Error("Invalid response format from Vertex AI Gemini.");
-  }
-
-  return assistantText;
 }

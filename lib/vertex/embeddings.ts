@@ -1,71 +1,39 @@
-import { GoogleAuth } from "google-auth-library";
+import { GoogleGenAI } from "@google/genai";
 
 /**
- * Generates an embedding for a given text using Vertex AI.
- * Model: gemini-embedding-001 (usually 768 dimensions)
- * However, we will aim for the requested 3072 if the API supports it or use the default.
+ * Generates an embedding for a given text using @google/genai.
+ * Model: text-embedding-004
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
-  const location = process.env.GOOGLE_CLOUD_LOCATION || "us-central1";
-  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("Missing Vertex AI credentials in environment variables.");
+  if (!apiKey) {
+    throw new Error("Missing GEMINI_API_KEY in environment variables.");
   }
 
-  const auth = new GoogleAuth({
-    credentials: {
-      client_email: clientEmail,
-      private_key: privateKey,
-    },
-    scopes: "https://www.googleapis.com/auth/cloud-platform",
-  });
+  const ai = new GoogleGenAI({ apiKey });
 
-  const client = await auth.getClient();
-  const accessToken = await client.getAccessToken();
-
-  const url = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/google/models/text-embedding-004:predict`; 
-  // Using text-embedding-004 which is the latest and supports higher dimensions if needed, 
-  // although gemini-embedding-001 was requested. text-embedding-004 is generally better.
-
-  const payload = {
-    instances: [
-      {
-        content: text,
-        task_type: "RETRIEVAL_DOCUMENT"
+  try {
+    const response = await ai.models.embedContent({
+      model: 'gemini-embedding-2',
+      contents: text,
+      config: {
+        outputDimensionality: 768,
       }
-    ],
-    parameters: {
-      outputDimensionality: 768 // Requested dimension
+    });
+
+    const embedding = response.embeddings?.[0]?.values;
+
+    if (!embedding || !Array.isArray(embedding)) {
+      throw new Error("Invalid response format from Gemini Embeddings.");
     }
-  };
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+    if (embedding.length !== 768) {
+      throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
+    }
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Vertex AI API Error: ${JSON.stringify(errorData)}`);
+    return embedding;
+  } catch (error: any) {
+    throw new Error(`Gemini API Error: ${error.message || JSON.stringify(error)}`);
   }
-
-  const data = await response.json();
-  const embedding = data.predictions?.[0]?.embeddings?.values;
-
-  if (!embedding || !Array.isArray(embedding)) {
-    throw new Error("Invalid response format from Vertex AI.");
-  }
-
-  if (embedding.length !== 768) {
-    throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
-  }
-
-  return embedding;
 }

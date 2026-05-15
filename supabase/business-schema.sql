@@ -42,6 +42,9 @@ CREATE TABLE widget_configs (
   suggested_questions JSONB DEFAULT '[]'::jsonb,
   avatar_url TEXT,
   show_branding BOOLEAN DEFAULT TRUE,
+  is_enabled BOOLEAN DEFAULT TRUE,
+  allowed_domains TEXT[] DEFAULT '{}',
+  collect_leads BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

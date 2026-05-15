@@ -1,10 +1,59 @@
-import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { stats, recentConversations, popularQuestions, setupChecklist } from "@/lib/mock-data";
-import { CheckCircle2, Circle, MessageSquare, TrendingUp } from "lucide-react";
+import { 
+  getDashboardStats, 
+  getRecentConversations, 
+  getSetupChecklist 
+} from "@/lib/queries/dashboard";
+import { CheckCircle2, Circle, MessageSquare, TrendingUp, Users, MessageCircle, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-export default function DashboardOverview() {
+export default async function DashboardOverview() {
+  const [statsData, recentConversations, setupChecklist] = await Promise.all([
+    getDashboardStats(),
+    getRecentConversations(),
+    getSetupChecklist()
+  ]);
+
+  if (!statsData) return null;
+
+  const stats = [
+    {
+      title: "Total Conversations",
+      value: statsData.totalConversations.toString(),
+      icon: <MessageCircle className="w-5 h-5" />,
+      trend: "Overall",
+      color: "indigo"
+    },
+    {
+      title: "Leads Captured",
+      value: statsData.totalLeads.toString(),
+      icon: <Users className="w-5 h-5" />,
+      trend: `${Math.round((statsData.totalLeads / (statsData.totalConversations || 1)) * 100)}% conversion`,
+      color: "emerald"
+    },
+    {
+      title: "Message Usage",
+      value: `${statsData.usage}/${statsData.limit}`,
+      icon: <TrendingUp className="w-5 h-5" />,
+      trend: `${Math.round((statsData.usage / statsData.limit) * 100)}% of limit`,
+      color: "amber"
+    },
+    {
+      title: "Knowledge Sources",
+      value: statsData.knowledgeSources.toString(),
+      icon: <Database className="w-5 h-5" />,
+      trend: "Trained",
+      color: "blue"
+    }
+  ];
+
+  const popularQuestions = [
+    { question: "What are your pricing plans?", count: 12 },
+    { question: "How do I install the widget?", count: 8 },
+    { question: "Can I speak to a human?", count: 5 },
+  ];
+
   return (
     <>
       <div className="mb-10">
@@ -15,7 +64,7 @@ export default function DashboardOverview() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         {stats.map((stat, index) => (
-          <StatCard key={index} {...stat} />
+          <StatCard key={index} {...(stat as any)} />
         ))}
       </div>
 
@@ -25,37 +74,46 @@ export default function DashboardOverview() {
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">Recent Conversations</h3>
-              <Button variant="ghost" className="text-indigo-600 font-bold text-xs uppercase tracking-widest">View All</Button>
+              <Button asChild variant="ghost" className="text-indigo-600 font-bold text-xs uppercase tracking-widest">
+                <Link href="/dashboard/conversations">View All</Link>
+              </Button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <th className="px-6 py-4">Visitor</th>
-                    <th className="px-6 py-4">Last Message</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Time</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {recentConversations.map((convo) => (
-                    <tr key={convo.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-slate-900 text-sm">{convo.visitor}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-slate-500 line-clamp-1">{convo.lastMessage}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={convo.status === "Lead" ? "px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-full" : "px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full"}>
-                          {convo.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right text-xs text-slate-400 font-medium">{convo.time}</td>
+              {recentConversations.length > 0 ? (
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <th className="px-6 py-4">Visitor</th>
+                      <th className="px-6 py-4">Last Message</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4 text-right">Time</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {recentConversations.map((convo) => (
+                      <tr key={convo.id} className="hover:bg-slate-50 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900 text-sm">{convo.visitor}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-slate-500 line-clamp-1">{convo.lastMessage}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={convo.status === "Lead" ? "px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-full" : "px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full"}>
+                            {convo.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right text-xs text-slate-400 font-medium">{convo.time}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-20 text-center">
+                  <MessageSquare className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                  <p className="text-slate-500 font-medium">No conversations yet.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -65,9 +123,11 @@ export default function DashboardOverview() {
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-slate-900 mb-1">Scale your business with more leads</h3>
-              <p className="text-sm text-slate-500">Your AI assistant captured 42 leads this week. That&apos;s 15% more than last week!</p>
+              <p className="text-sm text-slate-500">Your AI assistant is working 24/7 to capture leads and answer customer questions.</p>
             </div>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-6">View Analytics</Button>
+            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-6">
+              <Link href="/dashboard/leads">View Leads</Link>
+            </Button>
           </div>
         </div>
 
@@ -90,17 +150,19 @@ export default function DashboardOverview() {
                 </div>
               ))}
             </div>
-            <div className="mt-8 pt-6 border-t border-slate-100">
-              <Button className="w-full h-12 rounded-2xl border-2 border-indigo-600 bg-transparent text-indigo-600 hover:bg-indigo-50 font-bold">
-                Continue Setup
-              </Button>
-            </div>
+            {!setupChecklist.every(i => i.completed) && (
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <Button asChild className="w-full h-12 rounded-2xl border-2 border-indigo-600 bg-transparent text-indigo-600 hover:bg-indigo-50 font-bold">
+                  <Link href="/onboarding">Continue Setup</Link>
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Popular Questions */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-slate-900">Popular Questions</h3>
+              <h3 className="text-lg font-bold text-slate-900">Common Topics</h3>
               <MessageSquare className="w-5 h-5 text-slate-400" />
             </div>
             <div className="space-y-4">
@@ -117,3 +179,4 @@ export default function DashboardOverview() {
     </>
   );
 }
+

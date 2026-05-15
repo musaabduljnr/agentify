@@ -108,7 +108,7 @@ export async function completeOnboarding(rawData: OnboardingData) {
 Business Description: ${data.description}
 Industry: ${data.industry}
 Your goal is to help visitors and collect leads.`,
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       temperature: 0.4,
       is_active: true,
     };

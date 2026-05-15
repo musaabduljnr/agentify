@@ -8,11 +8,16 @@ import {
   ChevronRight,
   Info
 } from "lucide-react";
+import { getCurrentBusinessSetup } from "@/lib/queries/business";
+import { CopyButton } from "@/components/dashboard/embed/copy-button";
 
-export default function EmbedCodePage() {
+export default async function EmbedCodePage() {
+  const { business, widgetConfig } = await getCurrentBusinessSetup();
+  const businessId = business?.id || "business_id_missing";
+
   const embedCode = `<script 
-  src="https://agentify.ai/widget.js"
-  data-business-id="business_123"
+  src="${process.env.NEXT_PUBLIC_APP_URL || 'https://agentify.ai'}/widget.js"
+  data-business-id="${businessId}"
   async>
 </script>`;
 
@@ -33,10 +38,7 @@ export default function EmbedCodePage() {
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">Your Widget Code</h3>
               </div>
-              <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-6 flex items-center gap-2 font-bold h-10">
-                <Copy className="w-4 h-4" />
-                Copy Code
-              </Button>
+              <CopyButton text={embedCode} />
             </div>
             <div className="p-8 bg-slate-900 overflow-x-auto">
               <pre className="text-indigo-300 font-mono text-sm leading-relaxed">
@@ -72,23 +74,35 @@ export default function EmbedCodePage() {
         </div>
 
         <div className="lg:col-span-4 space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Widget Status</h3>
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${widgetConfig?.is_enabled ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+              <span className="text-sm font-bold text-slate-700">
+                {widgetConfig?.is_enabled ? 'Widget is Active' : 'Widget is Disabled'}
+              </span>
+            </div>
+            {!widgetConfig?.is_enabled && (
+              <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                Your widget is currently disabled. Enable it in the <a href="/dashboard/widget" className="text-indigo-600 font-bold hover:underline">Widget Settings</a> to make it visible on your site.
+              </p>
+            )}
+          </div>
+
           <div className="bg-indigo-600 rounded-3xl p-8 text-white shadow-xl shadow-indigo-100 overflow-hidden relative">
             <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
-            <h3 className="text-xl font-bold mb-4 relative z-10">Test Installation</h3>
-            <p className="text-indigo-100 text-sm mb-8 relative z-10">
-              Once you&apos;ve added the code to your site, you can verify if it&apos;s working correctly.
+            <h3 className="text-xl font-bold mb-4 relative z-10">Local Testing</h3>
+            <p className="text-indigo-100 text-sm mb-6 relative z-10 leading-relaxed">
+              To test the widget locally:
             </p>
+            <ol className="text-indigo-50 text-xs space-y-3 mb-8 relative z-10 list-decimal ml-4">
+              <li>Create a file named <code className="bg-white/20 px-1 rounded">test-widget.html</code> in your project root.</li>
+              <li>Paste the embed code into it.</li>
+              <li>Open the file in your browser using <code className="bg-white/20 px-1 rounded">http://localhost:3000/test-widget.html</code> or similar.</li>
+            </ol>
             <div className="space-y-4 relative z-10">
-              <div className="space-y-2">
-                <label className="text-xs font-bold opacity-80 uppercase tracking-widest">Your Website URL</label>
-                <input 
-                  type="url" 
-                  placeholder="https://yourwebsite.com" 
-                  className="w-full bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-white/30 placeholder:text-indigo-300"
-                />
-              </div>
               <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold h-12">
-                Check Status
+                Open Test Page
               </Button>
             </div>
           </div>
@@ -117,3 +131,4 @@ export default function EmbedCodePage() {
     </>
   );
 }
+
