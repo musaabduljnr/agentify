@@ -14,7 +14,8 @@ import {
   Settings,
   X,
   LogOut,
-  Sparkles
+  Sparkles,
+  BarChart3
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -26,13 +27,25 @@ const menuItems = [
   { icon: MessageSquare, label: "Knowledge Base", href: "/dashboard/knowledge" },
   { icon: Users, label: "Conversations", href: "/dashboard/conversations" },
   { icon: Users, label: "Leads", href: "/dashboard/leads" },
+  { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
   { icon: Paintbrush, label: "Widget", href: "/dashboard/widget" },
   { icon: Code2, label: "Embed Code", href: "/dashboard/embed" },
   { icon: CreditCard, label: "Billing", href: "/dashboard/billing" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
-export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (val: boolean) => void }) {
+type SidebarProps = {
+  isOpen: boolean;
+  setIsOpen: (val: boolean) => void;
+  subscription?: {
+    plan: string;
+    status: string;
+    messagesUsed: number;
+    messagesLimit: number;
+  } | null;
+};
+
+export function Sidebar({ isOpen, setIsOpen, subscription }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -42,6 +55,16 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (va
     router.push("/login");
     router.refresh();
   };
+
+  // Calculate usage percentage
+  const usagePct = subscription 
+    ? subscription.messagesLimit >= 999999999 
+      ? 2 
+      : Math.min(100, Math.round((subscription.messagesUsed / subscription.messagesLimit) * 100))
+    : 0;
+  
+  const planLabel = subscription?.plan?.replace("_", " ") || "Free Trial";
+  const planUpperLabel = planLabel.charAt(0).toUpperCase() + planLabel.slice(1);
 
   return (
     <>
@@ -102,18 +125,32 @@ export function Sidebar({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (va
             <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Plan</span>
-                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-bold rounded-full">Pro</span>
+                <span className={cn(
+                  "px-2 py-0.5 text-[10px] font-bold rounded-full",
+                  subscription?.status === "active" ? "bg-indigo-100 text-indigo-600" : "bg-slate-100 text-slate-500"
+                )}>
+                  {planUpperLabel}
+                </span>
               </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-slate-700">Message Usage</span>
-                <span className="text-xs text-slate-500 font-medium">84%</span>
+                <span className="text-xs text-slate-500 font-medium">{usagePct}%</span>
               </div>
               <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden mb-4">
-                <div className="h-full bg-indigo-600 w-[84%]" />
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500",
+                    usagePct >= 100 ? "bg-red-500" : usagePct >= 80 ? "bg-amber-500" : "bg-indigo-600"
+                  )}
+                  style={{ width: `${Math.max(2, usagePct)}%` }}
+                />
               </div>
-              <button className="w-full py-2.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
-                Upgrade Plan
-              </button>
+              <Link
+                href="/dashboard/billing"
+                className="block w-full py-2.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors text-center"
+              >
+                {usagePct >= 80 ? "Upgrade Plan" : "Manage Plan"}
+              </Link>
             </div>
           </div>
         </div>

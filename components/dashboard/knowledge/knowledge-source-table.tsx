@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Eye, Pencil, Trash2, Globe, HelpCircle, FileText, Upload, BookOpen } from "lucide-react";
 import { StatusBadge } from "./status-badge";
 import { ProcessWebsiteButton } from "./process-website-button";
+import { ProcessDocumentButton } from "./process-document-button";
 import { GenerateEmbeddingsButton } from "./generate-embeddings-button";
 import { EmbeddingStatusBadge } from "./embedding-status-badge";
 import { SourceMetadata } from "./source-metadata";
@@ -85,6 +86,9 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                       <StatusBadge status={source.status} />
                       {source.type === "website" && (
                         <ProcessWebsiteButton sourceId={source.id} status={source.status} />
+                      )}
+                      {source.type === "document" && (
+                        <ProcessDocumentButton sourceId={source.id} status={source.status} />
                       )}
                       <GenerateEmbeddingsButton 
                         sourceId={source.id} 

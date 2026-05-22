@@ -43,7 +43,7 @@ export async function completeOnboarding(rawData: OnboardingData) {
   // 1. Validate data
   const validatedData = onboardingSchema.safeParse(rawData);
   if (!validatedData.success) {
-    return { error: validatedData.error.errors[0].message };
+    return { error: validatedData.error.issues[0].message };
   }
 
   const data = validatedData.data;
@@ -151,13 +151,25 @@ Your goal is to help visitors and collect leads.`,
       if (widgetError) throw widgetError;
     }
 
-    // 5. Upsert Subscription
+    // 5. Upsert Subscription with full billing infrastructure
+    const now = new Date();
+    const periodEnd = new Date();
+    periodEnd.setDate(periodEnd.getDate() + 30);
+
     const subscriptionData = {
       business_id: businessId,
       plan: "free_trial",
       status: "active",
+      payment_provider: "manual",
       message_limit: 100,
+      knowledge_limit: 5,
+      lead_limit: 50,
+      widget_limit: 1,
+      embedding_limit: 1000,
       current_usage: 0,
+      current_period_start: now.toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      reset_date: periodEnd.toISOString(),
     };
 
     if (setup.subscription) {

@@ -1,39 +1,26 @@
-import { GoogleGenAI } from "@google/genai";
+import { getEmbeddingProviderConfig } from "@/lib/ai/engine-config";
+import { generateGeminiEmbedding } from "@/lib/ai/providers/gemini";
+import { generateVertexEmbedding } from "@/lib/ai/providers/vertex";
 
 /**
- * Generates an embedding for a given text using @google/genai.
- * Model: text-embedding-004
+ * Generates vector embeddings using the dynamically active embedding model provider.
+ * Maintains stable public signature for backward-compatible client integrations.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const config = await getEmbeddingProviderConfig();
+  const provider = config.provider || "gemini";
+  const model = config.model || "text-embedding-004";
 
-  if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY in environment variables.");
-  }
+  console.log(
+    `[AI Engine] Routing embedding generation request to: ${provider} (${model})`
+  );
 
-  const ai = new GoogleGenAI({ apiKey });
-
-  try {
-    const response = await ai.models.embedContent({
-      model: 'gemini-embedding-2',
-      contents: text,
-      config: {
-        outputDimensionality: 768,
-      }
-    });
-
-    const embedding = response.embeddings?.[0]?.values;
-
-    if (!embedding || !Array.isArray(embedding)) {
-      throw new Error("Invalid response format from Gemini Embeddings.");
-    }
-
-    if (embedding.length !== 768) {
-      throw new Error(`Expected 768 dimensions, got ${embedding.length}`);
-    }
-
-    return embedding;
-  } catch (error: any) {
-    throw new Error(`Gemini API Error: ${error.message || JSON.stringify(error)}`);
+  switch (provider) {
+    case "gemini":
+      return generateGeminiEmbedding({ model, text });
+    case "vertex":
+      return generateVertexEmbedding({ model, text });
+    default:
+      throw new Error(`Unsupported AI embedding provider: ${provider}`);
   }
 }

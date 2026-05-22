@@ -2,11 +2,21 @@ import { KnowledgeTabs } from "@/components/dashboard/knowledge/knowledge-tabs";
 import { KnowledgeSourceTable } from "@/components/dashboard/knowledge/knowledge-source-table";
 import { TestKnowledgeSearch } from "@/components/dashboard/knowledge/test-knowledge-search";
 import { getKnowledgeSources, getCurrentBusiness } from "@/lib/actions/knowledge";
+import { getBusinessBillingContext } from "@/lib/queries/billing";
+import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { BrainCircuit } from "lucide-react";
 
 export default async function KnowledgeBasePage() {
-  const sources = await getKnowledgeSources();
-  const business = await getCurrentBusiness();
+  const [sources, business, billing] = await Promise.all([
+    getKnowledgeSources(),
+    getCurrentBusiness(),
+    getBusinessBillingContext(),
+  ]);
+
+  // Filter warnings relevant to this page
+  const relevantWarnings = (billing?.warnings || []).filter(
+    (w: any) => w.type === "knowledge_sources" || w.type === "embeddings"
+  );
 
   return (
     <>
@@ -21,6 +31,9 @@ export default async function KnowledgeBasePage() {
           </div>
         </div>
       </div>
+
+      {/* Usage Warnings */}
+      <UsageWarningBanner warnings={relevantWarnings} />
 
       {/* Add Knowledge Section */}
       <div className="mb-10">

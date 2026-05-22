@@ -52,10 +52,21 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
       const result = await sendDashboardTestMessage({
         message: text,
         conversationId,
-      });
+      }) as any;
 
       if (result.error) {
         toast.error(result.error);
+        return;
+      }
+
+      // Handle usage limit reached — show as assistant message
+      if (result.limitReached) {
+        const limitMsg: Message = {
+          role: "assistant",
+          content: result.reply || "You've reached your message limit. Please upgrade your plan.",
+          created_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, limitMsg]);
         return;
       }
 

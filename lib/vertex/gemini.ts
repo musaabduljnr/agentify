@@ -1,7 +1,13 @@
-import { GoogleGenAI } from "@google/genai";
+import { getChatProviderConfig } from "@/lib/ai/engine-config";
+import { generateGeminiChat } from "@/lib/ai/providers/gemini";
+import { generateOpenRouterChat } from "@/lib/ai/providers/openrouter";
+import { generateGroqChat } from "@/lib/ai/providers/groq";
+import { generateVertexChat } from "@/lib/ai/providers/vertex";
 
 /**
- * Generates a response from Gemini using the @google/genai SDK.
+ * Generates a response from the dynamically selected AI provider.
+ * Maintains a stable signature for full backward compatibility, with
+ * automatic failover routing to the fallback provider on errors.
  */
 export async function generateGeminiResponse({
   systemInstruction,
@@ -14,44 +20,85 @@ export async function generateGeminiResponse({
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
 }): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const config = await getChatProviderConfig();
+  
+  const primaryProvider = config.provider || "gemini";
+  const primaryModel = config.model || "gemini-2.0-flash";
 
-  if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY in environment variables.");
+  console.log(
+    `[AI Engine] Routing chat generation to primary provider: ${primaryProvider} (${primaryModel})`
+  );
+
+  async function callProvider(prov: string, mod: string): Promise<string> {
+    switch (prov) {
+      case "gemini":
+        return generateGeminiChat({
+          model: mod,
+          systemInstruction,
+          userMessage,
+          history,
+          temperature,
+        });
+      case "openrouter":
+        return generateOpenRouterChat({
+          model: mod,
+          systemInstruction,
+          userMessage,
+          history,
+          temperature,
+        });
+      case "groq":
+        return generateGroqChat({
+          model: mod,
+          systemInstruction,
+          userMessage,
+          history,
+          temperature,
+        });
+      case "vertex":
+        return generateVertexChat({
+          model: mod,
+          systemInstruction,
+          userMessage,
+          history,
+          temperature,
+        });
+      default:
+        throw new Error(`Unsupported AI chat provider: ${prov}`);
+    }
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const model = process.env.GOOGLE_GEMINI_MODEL || "gemini-2.0-flash"; // Use stable 2.0 flash
-
-  // Map history to Google AI format
-  const contents = [
-    ...history.map((msg) => ({
-      role: msg.role,
-      parts: [{ text: msg.content }],
-    })),
-    {
-      role: "user",
-      parts: [{ text: userMessage }],
-    },
-  ];
-
   try {
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        temperature: temperature,
-        maxOutputTokens: 800,
-      },
-    });
+    return await callProvider(primaryProvider, primaryModel);
+  } catch (error: any) {
+    console.error(
+      `[AI Engine Error] Primary provider '${primaryProvider}' failed: ${
+        error.message || JSON.stringify(error)
+      }`
+    );
 
-    if (!response.text) {
-      throw new Error("Invalid response format from Gemini.");
+    const fallbackProvider = config.fallbackProvider;
+    const fallbackModel = config.fallbackModel;
+
+    if (fallbackProvider && fallbackProvider !== primaryProvider) {
+      console.log(
+        `[AI Engine Fallback] Initiating failover routing to: ${fallbackProvider} (${fallbackModel})`
+      );
+      try {
+        return await callProvider(fallbackProvider, fallbackModel || "");
+      } catch (fallbackError: any) {
+        console.error(
+          `[AI Engine Fallback Error] Failover provider '${fallbackProvider}' also failed: ${
+            fallbackError.message || JSON.stringify(fallbackError)
+          }`
+        );
+        throw new Error(
+          `Both primary (${primaryProvider}) and fallback (${fallbackProvider}) AI engines failed to generate response. Primary: ${error.message}. Fallback: ${fallbackError.message}`
+        );
+      }
     }
 
-    return response.text;
-  } catch (error: any) {
-    throw new Error(`Gemini API Error: ${error.message || JSON.stringify(error)}`);
+    // Rethrow primary error if no fallback is available
+    throw error;
   }
 }

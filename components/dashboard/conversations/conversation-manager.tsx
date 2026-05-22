@@ -111,6 +111,11 @@ export function ConversationManager({ initialConversations }: { initialConversat
                       <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold rounded uppercase tracking-wider">
                         {convo.source.replace("_", " ")}
                       </span>
+                      {(convo as any).metadata?.intent_type && (
+                        <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-bold rounded uppercase tracking-wider">
+                          {(convo as any).metadata.intent_type.replace("_", " ")}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

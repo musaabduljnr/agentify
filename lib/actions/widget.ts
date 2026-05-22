@@ -8,12 +8,17 @@ import { getCurrentBusiness } from "@/lib/queries/business";
 const widgetConfigSchema = z.object({
   primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid color format"),
   position: z.enum(["bottom-right", "bottom-left"]),
-  welcomeText: z.string().min(1, "Welcome text is required"),
-  suggestedQuestions: z.array(z.string()),
+  welcomeText: z.string().trim().min(1, "Welcome text is required").max(500),
+  suggestedQuestions: z.array(z.string().trim().min(1).max(160)).max(8),
   showBranding: z.boolean().default(true),
   isEnabled: z.boolean().default(true),
   collectLeads: z.boolean().default(true),
-  allowedDomains: z.array(z.string()).default([]),
+  allowedDomains: z.array(
+    z.string()
+      .trim()
+      .toLowerCase()
+      .regex(/^(?!https?:\/\/)(?!localhost$)(?!127\.0\.0\.1$)([a-z0-9-]+\.)+[a-z]{2,}$/i, "Enter domains only, such as example.com")
+  ).max(20).default([]),
 });
 
 export type WidgetConfigData = z.infer<typeof widgetConfigSchema>;
@@ -25,7 +30,7 @@ export async function updateWidgetConfig(data: WidgetConfigData) {
 
     const validatedData = widgetConfigSchema.safeParse(data);
     if (!validatedData.success) {
-      return { error: validatedData.error.errors[0].message };
+      return { error: validatedData.error.issues[0].message };
     }
 
     const supabase = await createClient();

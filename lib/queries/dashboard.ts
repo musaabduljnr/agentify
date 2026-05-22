@@ -13,12 +13,11 @@ export async function getDashboardStats() {
     .select("*", { count: "exact", head: true })
     .eq("business_id", business.id);
 
-  // 2. Get total leads (conversations with visitor_email or visitor_phone)
+  // 2. Get total leads from the dedicated leads table
   const { count: totalLeads } = await supabase
-    .from("conversations")
+    .from("leads")
     .select("*", { count: "exact", head: true })
-    .eq("business_id", business.id)
-    .or("visitor_email.neq.null,visitor_phone.neq.null");
+    .eq("business_id", business.id);
 
   // 3. Get message usage from subscription
   const { data: subscription } = await supabase
@@ -33,12 +32,24 @@ export async function getDashboardStats() {
     .select("*", { count: "exact", head: true })
     .eq("business_id", business.id);
 
+  // 5. Get intent-specific stats
+  const { data: intentStats } = await supabase
+    .from("conversations")
+    .select("metadata")
+    .eq("business_id", business.id)
+    .not("metadata->intent_type", "is", "null");
+
+  const bookingCount = intentStats?.filter(c => (c.metadata as any)?.intent_type === "booking").length || 0;
+  const supportCount = intentStats?.filter(c => (c.metadata as any)?.intent_type === "support_ticket").length || 0;
+
   return {
     totalConversations: totalConversations || 0,
     totalLeads: totalLeads || 0,
     usage: subscription?.current_usage || 0,
     limit: subscription?.message_limit || 100,
     knowledgeSources: knowledgeSources || 0,
+    bookingCount,
+    supportCount,
   };
 }
 

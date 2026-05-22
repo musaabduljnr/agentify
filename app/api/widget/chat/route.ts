@@ -2,23 +2,65 @@ import { NextRequest } from "next/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { corsHeaders, jsonWithCors } from "@/lib/http/cors";
 import { runBusinessChat } from "@/lib/actions/chat";
+import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
+import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
+import { z } from "zod";
+
+type WidgetChatResponse = Awaited<ReturnType<typeof runBusinessChat>> & {
+  limitReached?: boolean;
+};
+
+const widgetChatSchema = z.object({
+  businessId: z.string().uuid(),
+  conversationId: z.string().uuid().optional().nullable(),
+  visitorId: z.string().trim().max(120).optional().nullable(),
+  message: z.string().trim().min(1).max(1000),
+  pageUrl: z.string().url().optional().nullable(),
+});
 
 export async function OPTIONS() {
   return new Response(null, { headers: corsHeaders });
 }
 
+function getTrustedHost(req: NextRequest, pageUrl?: string): string | null {
+  const origin = req.headers.get("origin");
+  const referer = req.headers.get("referer");
+  const value = origin || referer || pageUrl;
+  if (!value) return null;
+
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedHost(hostname: string | null, allowedDomains: string[] | null | undefined) {
+  if (!allowedDomains || allowedDomains.length === 0) return true;
+  if (!hostname) return false;
+
+  if (process.env.NODE_ENV === "production" && ["localhost", "127.0.0.1", "::1"].includes(hostname)) {
+    return false;
+  }
+
+  return allowedDomains.some((domain) => {
+    const normalized = domain.trim().toLowerCase();
+    return hostname === normalized || hostname.endsWith(`.${normalized}`);
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { businessId, conversationId, visitorId, message, pageUrl } = body;
-
-    if (!businessId || !message) {
-      return jsonWithCors({ error: "Missing businessId or message" }, { status: 400 });
+    const parsed = widgetChatSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return jsonWithCors({ error: "Invalid widget chat request." }, { status: 400 });
     }
+    const { businessId, conversationId, visitorId, message, pageUrl } = parsed.data;
 
-    if (message.length > 1000) {
-      return jsonWithCors({ error: "Message too long" }, { status: 400 });
-    }
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rateLimitKey = `${businessId}:${visitorId || ip}`;
+    const rl = await rateLimit(rateLimitKey, "widget_chat");
+    if (!rl.success) return rateLimitResponse(rl, corsHeaders);
 
     const supabase = createServiceClient();
 
@@ -37,35 +79,26 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: "Widget is disabled" }, { status: 403 });
     }
 
-    // Domain check
-    if (config.allowed_domains && config.allowed_domains.length > 0 && pageUrl) {
-      try {
-        const hostname = new URL(pageUrl).hostname;
-        const isAllowed = config.allowed_domains.some((domain: string) => 
-          hostname === domain || hostname.endsWith("." + domain)
-        );
-        if (!isAllowed) {
-          return jsonWithCors({ error: "Domain not allowed" }, { status: 403 });
-        }
-      } catch (e) {
-        console.error("Invalid pageUrl:", pageUrl);
-      }
+    const trustedHost = getTrustedHost(req, pageUrl || undefined);
+    if (!isAllowedHost(trustedHost, config.allowed_domains)) {
+      return jsonWithCors({ error: "Domain not allowed" }, { status: 403 });
     }
 
-    const result = await runBusinessChat({
+    const result: WidgetChatResponse = await runBusinessChat({
       message,
       businessId,
-      conversationId,
-      visitorId,
+      conversationId: conversationId || undefined,
+      visitorId: visitorId || undefined,
       source: "widget",
     });
 
     return jsonWithCors({
       conversationId: result.conversationId,
       reply: result.reply,
+      limitReached: result.limitReached || false,
     });
-  } catch (error: any) {
-    console.error("Widget chat error:", error);
-    return jsonWithCors({ error: error.message || "Internal server error" }, { status: 500 });
+  } catch (error: unknown) {
+    logErrorSync(error, "widget-chat");
+    return jsonWithCors({ error: getUserFriendlyError("widget-chat") }, { status: 500 });
   }
 }

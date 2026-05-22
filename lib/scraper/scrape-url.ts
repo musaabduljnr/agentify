@@ -1,5 +1,10 @@
 import * as cheerio from "cheerio";
-import { isValidHttpUrl, isPrivateOrLocalUrl, normalizeUrl } from "./url-safety";
+import {
+  assertPublicHttpUrl,
+  hasRedirectsRemaining,
+  normalizeUrl,
+  resolveRedirectUrl,
+} from "./url-safety";
 import { cleanExtractedText, countWords } from "./text-cleaner";
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -34,15 +39,9 @@ export type ScrapeResult = {
 };
 
 export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
-  const url = normalizeUrl(rawUrl);
+  let url = normalizeUrl(rawUrl);
 
-  // Safety checks
-  if (!isValidHttpUrl(url)) {
-    throw new Error("Invalid URL. Only http and https URLs are allowed.");
-  }
-  if (isPrivateOrLocalUrl(url)) {
-    throw new Error("Cannot scrape private or local URLs.");
-  }
+  await assertPublicHttpUrl(url);
 
   // Fetch with timeout
   const controller = new AbortController();
@@ -50,19 +49,35 @@ export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
 
   let response: Response;
   try {
-    response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-      },
-      redirect: "follow",
-    });
-  } catch (err: any) {
-    if (err.name === "AbortError") {
+    for (let redirectCount = 0; ; redirectCount++) {
+      response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": USER_AGENT,
+          Accept: "text/html,application/xhtml+xml",
+        },
+        redirect: "manual",
+      });
+
+      if (![301, 302, 303, 307, 308].includes(response.status)) {
+        break;
+      }
+
+      if (!hasRedirectsRemaining(redirectCount)) {
+        throw new Error("Too many redirects while fetching the website.");
+      }
+
+      url = resolveRedirectUrl(url, response.headers.get("location"));
+      await assertPublicHttpUrl(url);
+    }
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Request timed out. The website took too long to respond.");
     }
-    throw new Error(`Failed to fetch URL: ${err.message}`);
+    if (err instanceof Error) {
+      throw new Error(`Failed to fetch URL: ${err.message}`);
+    }
+    throw new Error("Failed to fetch URL.");
   } finally {
     clearTimeout(timeout);
   }

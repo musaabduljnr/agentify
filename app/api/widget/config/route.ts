@@ -1,19 +1,58 @@
 import { NextRequest } from "next/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { corsHeaders, jsonWithCors } from "@/lib/http/cors";
+import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
+import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
+import { z } from "zod";
+
+const widgetConfigQuerySchema = z.object({
+  businessId: z.string().uuid(),
+});
 
 export async function OPTIONS() {
   return new Response(null, { headers: corsHeaders });
 }
 
+function getRequestHost(req: NextRequest): string | null {
+  const origin = req.headers.get("origin");
+  const referer = req.headers.get("referer");
+  const value = origin || referer;
+  if (!value) return null;
+
+  try {
+    return new URL(value).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedHost(hostname: string, allowedDomains: string[] | null | undefined) {
+  if (!allowedDomains || allowedDomains.length === 0) return true;
+  if (!hostname) return false;
+  if (process.env.NODE_ENV === "production" && ["localhost", "127.0.0.1", "::1"].includes(hostname)) {
+    return false;
+  }
+
+  return allowedDomains.some((domain) => {
+    const normalized = domain.trim().toLowerCase();
+    return hostname === normalized || hostname.endsWith(`.${normalized}`);
+  });
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const businessId = searchParams.get("businessId");
-
-    if (!businessId) {
-      return jsonWithCors({ error: "Missing businessId" }, { status: 400 });
+    const parsed = widgetConfigQuerySchema.safeParse({
+      businessId: searchParams.get("businessId"),
+    });
+    if (!parsed.success) {
+      return jsonWithCors({ error: "Invalid widget config request." }, { status: 400 });
     }
+    const { businessId } = parsed.data;
+
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const rl = await rateLimit(`${ip}:${businessId}`, "widget_config");
+    if (!rl.success) return rateLimitResponse(rl, corsHeaders);
 
     const supabase = createServiceClient();
 
@@ -29,7 +68,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch assistant
-    const { data: assistant, error: assistantError } = await supabase
+    const { data: assistant } = await supabase
       .from("assistants")
       .select("name, welcome_message")
       .eq("business_id", businessId)
@@ -51,6 +90,11 @@ export async function GET(req: NextRequest) {
       return jsonWithCors({ isEnabled: false }, { status: 200 });
     }
 
+    const requestHost = getRequestHost(req);
+    if (!isAllowedHost(requestHost || "", config.allowed_domains)) {
+      return jsonWithCors({ error: "Domain not allowed" }, { status: 403 });
+    }
+
     return jsonWithCors({
       businessId: business.id,
       businessName: business.name,
@@ -63,8 +107,8 @@ export async function GET(req: NextRequest) {
       isEnabled: config.is_enabled,
       showBranding: config.show_branding,
     });
-  } catch (error: any) {
-    console.error("Widget config error:", error);
-    return jsonWithCors({ error: "Internal server error" }, { status: 500 });
+  } catch (error: unknown) {
+    logErrorSync(error, "widget-config");
+    return jsonWithCors({ error: getUserFriendlyError("widget-config") }, { status: 500 });
   }
 }

@@ -10,6 +10,12 @@ interface DashboardLayoutProps {
   profile: any;
   business: any;
   assistant: any;
+  subscription?: {
+    plan: string;
+    status: string;
+    messagesUsed: number;
+    messagesLimit: number;
+  } | null;
 }
 
 export default function DashboardLayout({ 
@@ -17,13 +23,18 @@ export default function DashboardLayout({
   user,
   profile,
   business,
-  assistant
+  assistant,
+  subscription,
 }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Sidebar 
+        isOpen={isSidebarOpen} 
+        setIsOpen={setIsSidebarOpen} 
+        subscription={subscription}
+      />
       
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar 

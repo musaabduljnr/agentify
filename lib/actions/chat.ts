@@ -7,6 +7,15 @@ import { generateEmbedding } from "@/lib/vertex/embeddings";
 import { generateGeminiResponse } from "@/lib/vertex/gemini";
 import { buildBusinessPrompt } from "@/lib/ai/build-business-prompt";
 import { requireCompleteBusinessSetup } from "@/lib/queries/business";
+import { 
+  detectLeadIntent, 
+  extractLeadInfo, 
+  detectConversationIntent 
+} from "@/lib/ai/lead-detection";
+import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
+import { requireActiveSubscription } from "@/lib/billing/subscription";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -144,6 +153,31 @@ export async function runBusinessChat({
 }) {
   const supabase = createServiceClient();
 
+  // 0. Enforce subscription & message limits
+  try {
+    await requireActiveSubscription(businessId);
+  } catch (e: any) {
+    return {
+      success: false,
+      conversationId: conversationId || "",
+      reply: e.message || "Your subscription is not active. Please update your billing to continue.",
+      assistantMessage: null,
+      limitReached: true,
+    };
+  }
+
+  const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
+  const usageCheck = await checkUsageLimit(businessId, usageType);
+  if (!usageCheck.allowed) {
+    return {
+      success: false,
+      conversationId: conversationId || "",
+      reply: "You've reached your monthly AI message limit. Please upgrade your plan to continue.",
+      assistantMessage: null,
+      limitReached: true,
+    };
+  }
+
   // 1. Fetch business and assistant
   const { data: business, error: bErr } = await supabase
     .from("businesses")
@@ -163,6 +197,7 @@ export async function runBusinessChat({
   if (aErr || !assistant) throw new Error("Assistant not found");
 
   let currentConversationId = conversationId;
+  let conversation: any = null;
 
   // 2. Create/Fetch conversation
   if (!currentConversationId) {
@@ -179,7 +214,109 @@ export async function runBusinessChat({
 
     if (convError) throw new Error(`Failed to create conversation: ${convError.message}`);
     currentConversationId = conv.id;
+    conversation = conv;
+  } else {
+    const { data: existingConversation, error: existingConversationError } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("id", currentConversationId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (existingConversationError || !existingConversation) {
+      throw new Error("Conversation not found for this business.");
+    }
+    conversation = existingConversation;
   }
+
+  // 2.1 Lead Intelligence & Capture
+  const metadata = (conversation?.metadata as any) || {};
+  const hasBuyingIntent = detectLeadIntent(message);
+  const { intentType, requestedAction } = detectConversationIntent(message);
+  const extractedInfo = extractLeadInfo(message);
+
+  let contactRequested = metadata.contact_requested || false;
+  let contactCaptured = metadata.contact_captured || false;
+
+  // Update intent in metadata
+  if (intentType !== "general_inquiry") {
+    metadata.intent_type = intentType;
+    metadata.requested_action = requestedAction;
+  }
+
+  // Handle contact info extraction
+  if (extractedInfo.email || extractedInfo.phone || extractedInfo.name) {
+    const leadUpdate: any = {
+      business_id: businessId,
+      conversation_id: currentConversationId,
+      source: source,
+    };
+    if (extractedInfo.email) leadUpdate.email = extractedInfo.email;
+    if (extractedInfo.phone) leadUpdate.phone = extractedInfo.phone;
+    if (extractedInfo.name) leadUpdate.name = extractedInfo.name;
+    if (intentType !== "general_inquiry") leadUpdate.interest = requestedAction;
+
+    // Upsert lead
+    const { data: existingLead } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("conversation_id", currentConversationId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+
+    if (existingLead) {
+      await supabase
+        .from("leads")
+        .update(leadUpdate)
+        .eq("id", existingLead.id)
+        .eq("business_id", businessId);
+    } else {
+      // Check lead limit before creating new lead
+      const leadCheck = await checkUsageLimit(businessId, "lead");
+      if (!leadCheck.allowed) {
+        // Don't block chat, just add metadata note
+        metadata.lead_limit_reached = true;
+      } else {
+        await supabase.from("leads").insert(leadUpdate);
+        await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
+      }
+    }
+
+    if (extractedInfo.email || extractedInfo.phone) {
+      contactCaptured = true;
+      metadata.contact_captured = true;
+      metadata.email_collected_early = true;
+      
+      // Update conversation visitor info if possible
+      const convUpdate: any = { lead_captured: true };
+      if (extractedInfo.email) convUpdate.visitor_email = extractedInfo.email;
+      if (extractedInfo.name) convUpdate.visitor_name = extractedInfo.name;
+      if (extractedInfo.phone) convUpdate.visitor_phone = extractedInfo.phone;
+      
+      await supabase
+        .from("conversations")
+        .update(convUpdate)
+        .eq("id", currentConversationId)
+        .eq("business_id", businessId);
+    }
+  }
+
+  // If this is an early interaction and contact hasn't been requested
+  if (!contactRequested && !contactCaptured) {
+    metadata.contact_requested = true;
+    // We don't need to manually inject a message here, 
+    // the system prompt rules in buildBusinessPrompt will handle the AI asking.
+  }
+
+  // Update conversation metadata
+  await supabase
+    .from("conversations")
+    .update({ 
+      metadata,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", currentConversationId)
+    .eq("business_id", businessId);
 
   // 3. Save user message
   const { error: userMsgError } = await supabase.from("messages").insert({
@@ -206,6 +343,7 @@ export async function runBusinessChat({
     .from("messages")
     .select("role, content")
     .eq("conversation_id", currentConversationId)
+    .eq("business_id", businessId)
     .order("created_at", { ascending: true }) // chronological order
     .limit(20);
 
@@ -245,6 +383,12 @@ export async function runBusinessChat({
 
   if (assistantMsgError) throw new Error(`Failed to save assistant response: ${assistantMsgError.message}`);
 
+  // 7. Increment usage after successful AI response
+  await incrementUsage(businessId, usageType, 1, {
+    conversation_id: currentConversationId,
+    source,
+  });
+
   return {
     success: true,
     conversationId: currentConversationId,
@@ -263,6 +407,11 @@ export async function sendDashboardTestMessage({
   try {
     const setup = await requireCompleteBusinessSetup();
     const { business } = setup;
+
+    const rateLimitResult = await rateLimit(setup.user.id, "playground_chat");
+    if (!rateLimitResult.success) {
+      return { error: "Too many AI playground messages. Please slow down and try again later." };
+    }
     
     const result = await runBusinessChat({
       message,
@@ -276,11 +425,11 @@ export async function sendDashboardTestMessage({
 
     return {
       ...result,
-      retrievedChunks: result.assistantMessage.retrieved_chunks,
+      retrievedChunks: result.assistantMessage?.retrieved_chunks || [],
     };
   } catch (err: any) {
-    console.error("Chat Action Error:", err);
-    return { error: err.message || "An error occurred during chat processing." };
+    logErrorSync(err, "ai-provider");
+    return { error: getUserFriendlyError("ai-provider") };
   }
 }
 
