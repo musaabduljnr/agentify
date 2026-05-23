@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Bot, Chrome, Loader2 } from "lucide-react";
+import { Bot, Chrome, Loader2, MailCheck } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,10 +14,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [signupSuccess, setSignupSuccess] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    setSignupSuccess(new URLSearchParams(window.location.search).get("signup") === "success");
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verification") === "sent") {
+      const emailParam = params.get("email");
+      setVerificationEmail(emailParam ? decodeURIComponent(emailParam) : "");
+      if (emailParam) setEmail(decodeURIComponent(emailParam));
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -52,9 +57,19 @@ export default function LoginPage() {
         </div>
         
         <form className="space-y-4" onSubmit={handleLogin}>
-          {signupSuccess && (
-            <div className="bg-green-50 text-green-700 p-4 rounded-2xl text-sm font-medium border border-green-100">
-              Account created successfully. Please sign in to continue.
+          {verificationEmail !== null && (
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-left">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                  <MailCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-emerald-900">Verification email sent</p>
+                  <p className="mt-1 text-sm leading-relaxed text-emerald-700">
+                    Check {verificationEmail ? <span className="font-bold">{verificationEmail}</span> : "your inbox"} and verify your email before signing in.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
           {error && (

@@ -46,7 +46,7 @@ export default function SignupPage() {
       setLoading(false);
     } else {
       await supabase.auth.signOut();
-      router.replace("/login?signup=success");
+      router.replace(`/login?verification=sent&email=${encodeURIComponent(email)}`);
       router.refresh();
     }
   };
