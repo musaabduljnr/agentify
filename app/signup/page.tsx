@@ -45,7 +45,8 @@ export default function SignupPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push("/dashboard");
+      await supabase.auth.signOut();
+      router.replace("/login?signup=success");
       router.refresh();
     }
   };

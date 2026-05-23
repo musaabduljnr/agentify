@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 
-export function StepWidget({ register, watch, setValue }: any) {
+export function StepWidget({ register, watch, setValue, errors }: any) {
   const colors = ["#4f46e5", "#0ea5e9", "#10b981", "#f43f5e", "#f59e0b", "#7c3aed"];
   const positions = [
     { value: "bottom-right", label: "Bottom Right" },
@@ -10,6 +10,8 @@ export function StepWidget({ register, watch, setValue }: any) {
   ];
 
   const suggestedQuestions = watch("suggestedQuestions") || [];
+  const selectedColor = watch("primaryColor");
+  const selectedPosition = watch("position");
 
   const addQuestion = (e: any) => {
     if (e.key === "Enter" && e.target.value) {
@@ -34,19 +36,22 @@ export function StepWidget({ register, watch, setValue }: any) {
                 key={color}
                 type="button"
                 className={`w-10 h-10 rounded-full border-2 transition-all ${
-                  watch("primaryColor") === color ? "border-slate-900 scale-110" : "border-transparent"
+                  selectedColor === color ? "border-slate-900 scale-110" : "border-transparent"
                 }`}
                 style={{ backgroundColor: color }}
-                onClick={() => setValue("primaryColor", color)}
+                aria-label={`Use ${color} as brand color`}
+                onClick={() => setValue("primaryColor", color, { shouldDirty: true, shouldValidate: true })}
               />
             ))}
           </div>
           <Input 
             type="color"
             className="w-12 h-10 p-1 rounded-xl cursor-pointer"
-            {...register("primaryColor")}
+            value={selectedColor || "#4f46e5"}
+            {...register("primaryColor", { required: "Please choose a brand color" })}
           />
         </div>
+        {errors.primaryColor && <p className="text-xs font-bold text-red-500 ml-1">{errors.primaryColor.message}</p>}
       </div>
 
       <div className="space-y-2">
@@ -56,7 +61,7 @@ export function StepWidget({ register, watch, setValue }: any) {
             <label 
               key={pos.value}
               className={`px-4 py-3 rounded-2xl text-sm font-bold cursor-pointer border-2 text-center transition-all ${
-                watch("position") === pos.value 
+                selectedPosition === pos.value
                   ? "bg-indigo-50 border-indigo-600 text-indigo-600" 
                   : "bg-white border-slate-100 text-slate-500 hover:border-slate-200"
               }`}
@@ -65,12 +70,13 @@ export function StepWidget({ register, watch, setValue }: any) {
                 type="radio" 
                 value={pos.value} 
                 className="hidden" 
-                {...register("position")}
+                {...register("position", { required: "Please choose where the widget should appear" })}
               />
               {pos.label}
             </label>
           ))}
         </div>
+        {errors.position && <p className="text-xs font-bold text-red-500 ml-1">{errors.position.message}</p>}
       </div>
 
       <div className="space-y-2">

@@ -1,10 +1,27 @@
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function StatCard({ label, value, change, changeType }: any) {
+const colorClasses: Record<string, string> = {
+  indigo: "bg-indigo-50 text-indigo-600",
+  emerald: "bg-emerald-50 text-emerald-600",
+  amber: "bg-amber-50 text-amber-600",
+  blue: "bg-blue-50 text-blue-600",
+};
+
+export function StatCard({ label, title, value, change, trend, changeType = "neutral", icon, color = "indigo" }: any) {
+  const displayLabel = label || title;
+  const displayChange = change || trend || "No change";
+
   return (
     <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm transition-all hover:shadow-md">
-      <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">{label}</p>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">{displayLabel}</p>
+        {icon && (
+          <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center", colorClasses[color] || colorClasses.indigo)}>
+            {icon}
+          </div>
+        )}
+      </div>
       <div className="flex items-end justify-between">
         <h3 className="text-3xl font-extrabold text-slate-900">{value}</h3>
         <div className={cn(
@@ -16,7 +33,7 @@ export function StatCard({ label, value, change, changeType }: any) {
           {changeType === "positive" && <ArrowUpRight className="w-4 h-4" />}
           {changeType === "negative" && <ArrowDownRight className="w-4 h-4" />}
           {changeType === "neutral" && <Minus className="w-4 h-4" />}
-          <span>{change}</span>
+          <span>{displayChange}</span>
         </div>
       </div>
     </div>

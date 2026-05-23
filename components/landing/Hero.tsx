@@ -21,7 +21,7 @@ export function Hero() {
               <Button size="lg" className="rounded-full px-8 h-14 text-lg">
                 Start free trial
               </Button>
-              <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-lg">
+              <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-lg border-slate-300 bg-white text-slate-900 hover:bg-slate-50">
                 View demo
               </Button>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+
+  useEffect(() => {
+    setSignupSuccess(new URLSearchParams(window.location.search).get("signup") === "success");
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +52,11 @@ export default function LoginPage() {
         </div>
         
         <form className="space-y-4" onSubmit={handleLogin}>
+          {signupSuccess && (
+            <div className="bg-green-50 text-green-700 p-4 rounded-2xl text-sm font-medium border border-green-100">
+              Account created successfully. Please sign in to continue.
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-medium border border-red-100">
               {error}

@@ -17,7 +17,7 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<OnboardingData>({
+  const { register, handleSubmit, watch, setValue, trigger, formState: { errors } } = useForm<OnboardingData>({
     mode: "onChange",
     defaultValues: {
       businessName: initialData.businessName || "",
@@ -31,13 +31,23 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
       assistantName: initialData.assistantName || "",
       assistantTone: initialData.assistantTone || "Friendly",
       welcomeMessage: initialData.welcomeMessage || "Hello! I'm your AI assistant. How can I help you today?",
-      primaryColor: initialData.primaryColor || "#4f46e5",
-      position: (initialData.position as any) || "bottom-right",
+      primaryColor: initialData.primaryColor || "",
+      position: (initialData.position as any) || "",
       suggestedQuestions: initialData.suggestedQuestions || ["How much does it cost?", "What are your hours?"]
     }
   });
 
-  const nextStep = () => setStep((s) => s + 1);
+  const stepFields: Record<number, (keyof OnboardingData)[]> = {
+    1: ["businessName", "industry", "websiteUrl", "description"],
+    2: ["contactEmail"],
+    3: ["assistantName", "assistantTone", "welcomeMessage"],
+    4: ["primaryColor", "position"],
+  };
+
+  const nextStep = async () => {
+    const isValid = await trigger(stepFields[step]);
+    if (isValid) setStep((s) => s + 1);
+  };
   const prevStep = () => setStep((s) => s - 1);
 
   const onSubmit = async (data: OnboardingData) => {
@@ -62,7 +72,7 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
       case 1: return <StepBusinessInfo register={register} errors={errors} />;
       case 2: return <StepContact register={register} errors={errors} />;
       case 3: return <StepAssistant register={register} errors={errors} watch={watch} />;
-      case 4: return <StepWidget register={register} watch={watch} setValue={setValue} />;
+      case 4: return <StepWidget register={register} watch={watch} setValue={setValue} errors={errors} />;
       case 5: return <StepSuccess />;
       default: return null;
     }
