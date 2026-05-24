@@ -1,5 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 
+const DEFAULT_GEMINI_CHAT_MODEL = "gemini-1.5-flash";
+const GEMINI_CHAT_FALLBACK_MODELS = ["gemini-1.5-flash"];
+
+function isGeminiQuotaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : JSON.stringify(error);
+  return /429|quota|RESOURCE_EXHAUSTED|rate-limit|rate limit/i.test(message || "");
+}
+
 export async function generateGeminiChat({
   model,
   systemInstruction,
@@ -19,7 +27,7 @@ export async function generateGeminiChat({
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  
+
   // Format history for @google/genai SDK
   const contents = [
     ...history.map((msg) => ({
@@ -32,21 +40,42 @@ export async function generateGeminiChat({
     },
   ];
 
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: contents,
-    config: {
-      systemInstruction: systemInstruction,
-      temperature: temperature,
-      maxOutputTokens: 800,
-    },
-  });
+  async function callGeminiChat(selectedModel: string): Promise<string> {
+    const response = await ai.models.generateContent({
+      model: selectedModel,
+      contents: contents,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: temperature,
+        maxOutputTokens: 800,
+      },
+    });
 
-  if (!response.text) {
-    throw new Error("Invalid response format from Gemini.");
+    if (!response.text) {
+      throw new Error("Invalid response format from Gemini.");
+    }
+
+    return response.text;
   }
 
-  return response.text;
+  const selectedModel = model || DEFAULT_GEMINI_CHAT_MODEL;
+
+  try {
+    return await callGeminiChat(selectedModel);
+  } catch (error) {
+    if (!isGeminiQuotaError(error)) throw error;
+
+    const fallbackModel = GEMINI_CHAT_FALLBACK_MODELS.find(
+      (candidate) => candidate !== selectedModel
+    );
+
+    if (!fallbackModel) throw error;
+
+    console.warn(
+      `[Gemini Warning] ${selectedModel} quota/rate limit hit. Retrying chat with ${fallbackModel}.`
+    );
+    return callGeminiChat(fallbackModel);
+  }
 }
 
 export async function generateGeminiEmbedding({

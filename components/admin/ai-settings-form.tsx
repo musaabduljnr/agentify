@@ -14,7 +14,7 @@ interface AISettingsFormProps {
 }
 
 const PROVIDER_CHAT_MODELS: Record<string, string[]> = {
-  gemini: ["gemini-2.0-flash", "gemini-1.5-flash"],
+  gemini: ["gemini-1.5-flash", "gemini-2.0-flash"],
   openrouter: [
     "openai/gpt-oss-20b:free",
     "deepseek/deepseek-v4-flash:free",
@@ -33,7 +33,7 @@ const PROVIDER_EMBEDDING_MODELS: Record<string, string[]> = {
 
 export function AISettingsForm({ initialSettings }: AISettingsFormProps) {
   const [provider, setProvider] = useState(initialSettings?.provider || "gemini");
-  const [chatModel, setChatModel] = useState(initialSettings?.chat_model || "gemini-2.0-flash");
+  const [chatModel, setChatModel] = useState(initialSettings?.chat_model || "gemini-1.5-flash");
   
   const [embeddingProvider, setEmbeddingProvider] = useState(initialSettings?.embedding_provider || "gemini");
   const [embeddingModel, setEmbeddingModel] = useState(initialSettings?.embedding_model || "text-embedding-004");

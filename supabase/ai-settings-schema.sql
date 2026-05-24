@@ -7,7 +7,7 @@ create table if not exists public.ai_engine_settings (
   id uuid primary key default gen_random_uuid(),
   provider text not null default 'gemini'
     check (provider in ('gemini', 'openrouter', 'vertex', 'groq')),
-  chat_model text not null default 'gemini-2.0-flash',
+  chat_model text not null default 'gemini-1.5-flash',
   embedding_provider text not null default 'gemini'
     check (embedding_provider in ('gemini', 'vertex')),
   embedding_model text not null default 'text-embedding-004',
@@ -75,7 +75,7 @@ insert into public.ai_engine_settings (
 )
 select
   'gemini',
-  'gemini-2.0-flash',
+  'gemini-1.5-flash',
   'gemini',
   'gemini-embedding-2',
   'openrouter',
