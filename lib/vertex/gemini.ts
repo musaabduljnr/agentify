@@ -77,8 +77,25 @@ export async function generateGeminiResponse({
       }`
     );
 
-    const fallbackProvider = config.fallbackProvider;
-    const fallbackModel = config.fallbackModel;
+    let fallbackProvider = config.fallbackProvider;
+    let fallbackModel = config.fallbackModel;
+
+    // Dynamically fallback if the configured fallback is missing, or identical to the primary provider
+    if (!fallbackProvider || fallbackProvider === primaryProvider) {
+      if (process.env.OPENROUTER_API_KEY && primaryProvider !== "openrouter") {
+        fallbackProvider = "openrouter";
+        fallbackModel = "openai/gpt-oss-20b:free";
+        console.log(
+          `[AI Engine Fallback] Primary and fallback are identical or missing. Dynamically re-routing failover to OpenRouter: ${fallbackProvider} (${fallbackModel})`
+        );
+      } else if (process.env.GROQ_API_KEY && primaryProvider !== "groq") {
+        fallbackProvider = "groq";
+        fallbackModel = "llama-3.3-70b-versatile";
+        console.log(
+          `[AI Engine Fallback] Primary and fallback are identical or missing. Dynamically re-routing failover to Groq: ${fallbackProvider} (${fallbackModel})`
+        );
+      }
+    }
 
     if (fallbackProvider && fallbackProvider !== primaryProvider) {
       console.log(

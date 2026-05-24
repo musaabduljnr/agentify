@@ -1,6 +1,6 @@
 # Agentify Production Deployment
 
-This guide prepares Agentify for production deployment on Vercel with Supabase, Gemini/OpenRouter, Paystack, Resend, and the embeddable widget.
+This guide prepares Agentify for production deployment on Vercel with Supabase, Gemini, optional OpenRouter fallback, Paystack, Resend, and the embeddable widget.
 
 Replace `https://yourdomain.com` with the final production domain before deploying.
 
@@ -15,7 +15,6 @@ Set these in Vercel under Project Settings -> Environment Variables for the Prod
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public | Supabase anon key. Safe for browser use with RLS enabled. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only | Never expose client-side. Used by server routes and actions. |
 | `GEMINI_API_KEY` | Server only | Gemini provider key. |
-| `OPENROUTER_API_KEY` | Server only | OpenRouter provider key. |
 | `PAYSTACK_SECRET_KEY` | Server only | Paystack secret key for transaction initialize/verify. |
 | `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Public | Paystack public key. Safe for browser use. |
 | `PAYSTACK_WEBHOOK_SECRET` | Server only | Webhook signing secret used for HMAC verification. If Paystack only provides one secret, use the Paystack secret key value here too. |
@@ -33,6 +32,7 @@ Optional environment variables already referenced by the codebase:
 | `UPSTASH_REDIS_REST_TOKEN` | Server only | Upstash token. |
 | `FLUTTERWAVE_SECRET_KEY` | Server only | Reserved for Flutterwave checkout. |
 | `FLUTTERWAVE_WEBHOOK_SECRET` | Server only | Reserved for Flutterwave webhook verification. |
+| `OPENROUTER_API_KEY` | Server only | Required only if OpenRouter is selected as a primary or fallback AI provider. |
 | `GROQ_API_KEY` | Server only | Optional AI provider support. |
 | `GOOGLE_CLOUD_PROJECT_ID` | Server only | Optional Vertex AI support. |
 
@@ -40,7 +40,7 @@ Secret safety rules:
 
 - Only variables that intentionally start with `NEXT_PUBLIC_` are bundled for browser use.
 - Do not create `NEXT_PUBLIC_` copies of service role keys, API keys, secret keys, webhook secrets, private tokens, or provider tokens.
-- `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`, and `RESEND_API_KEY` must stay server-only.
+- `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` if used, `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`, and `RESEND_API_KEY` must stay server-only.
 - Provider secrets are configured in Vercel, not through the browser admin UI.
 
 ## Vercel Setup
@@ -243,4 +243,3 @@ Security:
 - [ ] Admin routes require server-side admin validation.
 - [ ] Paystack webhook rejects missing or invalid signatures.
 - [ ] Vercel deployment logs do not print provider secrets.
-

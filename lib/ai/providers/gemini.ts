@@ -3,9 +3,39 @@ import { GoogleGenAI } from "@google/genai";
 const DEFAULT_GEMINI_CHAT_MODEL = "gemini-1.5-flash";
 const GEMINI_CHAT_FALLBACK_MODELS = ["gemini-1.5-flash"];
 
-function isGeminiQuotaError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : JSON.stringify(error);
-  return /429|quota|RESOURCE_EXHAUSTED|rate-limit|rate limit/i.test(message || "");
+function isGeminiQuotaError(error: any): boolean {
+  if (!error) return false;
+  const parts: string[] = [];
+  if (typeof error === "string") {
+    parts.push(error);
+  } else {
+    if (error.message) parts.push(String(error.message));
+    if (error.statusText) parts.push(String(error.statusText));
+    if (error.status) parts.push(String(error.status));
+    if (error.code) parts.push(String(error.code));
+    if (error.error) {
+      if (typeof error.error === "string") {
+        parts.push(error.error);
+      } else {
+        if (error.error.message) parts.push(String(error.error.message));
+        if (error.error.status) parts.push(String(error.error.status));
+        if (error.error.code) parts.push(String(error.error.code));
+      }
+    }
+    try {
+      const stringified = JSON.stringify(error);
+      if (stringified && stringified !== "{}") {
+        parts.push(stringified);
+      }
+    } catch (_) {}
+    if (error instanceof Error) {
+      parts.push(error.name || "");
+      parts.push(error.message || "");
+      if (error.stack) parts.push(error.stack);
+    }
+  }
+  const searchSpace = parts.join(" ");
+  return /429|quota|RESOURCE_EXHAUSTED|rate-limit|rate limit|limit exceeded/i.test(searchSpace);
 }
 
 export async function generateGeminiChat({

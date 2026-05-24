@@ -43,9 +43,9 @@ const ENV_SPECS: EnvSpec[] = [
   },
   {
     key: "OPENROUTER_API_KEY",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "OpenRouter API key - server-side only",
+    description: "OpenRouter API key - server-side only, required only when OpenRouter is selected",
   },
   {
     key: "PAYSTACK_SECRET_KEY",
