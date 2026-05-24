@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { getConfiguredOptionalEnv, isConfiguredEnvValue } from "@/lib/env";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -10,6 +11,13 @@ interface PaystackInitializeInput {
   businessId: string;
   callbackUrl: string;
   metadata?: JsonRecord;
+}
+
+export class PaystackProviderError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PaystackProviderError";
+  }
 }
 
 export async function initializePaystackTransaction(input: PaystackInitializeInput) {
@@ -52,7 +60,7 @@ export async function initializePaystackTransaction(input: PaystackInitializeInp
   const data = await response.json();
 
   if (!response.ok || !data.status) {
-    throw new Error(data.message || "Failed to initialize Paystack transaction.");
+    throw new PaystackProviderError(data.message || "Failed to initialize Paystack transaction.");
   }
 
   return {
@@ -79,15 +87,16 @@ export async function verifyPaystackTransaction(reference: string) {
   const data = await response.json();
 
   if (!response.ok || !data.status) {
-    throw new Error(data.message || "Failed to verify Paystack transaction.");
+    throw new PaystackProviderError(data.message || "Failed to verify Paystack transaction.");
   }
 
   return data.data;
 }
 
 export function verifyPaystackWebhookSignature(rawBody: string, signature: string): boolean {
-  const secret = process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY;
+  const secret = getConfiguredOptionalEnv("PAYSTACK_WEBHOOK_SECRET") || process.env.PAYSTACK_SECRET_KEY;
   if (!secret) return false;
+  if (!isConfiguredEnvValue(secret)) return false;
 
   const hash = crypto
     .createHmac("sha512", secret)

@@ -60,21 +60,21 @@ const ENV_SPECS: EnvSpec[] = [
   },
   {
     key: "PAYSTACK_WEBHOOK_SECRET",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "Paystack webhook signing secret - server-side only",
+    description: "Optional Paystack webhook signing secret. Falls back to PAYSTACK_SECRET_KEY.",
   },
   {
     key: "PAYSTACK_STARTER_PLAN_CODE",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "Paystack Starter subscription plan code",
+    description: "Optional Paystack Starter subscription plan code. Omit for one-time checkout.",
   },
   {
     key: "PAYSTACK_GROWTH_PLAN_CODE",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "Paystack Growth subscription plan code",
+    description: "Optional Paystack Growth subscription plan code. Omit for one-time checkout.",
   },
   {
     key: "RESEND_API_KEY",
@@ -185,6 +185,31 @@ export function getRequiredEnv(key: string): string {
 /** Get an optional env var with a default fallback */
 export function getOptionalEnv(key: string, fallback = ""): string {
   return process.env[key] ?? fallback;
+}
+
+export function isConfiguredEnvValue(value: string | undefined | null): value is string {
+  if (!value) return false;
+
+  const normalized = value.trim();
+  if (!normalized) return false;
+
+  const lower = normalized.toLowerCase();
+  const placeholderMarkers = [
+    "changeme",
+    "dummy",
+    "example",
+    "placeholder",
+    "replace_me",
+    "your_",
+    "xxx",
+  ];
+
+  return !placeholderMarkers.some((marker) => lower.includes(marker));
+}
+
+export function getConfiguredOptionalEnv(key: string): string | null {
+  const value = process.env[key];
+  return isConfiguredEnvValue(value) ? value.trim() : null;
 }
 
 /** Returns true if running in a production environment */

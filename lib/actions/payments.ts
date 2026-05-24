@@ -2,10 +2,29 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
-import { initializePaystackTransaction, verifyPaystackTransaction } from "@/lib/payments/paystack";
+import {
+  initializePaystackTransaction,
+  PaystackProviderError,
+  verifyPaystackTransaction,
+} from "@/lib/payments/paystack";
 import { PLAN_CONFIG, getPlanLimits, type PlanId } from "@/lib/billing/plans";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
+
+function getAppBaseUrl(): string {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    "http://localhost:3000";
+
+  const trimmedUrl = configuredUrl.trim().replace(/\/+$/, "");
+  if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
+    return trimmedUrl;
+  }
+
+  return `https://${trimmedUrl}`;
+}
 
 /**
  * Creates a checkout session using Paystack (primary) or Flutterwave (secondary).
@@ -72,9 +91,7 @@ export async function createCheckoutSession(
         );
       }
 
-      const callbackUrl = `${
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-      }/payment/callback`;
+      const callbackUrl = `${getAppBaseUrl()}/payment/callback`;
 
       const paystackRes = await initializePaystackTransaction({
         email: user.email || business.contact_email || "billing@agentify.com",
@@ -127,6 +144,9 @@ export async function createCheckoutSession(
     return { checkoutUrl };
   } catch (error: any) {
     logErrorSync(error, "payment-checkout");
+    if (error instanceof PaystackProviderError) {
+      return { error: `Paystack checkout failed: ${error.message}` };
+    }
     return { error: getUserFriendlyError("payment-checkout") };
   }
 }
@@ -254,6 +274,9 @@ export async function verifyPaymentReference(reference: string) {
     }
   } catch (error: any) {
     logErrorSync(error, "payment-verification");
+    if (error instanceof PaystackProviderError) {
+      return { error: `Paystack verification failed: ${error.message}` };
+    }
     return { error: "Payment verification failed. Please contact support if you were charged." };
   }
 }

@@ -1,4 +1,6 @@
 // ══════════════════════════════════════════════════════════════
+import { getConfiguredOptionalEnv } from "@/lib/env";
+
 // Plan Configuration
 // ══════════════════════════════════════════════════════════════
 
@@ -56,7 +58,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
       "Email support",
       "Remove branding",
     ],
-    paystack_plan_code: process.env.PAYSTACK_STARTER_PLAN_CODE || null,
+    paystack_plan_code: getConfiguredOptionalEnv("PAYSTACK_STARTER_PLAN_CODE"),
     flutterwave_plan_id: null,
   },
 
@@ -78,7 +80,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
       "Remove branding",
       "Custom domain",
     ],
-    paystack_plan_code: process.env.PAYSTACK_GROWTH_PLAN_CODE || null,
+    paystack_plan_code: getConfiguredOptionalEnv("PAYSTACK_GROWTH_PLAN_CODE"),
     flutterwave_plan_id: null,
   },
 
