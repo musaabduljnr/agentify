@@ -5,7 +5,8 @@
 // ══════════════════════════════════════════════════════════════
 
 import { createServiceClient } from "@/utils/supabase/service";
-import { getPlanLimits, getPlanConfig, type PlanId } from "./plans";
+import { type PlanId } from "./plans";
+import { getEffectivePlanConfig, getEffectivePlanLimits } from "@/lib/billing/platform";
 
 export type Subscription = {
   id: string;
@@ -80,7 +81,7 @@ export async function syncSubscriptionLimitsFromPlan(
   plan: PlanId
 ): Promise<void> {
   const supabase = createServiceClient();
-  const limits = getPlanLimits(plan);
+  const limits = await getEffectivePlanLimits(plan);
 
   const { error } = await supabase
     .from("subscriptions")
@@ -104,7 +105,7 @@ export async function getCurrentPlan(businessId: string) {
   const sub = await getBusinessSubscription(businessId);
   if (!sub) return null;
 
-  const planConfig = getPlanConfig(sub.plan);
+  const planConfig = await getEffectivePlanConfig(sub.plan);
   return {
     subscription: sub,
     plan: planConfig,

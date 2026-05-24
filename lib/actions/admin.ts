@@ -2,7 +2,15 @@
 
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { createServiceClient } from "@/utils/supabase/service";
-import { getPlanLimits, type PlanId } from "@/lib/billing/plans";
+import { PLAN_ORDER, type PlanId } from "@/lib/billing/plans";
+import {
+  DEFAULT_BILLING_SETTINGS,
+  getBillingPlatformSettings,
+  getEffectivePlanConfigs,
+  getEffectivePlanLimits,
+  type BillingPlatformSettings,
+  type EditablePlanConfig,
+} from "@/lib/billing/platform";
 import { revalidatePath } from "next/cache";
 import { generateGeminiChat, generateGeminiEmbedding } from "@/lib/ai/providers/gemini";
 import { generateOpenRouterChat } from "@/lib/ai/providers/openrouter";
@@ -97,6 +105,34 @@ export async function updateUserRole(userId: string, role: "client" | "admin") {
   return { success: true };
 }
 
+export async function deleteUserAccount(userId: string) {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profile?.role === "admin") {
+    const { count } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("role", "admin");
+
+    if ((count || 0) <= 1) {
+      return { error: "You cannot delete the last admin account." };
+    }
+  }
+
+  const { error } = await supabase.auth.admin.deleteUser(userId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
 /**
  * 3. Businesses Management Actions
  */
@@ -152,7 +188,7 @@ export async function updateSubscriptionPlan(subscriptionId: string, plan: PlanI
   await requireAdmin();
   const supabase = createServiceClient();
 
-  const planLimits = getPlanLimits(plan);
+  const planLimits = await getEffectivePlanLimits(plan);
   const now = new Date();
   const periodEnd = new Date();
   periodEnd.setDate(periodEnd.getDate() + 30);
@@ -173,6 +209,91 @@ export async function updateSubscriptionPlan(subscriptionId: string, plan: PlanI
   if (error) return { error: error.message };
 
   revalidatePath("/admin/subscriptions");
+  return { success: true };
+}
+
+/**
+ * 4b. Editable platform billing settings
+ */
+export async function getAdminBillingSettings() {
+  await requireAdmin();
+
+  const [settings, plans] = await Promise.all([
+    getBillingPlatformSettings(),
+    getEffectivePlanConfigs(),
+  ]);
+
+  return {
+    settings,
+    plans: PLAN_ORDER.map((planId) => plans[planId]),
+  };
+}
+
+function normalizeLimit(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  return Math.floor(numeric);
+}
+
+export async function updateAdminBillingSettings(input: {
+  settings: BillingPlatformSettings;
+  plans: EditablePlanConfig[];
+}) {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  const currency = input.settings.currency.trim().toUpperCase();
+  const currencySymbol = input.settings.currency_symbol.trim();
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    return { error: "Currency must be a 3-letter ISO code like NGN or USD." };
+  }
+  if (!currencySymbol) {
+    return { error: "Currency symbol is required." };
+  }
+
+  const provider = input.settings.default_payment_provider || DEFAULT_BILLING_SETTINGS.default_payment_provider;
+
+  const { error: settingsError } = await supabase.from("platform_settings").upsert({
+    key: "billing",
+    value: {
+      currency,
+      currency_symbol: currencySymbol,
+      default_payment_provider: provider,
+    },
+    updated_at: new Date().toISOString(),
+  });
+
+  if (settingsError) return { error: settingsError.message };
+
+  for (const plan of input.plans) {
+    if (!PLAN_ORDER.includes(plan.id)) continue;
+
+    const config = {
+      name: plan.name.trim() || plan.id.replace("_", " "),
+      price_ngn: normalizeLimit(plan.price_ngn),
+      messages: normalizeLimit(plan.messages),
+      knowledge_sources: normalizeLimit(plan.knowledge_sources),
+      leads: normalizeLimit(plan.leads),
+      widgets: normalizeLimit(plan.widgets),
+      embeddings: normalizeLimit(plan.embeddings),
+      features: plan.features.map((feature) => feature.trim()).filter(Boolean),
+      paystack_plan_code: plan.paystack_plan_code?.trim() || null,
+      flutterwave_plan_id: plan.flutterwave_plan_id?.trim() || null,
+      contact_sales: Boolean(plan.contact_sales),
+    };
+
+    const { error } = await supabase.from("billing_plan_overrides").upsert({
+      plan_id: plan.id,
+      config,
+      updated_at: new Date().toISOString(),
+    });
+
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/dashboard/billing");
   return { success: true };
 }
 

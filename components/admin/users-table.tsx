@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { updateUserRole } from "@/lib/actions/admin";
-import { Search, ShieldAlert, ShieldCheck, Mail, Calendar, Building, Loader2 } from "lucide-react";
+import { deleteUserAccount, updateUserRole } from "@/lib/actions/admin";
+import { Search, ShieldAlert, ShieldCheck, Mail, Calendar, Building, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface UsersTableProps {
@@ -14,6 +14,7 @@ export function UsersTable({ initialUsers }: UsersTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Handle Search & Filter logic
@@ -48,6 +49,26 @@ export function UsersTable({ initialUsers }: UsersTableProps) {
       setActionError(err.message || "Failed to update user role privilege.");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, email: string) => {
+    const confirmed = window.confirm(
+      `Delete ${email || "this user"}? This removes their auth account and cascades their profile, businesses, subscriptions, conversations, and knowledge data.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(userId);
+    setActionError(null);
+
+    try {
+      const result = await deleteUserAccount(userId);
+      if (result.error) throw new Error(result.error);
+      setUsers((prev) => prev.filter((user) => user.id !== userId));
+    } catch (err: any) {
+      setActionError(err.message || "Failed to delete user account.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -156,33 +177,50 @@ export function UsersTable({ initialUsers }: UsersTableProps) {
                         </span>
                       </td>
                       <td className="py-4 px-6 text-right">
-                        <Button
-                          onClick={() => handleRoleToggle(user.id, user.role)}
-                          disabled={updatingId === user.id}
-                          variant="ghost"
-                          className={`rounded-xl h-9 text-[10px] font-bold uppercase tracking-wider border hover:bg-slate-900 hover:text-white transition-all ${
-                            user.role === "admin"
-                              ? "border-red-500/20 text-red-400 hover:border-red-500/40"
-                              : "border-indigo-500/20 text-indigo-400 hover:border-indigo-500/40"
-                          }`}
-                        >
-                          {updatingId === user.id ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                              Syncing...
-                            </>
-                          ) : user.role === "admin" ? (
-                            <>
-                              <ShieldAlert className="w-3.5 h-3.5 mr-1.5" />
-                              Demote
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
-                              Promote
-                            </>
-                          )}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            onClick={() => handleRoleToggle(user.id, user.role)}
+                            disabled={updatingId === user.id || deletingId === user.id}
+                            variant="ghost"
+                            className={`rounded-xl h-9 text-[10px] font-bold uppercase tracking-wider border hover:bg-slate-900 hover:text-white transition-all ${
+                              user.role === "admin"
+                                ? "border-red-500/20 text-red-400 hover:border-red-500/40"
+                                : "border-indigo-500/20 text-indigo-400 hover:border-indigo-500/40"
+                            }`}
+                          >
+                            {updatingId === user.id ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                Syncing...
+                              </>
+                            ) : user.role === "admin" ? (
+                              <>
+                                <ShieldAlert className="w-3.5 h-3.5 mr-1.5" />
+                                Demote
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />
+                                Promote
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            onClick={() => handleDeleteUser(user.id, user.email)}
+                            disabled={deletingId === user.id || updatingId === user.id}
+                            variant="ghost"
+                            className="h-9 rounded-xl border border-red-500/20 text-[10px] font-bold uppercase tracking-wider text-red-400 transition-all hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            {deletingId === user.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <>
+                                <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                                Delete
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );

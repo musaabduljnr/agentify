@@ -1,6 +1,7 @@
 import DashboardLayoutClient from "@/components/dashboard/DashboardLayout";
 import { requireCompleteBusinessSetup } from "@/lib/queries/business";
 import { getUsageSummary } from "@/lib/billing/usage";
+import { getDashboardNotifications } from "@/lib/queries/notifications";
 
 export default async function DashboardLayout({
   children,
@@ -12,6 +13,7 @@ export default async function DashboardLayout({
 
   // Fetch subscription data for sidebar
   let subscriptionData = null;
+  let notifications: Awaited<ReturnType<typeof getDashboardNotifications>> = [];
   if (setup.business && setup.subscription) {
     try {
       const usage = await getUsageSummary(setup.business.id);
@@ -30,6 +32,12 @@ export default async function DashboardLayout({
         messagesLimit: setup.subscription.message_limit || 100,
       };
     }
+
+    try {
+      notifications = await getDashboardNotifications(setup.business.id, setup.subscription);
+    } catch {
+      notifications = [];
+    }
   }
 
   return (
@@ -39,6 +47,7 @@ export default async function DashboardLayout({
       business={setup.business}
       assistant={setup.assistant}
       subscription={subscriptionData}
+      notifications={notifications}
     >
       {children}
     </DashboardLayoutClient>

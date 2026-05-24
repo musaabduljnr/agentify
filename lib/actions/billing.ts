@@ -7,7 +7,12 @@
 import { createClient } from "@/utils/supabase/server";
 import { getBusinessSubscription, getCurrentPlan, getRemainingUsage } from "@/lib/billing/subscription";
 import { getUsageSummary } from "@/lib/billing/usage";
-import { getPlanConfig, PLAN_CONFIG, PLAN_ORDER, formatPlanPrice, type PlanId } from "@/lib/billing/plans";
+import { PLAN_ORDER } from "@/lib/billing/plans";
+import {
+  formatCurrencyAmount,
+  getBillingPlatformSettings,
+  getEffectivePlanConfigs,
+} from "@/lib/billing/platform";
 
 async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -31,9 +36,11 @@ export async function getBillingData() {
     const business = await getCurrentBusiness();
     if (!business) return null;
 
-    const [planData, usage] = await Promise.all([
+    const [planData, usage, billingSettings, effectivePlans] = await Promise.all([
       getCurrentPlan(business.id),
       getUsageSummary(business.id),
+      getBillingPlatformSettings(),
+      getEffectivePlanConfigs(),
     ]);
 
     if (!planData) return null;
@@ -42,11 +49,11 @@ export async function getBillingData() {
 
     // Build plan comparison for all plans
     const plans = PLAN_ORDER.map((id) => {
-      const config = getPlanConfig(id);
+      const config = effectivePlans[id];
       return {
         id,
         name: config.name,
-        price: formatPlanPrice(config),
+        price: formatCurrencyAmount(config.price_ngn, billingSettings),
         price_ngn: config.price_ngn,
         features: config.features,
         isCurrent: id === planId,
@@ -69,9 +76,10 @@ export async function getBillingData() {
       currentPlan: {
         id: planId,
         name: plan.name,
-        price: formatPlanPrice(plan),
+        price: formatCurrencyAmount(plan.price_ngn, billingSettings),
         price_ngn: plan.price_ngn,
       },
+      billingSettings,
       usage,
       plans,
     };

@@ -6,6 +6,7 @@ type JsonRecord = Record<string, unknown>;
 interface PaystackInitializeInput {
   email: string;
   amount: number; // In Naira (converted to Kobo internally)
+  currency?: string;
   planCode?: string | null;
   reference: string;
   businessId: string;
@@ -32,6 +33,7 @@ export async function initializePaystackTransaction(input: PaystackInitializeInp
   const payload: JsonRecord = {
     email: input.email,
     amount: amountInKobo,
+    currency: input.currency || "NGN",
     reference: input.reference,
     callback_url: input.callbackUrl,
     metadata: {

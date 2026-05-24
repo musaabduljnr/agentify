@@ -5,7 +5,8 @@ import {
   verifyPaystackWebhookSignature,
 } from "@/lib/payments/paystack";
 import { createServiceClient } from "@/utils/supabase/service";
-import { getPlanLimits, type PlanId } from "@/lib/billing/plans";
+import { type PlanId } from "@/lib/billing/plans";
+import { getEffectivePlanLimits } from "@/lib/billing/platform";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 
 type JsonRecord = Record<string, unknown>;
@@ -149,7 +150,7 @@ export async function POST(request: Request) {
       const verifiedSubscriptionCode = stringValue(verified.subscription || data.subscription);
       const planCode = stringValue(verified.plan || data.plan);
       const resolvedBusinessId = tx.business_id;
-      const planLimits = getPlanLimits(planId);
+      const planLimits = await getEffectivePlanLimits(planId);
       const now = new Date();
       const periodEnd = new Date();
       periodEnd.setDate(periodEnd.getDate() + 30);

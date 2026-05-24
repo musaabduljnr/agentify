@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import type { DashboardNotification } from "@/lib/queries/notifications";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ interface DashboardLayoutProps {
     messagesUsed: number;
     messagesLimit: number;
   } | null;
+  notifications?: DashboardNotification[];
 }
 
 export default function DashboardLayout({ 
@@ -25,6 +27,7 @@ export default function DashboardLayout({
   business,
   assistant,
   subscription,
+  notifications = [],
 }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -43,6 +46,7 @@ export default function DashboardLayout({
           profile={profile}
           business={business}
           assistant={assistant}
+          notifications={notifications}
         />
         
         <main className="flex-1 p-6 lg:p-10 overflow-auto">

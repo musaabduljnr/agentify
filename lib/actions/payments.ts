@@ -7,7 +7,12 @@ import {
   PaystackProviderError,
   verifyPaystackTransaction,
 } from "@/lib/payments/paystack";
-import { PLAN_CONFIG, getPlanLimits, type PlanId } from "@/lib/billing/plans";
+import { type PlanId } from "@/lib/billing/plans";
+import {
+  getBillingPlatformSettings,
+  getEffectivePlanConfig,
+  getEffectivePlanLimits,
+} from "@/lib/billing/platform";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 
@@ -65,7 +70,10 @@ export async function createCheckoutSession(
     }
 
     // 4. Get plan config
-    const planConfig = PLAN_CONFIG[plan];
+    const [planConfig, billingSettings] = await Promise.all([
+      getEffectivePlanConfig(plan),
+      getBillingPlatformSettings(),
+    ]);
     if (!planConfig) {
       return { error: "Invalid plan selected." };
     }
@@ -96,6 +104,7 @@ export async function createCheckoutSession(
       const paystackRes = await initializePaystackTransaction({
         email: user.email || business.contact_email || "billing@agentify.com",
         amount: planConfig.price_ngn,
+        currency: billingSettings.currency,
         planCode: planCode || undefined, // One-time fallback if missing
         reference,
         businessId: business.id,
@@ -130,6 +139,7 @@ export async function createCheckoutSession(
         reference,
         plan,
         amount: planConfig.price_ngn,
+        currency: billingSettings.currency,
         status: "pending",
         checkout_url: checkoutUrl,
         raw_response: rawResponse,
@@ -215,7 +225,7 @@ export async function verifyPaymentReference(reference: string) {
     }
 
     if (paymentVerified) {
-      const planLimits = getPlanLimits(transaction.plan as PlanId);
+      const planLimits = await getEffectivePlanLimits(transaction.plan as PlanId);
       const now = new Date();
       const periodEnd = new Date();
       periodEnd.setDate(periodEnd.getDate() + 30);
