@@ -328,15 +328,26 @@ export async function runBusinessChat({
 
   if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
 
-  // 4. RAG: Search knowledge base
-  const queryEmbedding = await generateEmbedding(message);
-  const { data: matchedChunks, error: rpcError } = await supabase.rpc("match_knowledge_chunks", {
-    query_embedding: queryEmbedding,
-    match_business_id: businessId,
-    match_count: 5,
-  });
+  // 4. RAG: Search knowledge base. If embeddings are unavailable or over quota,
+  // keep chat alive and answer from the base business profile instead.
+  let matchedChunks: { content: string; similarity: number }[] = [];
+  try {
+    const queryEmbedding = await generateEmbedding(message);
+    const { data, error: rpcError } = await supabase.rpc("match_knowledge_chunks", {
+      query_embedding: queryEmbedding,
+      match_business_id: businessId,
+      match_count: 5,
+    });
 
-  if (rpcError) throw new Error(`Knowledge search failed: ${rpcError.message}`);
+    if (rpcError) throw new Error(`Knowledge search failed: ${rpcError.message}`);
+    matchedChunks = data || [];
+  } catch (knowledgeError: any) {
+    console.warn(
+      `[Knowledge Search Warning] Continuing chat without retrieved context: ${
+        knowledgeError.message || JSON.stringify(knowledgeError)
+      }`
+    );
+  }
 
   // 5. Fetch Conversation History
   const { data: historyMsgs } = await supabase
