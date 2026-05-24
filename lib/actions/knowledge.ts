@@ -437,6 +437,23 @@ export async function generateEmbeddingsForSource(sourceId: string) {
 
     // 1.5 Check embedding usage limit
     const chunks = chunkText(source.content);
+    if (chunks.length === 0) {
+      const updatedMetadata = {
+        ...(source.metadata || {}),
+        embedded: false,
+        chunk_count: 0,
+        embedding_error: "No usable text chunks were found. Add more source content or reprocess the website.",
+      };
+
+      await supabase
+        .from("knowledge_sources")
+        .update({ metadata: updatedMetadata })
+        .eq("id", sourceId);
+
+      revalidatePath("/dashboard/knowledge");
+      return { error: "No usable text was found to embed. Add more content or reprocess this source." };
+    }
+
     const embeddingCheck = await checkUsageLimit(business.id, "embedding");
     if (!embeddingCheck.allowed) {
       return { error: "You've reached your embedding limit for this plan. Please upgrade to generate more embeddings." };

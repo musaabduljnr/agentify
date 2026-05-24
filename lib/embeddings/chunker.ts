@@ -45,9 +45,10 @@ export function chunkText(
 
   if (currentChunk) chunks.push(currentChunk);
 
-  // Final cleanup: remove duplicates and very small chunks
+  // Final cleanup: remove duplicates and discard only empty/noisy fragments.
+  // Short scraped pages can still contain useful product or business facts.
   return Array.from(new Set(chunks))
-    .filter(c => c.length > 50)
+    .filter(c => c.trim().length >= 10)
     .map(c => c.trim());
 }
 
