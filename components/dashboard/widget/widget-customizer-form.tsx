@@ -9,7 +9,10 @@ import {
   Save,
   Undo,
   X,
-  Plus
+  Plus,
+  Copy,
+  ExternalLink,
+  Share2
 } from "lucide-react";
 import { updateWidgetConfig, WidgetConfigData } from "@/lib/actions/widget";
 import { toast } from "sonner";
@@ -23,6 +26,10 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
     showBranding: initialData?.show_branding ?? true,
     isEnabled: initialData?.is_enabled ?? true,
     collectLeads: initialData?.collect_leads ?? true,
+    hostedChatEnabled: initialData?.hosted_chat_enabled ?? true,
+    hostedChatSlug: initialData?.hosted_chat_slug || "",
+    hostedChatTitle: initialData?.hosted_chat_title || "",
+    hostedChatDescription: initialData?.hosted_chat_description || "",
     allowedDomains: initialData?.allowed_domains || [],
   });
 
@@ -38,7 +45,7 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
       } else {
         toast.success("Widget configuration published!");
       }
-    } catch (error) {
+    } catch {
       toast.error("An unexpected error occurred.");
     } finally {
       setIsSaving(false);
@@ -54,6 +61,10 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
       showBranding: initialData?.show_branding ?? true,
       isEnabled: initialData?.is_enabled ?? true,
       collectLeads: initialData?.collect_leads ?? true,
+      hostedChatEnabled: initialData?.hosted_chat_enabled ?? true,
+      hostedChatSlug: initialData?.hosted_chat_slug || "",
+      hostedChatTitle: initialData?.hosted_chat_title || "",
+      hostedChatDescription: initialData?.hosted_chat_description || "",
       allowedDomains: initialData?.allowed_domains || [],
     });
   };
@@ -76,6 +87,16 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
   };
 
   const colors = ["#4F46E5", "#3B82F6", "#10B981", "#0F172A", "#F43F5E", "#8B5CF6"];
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "");
+  const hostedChatLink = config.hostedChatSlug ? `${appUrl}/chat/${config.hostedChatSlug}` : "";
+  const slugIsValid = /^[a-z0-9-]{3,}$/.test(config.hostedChatSlug);
+  const normalizeSlug = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  const copyHostedLink = async () => {
+    if (!hostedChatLink) return;
+    await navigator.clipboard.writeText(hostedChatLink);
+    toast.success("Hosted chat link copied!");
+  };
 
   return (
     <>
@@ -199,6 +220,102 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
                 />
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest ml-1">Leave empty to allow all domains.</p>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+            <h3 className="text-lg font-bold text-slate-900 mb-8 flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-indigo-600" />
+              Hosted Chat Link
+            </h3>
+
+            <div className="space-y-6">
+              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Enable hosted chat page</p>
+                  <p className="text-xs text-slate-500">Create a public link customers can open without a website.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setConfig({ ...config, hostedChatEnabled: !config.hostedChatEnabled })}
+                  className={`w-24 rounded-xl border-2 px-4 py-2 text-xs font-bold transition-all ${
+                    config.hostedChatEnabled
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-400"
+                  }`}
+                >
+                  {config.hostedChatEnabled ? "On" : "Off"}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 ml-1">Hosted Chat Slug</label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="flex flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white focus-within:border-indigo-500">
+                    <span className="hidden shrink-0 items-center border-r border-slate-100 bg-slate-50 px-4 text-xs font-bold text-slate-400 sm:flex">
+                      /chat/
+                    </span>
+                    <input
+                      type="text"
+                      value={config.hostedChatSlug}
+                      onChange={(e) => setConfig({ ...config, hostedChatSlug: normalizeSlug(e.target.value) })}
+                      placeholder="business-slug"
+                      className="w-full px-4 py-3 text-sm font-bold outline-none"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={copyHostedLink}
+                    disabled={!slugIsValid}
+                    className="rounded-2xl border-2 border-slate-200 font-bold"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => window.open(hostedChatLink, "_blank", "noopener,noreferrer")}
+                    disabled={!slugIsValid}
+                    className="rounded-2xl border-2 border-slate-200 font-bold"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Preview
+                  </Button>
+                </div>
+                <p className={`text-[10px] font-bold uppercase tracking-widest ml-1 ${slugIsValid ? "text-slate-400" : "text-red-500"}`}>
+                  Lowercase letters, numbers, and hyphens only. Minimum 3 characters.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 ml-1">Page Title</label>
+                <input
+                  type="text"
+                  value={config.hostedChatTitle}
+                  onChange={(e) => setConfig({ ...config, hostedChatTitle: e.target.value })}
+                  placeholder="Chat with your business"
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:border-indigo-500 transition-all font-medium"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-slate-700 ml-1">Page Description</label>
+                <textarea
+                  rows={3}
+                  value={config.hostedChatDescription}
+                  onChange={(e) => setConfig({ ...config, hostedChatDescription: e.target.value })}
+                  placeholder="Ask a question, request support, or leave your details."
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium resize-none"
+                />
+              </div>
+
+              {hostedChatLink && (
+                <div className="rounded-2xl bg-slate-950 p-4 font-mono text-xs text-indigo-200 break-all">
+                  {hostedChatLink}
+                </div>
+              )}
             </div>
           </div>
 

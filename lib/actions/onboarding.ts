@@ -51,6 +51,7 @@ export async function completeOnboarding(rawData: OnboardingData) {
 
   try {
     let businessId = setup.business?.id;
+    let businessSlug = setup.business?.slug;
 
     // 2. Upsert Business
     if (setup.business) {
@@ -73,6 +74,7 @@ export async function completeOnboarding(rawData: OnboardingData) {
     } else {
       const slugBase = generateSlug(data.businessName);
       const slug = `${slugBase}-${Math.random().toString(36).substring(2, 7)}`;
+      businessSlug = slug;
 
       const { data: newBiz, error: bizError } = await supabase
         .from("businesses")
@@ -136,6 +138,10 @@ Your goal is to help visitors and collect leads.`,
       show_branding: true,
       is_enabled: true,
       collect_leads: true,
+      hosted_chat_enabled: true,
+      hosted_chat_slug: setup.widgetConfig?.hosted_chat_slug || businessSlug,
+      hosted_chat_title: `Chat with ${data.businessName}`,
+      hosted_chat_description: "Ask a question, request support, or leave your details and the team will follow up.",
     };
 
     if (setup.widgetConfig) {

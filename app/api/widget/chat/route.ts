@@ -16,6 +16,8 @@ const widgetChatSchema = z.object({
   visitorId: z.string().trim().max(120).optional().nullable(),
   message: z.string().trim().min(1).max(1000),
   pageUrl: z.string().url().optional().nullable(),
+  referrer: z.string().url().optional().nullable(),
+  source: z.enum(["widget", "hosted_chat"]).optional().default("widget"),
 });
 
 export async function OPTIONS() {
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return jsonWithCors({ error: "Invalid widget chat request." }, { status: 400 });
     }
-    const { businessId, conversationId, visitorId, message, pageUrl } = parsed.data;
+    const { businessId, conversationId, visitorId, message, pageUrl, source } = parsed.data;
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const rateLimitKey = `${businessId}:${visitorId || ip}`;
@@ -64,10 +66,10 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Check if widget is enabled and optional domain check
+    // Check public channel availability and optional widget domain check.
     const { data: config, error: configError } = await supabase
       .from("widget_configs")
-      .select("is_enabled, allowed_domains")
+      .select("is_enabled, allowed_domains, hosted_chat_enabled")
       .eq("business_id", businessId)
       .single();
 
@@ -75,12 +77,16 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: "Widget not configured" }, { status: 404 });
     }
 
-    if (!config.is_enabled) {
+    if (source === "widget" && !config.is_enabled) {
       return jsonWithCors({ error: "Widget is disabled" }, { status: 403 });
     }
 
+    if (source === "hosted_chat" && config.hosted_chat_enabled === false) {
+      return jsonWithCors({ error: "Hosted chat is disabled" }, { status: 403 });
+    }
+
     const trustedHost = getTrustedHost(req, pageUrl || undefined);
-    if (!isAllowedHost(trustedHost, config.allowed_domains)) {
+    if (source === "widget" && !isAllowedHost(trustedHost, config.allowed_domains)) {
       return jsonWithCors({ error: "Domain not allowed" }, { status: 403 });
     }
 
@@ -89,7 +95,7 @@ export async function POST(req: NextRequest) {
       businessId,
       conversationId: conversationId || undefined,
       visitorId: visitorId || undefined,
-      source: "widget",
+      source,
     });
 
     return jsonWithCors({

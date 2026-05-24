@@ -45,6 +45,10 @@ CREATE TABLE widget_configs (
   is_enabled BOOLEAN DEFAULT TRUE,
   allowed_domains TEXT[] DEFAULT '{}',
   collect_leads BOOLEAN DEFAULT TRUE,
+  hosted_chat_enabled BOOLEAN DEFAULT TRUE,
+  hosted_chat_slug TEXT UNIQUE,
+  hosted_chat_title TEXT,
+  hosted_chat_description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

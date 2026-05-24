@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { 
   Code2, 
-  Copy, 
   CheckCircle2, 
   Monitor, 
   ExternalLink,
   ChevronRight,
-  Info
+  Info,
+  Link2
 } from "lucide-react";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
 import { CopyButton } from "@/components/dashboard/embed/copy-button";
@@ -14,9 +14,12 @@ import { CopyButton } from "@/components/dashboard/embed/copy-button";
 export default async function EmbedCodePage() {
   const { business, widgetConfig } = await getCurrentBusinessSetup();
   const businessId = business?.id || "business_id_missing";
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "");
+  const hostedSlug = widgetConfig?.hosted_chat_slug || business?.slug || "business-slug";
+  const hostedChatLink = `${appUrl}/chat/${hostedSlug}`;
 
   const embedCode = `<script 
-  src="${process.env.NEXT_PUBLIC_APP_URL || 'https://agentify.ai'}/widget.js"
+  src="${appUrl}/widget.js"
   data-business-id="${businessId}"
   async>
 </script>`;
@@ -36,7 +39,10 @@ export default async function EmbedCodePage() {
                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
                   <Code2 className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-slate-900">Your Widget Code</h3>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Website Embed Code</h3>
+                  <p className="text-xs text-slate-500 font-medium">For businesses that already have a website.</p>
+                </div>
               </div>
               <CopyButton text={embedCode} />
             </div>
@@ -49,6 +55,40 @@ export default async function EmbedCodePage() {
               <Info className="w-5 h-5 text-indigo-600 shrink-0" />
               <p className="text-xs text-slate-600 font-medium">
                 Copy this code and paste it into your website&apos;s <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-900">&lt;head&gt;</code> or just before the closing <code className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-900">&lt;/body&gt;</code> tag.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-slate-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <Link2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Shareable Chat Link</h3>
+                  <p className="text-xs text-slate-500 font-medium">For WhatsApp, Instagram bios, Facebook, email, and businesses without a website.</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <CopyButton text={hostedChatLink} />
+                <Button asChild variant="outline" className="rounded-2xl border-2 border-slate-200 font-bold h-10">
+                  <a href={hostedChatLink} target="_blank" rel="noreferrer">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Preview
+                  </a>
+                </Button>
+              </div>
+            </div>
+            <div className="p-8 bg-slate-950 overflow-x-auto">
+              <pre className="text-emerald-300 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all">
+                {hostedChatLink}
+              </pre>
+            </div>
+            <div className="p-6 bg-slate-50 flex items-center gap-3">
+              <Info className="w-5 h-5 text-emerald-600 shrink-0" />
+              <p className="text-xs text-slate-600 font-medium">
+                Manage the slug, page title, and availability from <a href="/dashboard/widget" className="text-indigo-600 font-bold hover:underline">Widget Settings</a>.
               </p>
             </div>
           </div>
@@ -131,4 +171,3 @@ export default async function EmbedCodePage() {
     </>
   );
 }
-

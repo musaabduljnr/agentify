@@ -17,6 +17,7 @@ import {
   Calendar,
   Layers,
   Sparkles,
+  Link2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -134,6 +135,7 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                   const isSuspended = sub.status === "suspended";
                   const widget = biz.widget_configs?.[0] || {};
                   const widgetEnabled = widget.is_enabled !== false;
+                  const hostedEnabled = widget.hosted_chat_enabled !== false;
                   
                   const createdDate = new Date(biz.created_at).toLocaleDateString("en-US", {
                     month: "short",
@@ -200,6 +202,15 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                           }`}
                         >
                           {widgetEnabled ? "enabled" : "disabled"}
+                        </span>
+                        <span
+                          className={`ml-2 inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                            hostedEnabled
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                              : "bg-slate-900 border-slate-800 text-slate-500"
+                          }`}
+                        >
+                          hosted {hostedEnabled ? "on" : "off"}
                         </span>
                       </td>
                       <td className="py-4 px-6 font-medium text-slate-400">
@@ -349,6 +360,37 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                 )}
 
                 {/* Panel 3: Active Limits & Subscriptions */}
+                {selectedBusiness.widget_configs?.[0] ? (
+                  <div className="p-5 bg-slate-900/60 rounded-2xl border border-slate-850">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                      <Link2 className="w-3.5 h-3.5 text-indigo-400" />
+                      Hosted Chat Link
+                    </h4>
+                    <div className="text-xs space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-slate-500 font-semibold">Hosted Status</p>
+                          <p className={selectedBusiness.widget_configs[0].hosted_chat_enabled !== false ? "text-emerald-400 font-bold" : "text-slate-500 font-bold"}>
+                            {selectedBusiness.widget_configs[0].hosted_chat_enabled !== false ? "Enabled" : "Disabled"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 font-semibold">Slug</p>
+                          <p className="text-white font-mono">{selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}</p>
+                        </div>
+                      </div>
+                      <a
+                        href={`${(process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "")}/chat/${selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[10px] text-indigo-300 break-all hover:border-indigo-500/40"
+                      >
+                        {`${(process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "")}/chat/${selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}`}
+                      </a>
+                    </div>
+                  </div>
+                ) : null}
+
                 {selectedBusiness.subscriptions?.[0] ? (
                   <div className="p-5 bg-slate-900/60 rounded-2xl border border-slate-850">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">

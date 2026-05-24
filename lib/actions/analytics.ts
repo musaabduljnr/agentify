@@ -24,6 +24,8 @@ export interface AnalyticsData {
     totalLeads: number;
     conversionRate: number;
     widgetConversations: number;
+    hostedChatConversations: number;
+    hostedChatLeads: number;
     playgroundConversations: number;
   };
   dailyTrend: {
@@ -114,7 +116,9 @@ export async function getBusinessAnalytics(days: number = 30): Promise<Analytics
       : 0;
 
     const widgetConversations = convList.filter(c => c.source === "widget").length;
-    const playgroundConversations = convList.filter(c => c.source !== "widget").length;
+    const hostedChatConversations = convList.filter(c => c.source === "hosted_chat").length;
+    const hostedChatLeads = leadList.filter(l => l.source === "hosted_chat").length;
+    const playgroundConversations = convList.filter(c => c.source === "dashboard_test").length;
 
     // Generate Daily Trend data using date-fns for safety
     const daysInterval = eachDayOfInterval({
@@ -136,14 +140,20 @@ export async function getBusinessAnalytics(days: number = 30): Promise<Analytics
 
     // Top Sources Breakdown
     const sourceMap: Record<string, number> = {};
+    const sourceLabels: Record<string, string> = {
+      widget: "Chat Widget",
+      hosted_chat: "Hosted Chat Link",
+      dashboard_test: "Dashboard Test",
+    };
     convList.forEach(c => {
-      const src = c.source === "widget" ? "Chat Widget" : "Playground / Test";
+      const src = sourceLabels[c.source] || "Other";
       sourceMap[src] = (sourceMap[src] || 0) + 1;
     });
     const sources = Object.entries(sourceMap).map(([name, value]) => ({ name, value }));
     if (sources.length === 0) {
       sources.push({ name: "Chat Widget", value: 0 });
-      sources.push({ name: "Playground / Test", value: 0 });
+      sources.push({ name: "Hosted Chat Link", value: 0 });
+      sources.push({ name: "Dashboard Test", value: 0 });
     }
 
     // Lead Intent Breakdown
@@ -248,6 +258,8 @@ export async function getBusinessAnalytics(days: number = 30): Promise<Analytics
         totalLeads,
         conversionRate,
         widgetConversations,
+        hostedChatConversations,
+        hostedChatLeads,
         playgroundConversations
       },
       dailyTrend,

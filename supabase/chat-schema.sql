@@ -99,6 +99,22 @@ execute function public.handle_updated_at();
 create index if not exists conversations_business_id_idx
 on public.conversations(business_id);
 
+do $$
+begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.conversations'::regclass
+    and conname = 'conversations_source_check'
+  ) then
+    alter table public.conversations drop constraint conversations_source_check;
+  end if;
+
+  alter table public.conversations
+  add constraint conversations_source_check
+  check (source in ('dashboard_test', 'widget', 'hosted_chat'));
+end $$;
+
 create index if not exists messages_conversation_id_idx
 on public.messages(conversation_id);
 

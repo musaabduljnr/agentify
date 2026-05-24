@@ -45,6 +45,10 @@ export async function repairCurrentBusinessSetup() {
         show_branding: true,
         is_enabled: true,
         collect_leads: true,
+        hosted_chat_enabled: true,
+        hosted_chat_slug: setup.business.slug,
+        hosted_chat_title: `Chat with ${setup.business.name}`,
+        hosted_chat_description: "Ask a question, request support, or leave your details and the team will follow up.",
       });
       if (widgetError) throw widgetError;
     }

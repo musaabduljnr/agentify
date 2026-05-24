@@ -143,7 +143,7 @@ export async function getAllBusinesses() {
   // Load all businesses, including owner email, assistant, widget status, and subscription
   const { data: businesses, error } = await supabase
     .from("businesses")
-    .select("*, owner:profiles(email, full_name), assistants(id, name, is_active), widget_configs(id, is_enabled), subscriptions(*)")
+    .select("*, owner:profiles(email, full_name), assistants(id, name, tone, welcome_message, is_active), widget_configs(id, is_enabled, hosted_chat_enabled, hosted_chat_slug), subscriptions(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

@@ -109,7 +109,7 @@ export function ConversationsTable({ initialConversations }: ConversationsTableP
                       <td className="py-4 px-6 font-medium capitalize text-slate-400">
                         <span className="flex items-center gap-1.5">
                           <Globe className="w-3.5 h-3.5 text-slate-500" />
-                          {chat.metadata?.source || "widget_chat"}
+                          {(chat.source || "widget").replace("_", " ")}
                         </span>
                       </td>
                       <td className="py-4 px-6 font-mono text-slate-400 select-all">
