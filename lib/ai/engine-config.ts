@@ -33,7 +33,7 @@ export async function getActiveAIEngineSettings(): Promise<AIEngineSettings> {
         embedding_provider: "gemini",
         embedding_model: "text-embedding-004",
         fallback_provider: "openrouter",
-        fallback_chat_model: "meta-llama/llama-3.1-8b-instruct:free",
+        fallback_chat_model: "openai/gpt-oss-20b:free",
         is_active: true,
       };
     }
@@ -47,7 +47,7 @@ export async function getActiveAIEngineSettings(): Promise<AIEngineSettings> {
       embedding_provider: "gemini",
       embedding_model: "text-embedding-004",
       fallback_provider: "openrouter",
-      fallback_chat_model: "meta-llama/llama-3.1-8b-instruct:free",
+      fallback_chat_model: "openai/gpt-oss-20b:free",
       is_active: true,
     };
   }

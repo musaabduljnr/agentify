@@ -16,9 +16,11 @@ interface AISettingsFormProps {
 const PROVIDER_CHAT_MODELS: Record<string, string[]> = {
   gemini: ["gemini-2.0-flash", "gemini-1.5-flash"],
   openrouter: [
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
-    "mistralai/mistral-7b-instruct:free",
+    "openai/gpt-oss-20b:free",
+    "deepseek/deepseek-v4-flash:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "google/gemma-4-26b-a4b-it:free",
+    "openrouter/auto",
   ],
   vertex: ["gemini-2.5-flash"],
   groq: ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"],
@@ -37,7 +39,7 @@ export function AISettingsForm({ initialSettings }: AISettingsFormProps) {
   const [embeddingModel, setEmbeddingModel] = useState(initialSettings?.embedding_model || "text-embedding-004");
   
   const [fallbackProvider, setFallbackProvider] = useState(initialSettings?.fallback_provider || "openrouter");
-  const [fallbackChatModel, setFallbackChatModel] = useState(initialSettings?.fallback_chat_model || "meta-llama/llama-3.1-8b-instruct:free");
+  const [fallbackChatModel, setFallbackChatModel] = useState(initialSettings?.fallback_chat_model || "openai/gpt-oss-20b:free");
 
   const [saving, setSaving] = useState(false);
   const [testingChat, setTestingChat] = useState(false);

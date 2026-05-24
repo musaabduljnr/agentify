@@ -1,3 +1,10 @@
+const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-20b:free";
+const DEPRECATED_OPENROUTER_MODELS = new Set([
+  "meta-llama/llama-3.1-8b-instruct:free",
+  "google/gemini-2.0-flash-exp:free",
+  "mistralai/mistral-7b-instruct:free",
+]);
+
 export async function generateOpenRouterChat({
   model,
   systemInstruction,
@@ -26,16 +33,21 @@ export async function generateOpenRouterChat({
     { role: "user", content: userMessage },
   ];
 
+  const requestedModel = model || DEFAULT_OPENROUTER_MODEL;
+  const selectedModel = DEPRECATED_OPENROUTER_MODELS.has(requestedModel)
+    ? DEFAULT_OPENROUTER_MODEL
+    : requestedModel;
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://agentify.com", // Optional OpenRouter site identifier
+      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app",
       "X-Title": "Agentify AI",
     },
     body: JSON.stringify({
-      model: model || "meta-llama/llama-3.1-8b-instruct:free",
+      model: selectedModel,
       messages,
       temperature,
     }),
@@ -44,7 +56,13 @@ export async function generateOpenRouterChat({
   const data = await response.json();
 
   if (!response.ok || data.error) {
-    throw new Error(data.error?.message || data.message || "Failed to call OpenRouter API.");
+    const message = data.error?.message || data.message || "Failed to call OpenRouter API.";
+    if (/no endpoints found/i.test(message)) {
+      throw new Error(
+        `OpenRouter could not find an active endpoint for "${selectedModel}". Choose another OpenRouter model in Admin > AI Engine, or use "openai/gpt-oss-20b:free" as the default.`
+      );
+    }
+    throw new Error(message);
   }
 
   const text = data.choices?.[0]?.message?.content;

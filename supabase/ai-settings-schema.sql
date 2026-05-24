@@ -13,7 +13,7 @@ create table if not exists public.ai_engine_settings (
   embedding_model text not null default 'text-embedding-004',
   fallback_provider text default 'openrouter'
     check (fallback_provider in ('gemini', 'openrouter', 'vertex', 'groq')),
-  fallback_chat_model text default 'meta-llama/llama-3.1-8b-instruct:free',
+  fallback_chat_model text default 'openai/gpt-oss-20b:free',
   is_active boolean default true,
   metadata jsonb default '{}'::jsonb,
   created_at timestamp with time zone default now(),
@@ -79,7 +79,7 @@ select
   'gemini',
   'gemini-embedding-2',
   'openrouter',
-  'meta-llama/llama-3.1-8b-instruct:free',
+  'openai/gpt-oss-20b:free',
   true
 where not exists (
   select 1 from public.ai_engine_settings
