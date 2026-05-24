@@ -60,7 +60,7 @@ export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; s
       )}
       {result?.success && (
         <span className="text-[10px] text-emerald-500 font-medium">
-          Scraped{result.pageCount ? ` ${result.pageCount} page${result.pageCount === 1 ? "" : "s"}` : ""}
+          Scraped{result.pageCount ? ` ${result.pageCount} reachable page${result.pageCount === 1 ? "" : "s"}` : ""}
         </span>
       )}
     </div>

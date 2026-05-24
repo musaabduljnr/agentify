@@ -13,6 +13,8 @@ const MAX_CRAWL_PAGES = 15;
 const MAX_CRAWL_DEPTH = 2;
 const MAX_CRAWL_CONCURRENCY = 3;
 const MAX_TOTAL_TEXT_LENGTH = 300_000;
+const MAX_SCRIPT_ASSETS = 8;
+const MAX_SCRIPT_ASSET_SIZE = 300_000;
 const USER_AGENT =
   "Mozilla/5.0 (compatible; AgentifyBot/1.0; +https://agentify.ai)";
 
@@ -57,6 +59,11 @@ export type ScrapedPageSummary = {
   characterCount: number;
 };
 
+export type FailedScrapedPageSummary = {
+  url: string;
+  error: string;
+};
+
 export type ScrapeResult = {
   title: string;
   description: string;
@@ -65,6 +72,9 @@ export type ScrapeResult = {
   characterCount: number;
   pageCount: number;
   pages: ScrapedPageSummary[];
+  discoveredUrlCount: number;
+  failedPageCount: number;
+  failedPages: FailedScrapedPageSummary[];
 };
 
 type PageScrapeResult = ScrapedPageSummary & {
@@ -112,6 +122,222 @@ function isSameOrigin(candidateUrl: string, rootUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isUsefulScriptText(value: string): boolean {
+  const text = value.replace(/\s+/g, " ").trim();
+  const lower = text.toLowerCase();
+  const words = countWords(text);
+  const exactNoisyValues = new Set([
+    "404: this page could not be found.",
+    "description",
+    "next.metadata",
+    "next.metadataoutlet",
+    "next-size-adjust",
+    "this page could not be found.",
+    "viewport",
+  ]);
+
+  if (text.length < 4 || text.length > 260) return false;
+  if (exactNoisyValues.has(lower)) return false;
+  if (text.startsWith("/") || text.startsWith("$") || text.startsWith("#")) return false;
+  if (lower.includes("/_next/") || lower.includes(".js") || lower.includes(".css")) return false;
+  if (lower.startsWith("http://") || lower.startsWith("https://")) return false;
+  if (/[{}[\]=<>]/.test(text)) return false;
+  if (/^[a-z0-9_-]{18,}$/i.test(text)) return false;
+  if (!/[aeiou]/i.test(text)) return false;
+  if (words === 0) return false;
+
+  const noisyTerms = [
+    "absolute",
+    "animate",
+    "background",
+    "classname",
+    "duration",
+    "foreground",
+    "function",
+    "gradient",
+    "hydrate",
+    "opacity",
+    "rounded",
+    "translate",
+    "transition",
+    "webpack",
+  ];
+
+  return !noisyTerms.some((term) => lower.includes(term));
+}
+
+function decodeJsonStringValue(value: string): string {
+  try {
+    return JSON.parse(`"${value}"`);
+  } catch {
+    return value;
+  }
+}
+
+function pushUsefulText(target: string[], value: unknown): void {
+  if (typeof value !== "string") return;
+  const text = value.replace(/\s+/g, " ").trim();
+  if (isUsefulScriptText(text)) target.push(text);
+}
+
+function collectJsonText(value: unknown, target: string[]): void {
+  if (!value) return;
+
+  if (typeof value === "string") {
+    pushUsefulText(target, value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectJsonText(entry, target));
+    return;
+  }
+
+  if (typeof value === "object") {
+    Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
+      const lowerKey = key.toLowerCase();
+      if (
+        [
+          "alt",
+          "answer",
+          "articlebody",
+          "buttontext",
+          "content",
+          "description",
+          "headline",
+          "label",
+          "name",
+          "question",
+          "subtitle",
+          "text",
+          "title",
+        ].includes(lowerKey)
+      ) {
+        collectJsonText(entry, target);
+      } else if (typeof entry === "object") {
+        collectJsonText(entry, target);
+      }
+    });
+  }
+}
+
+function extractJsonLdText(script: string): string[] {
+  const textParts: string[] = [];
+
+  try {
+    collectJsonText(JSON.parse(script), textParts);
+  } catch {
+    // Invalid JSON-LD should not fail the scrape.
+  }
+
+  return textParts;
+}
+
+function extractNextFlightText(script: string): string[] {
+  const textParts: string[] = [];
+  const matches = script.matchAll(/self\.__next_f\.push\((\[[\s\S]*?\])\)/g);
+  const semanticValueRegex =
+    /"(?:alt|answer|buttonText|children|content|description|headline|label|name|question|subtitle|text|title)"\s*:\s*"((?:\\.|[^"\\])*)"/g;
+
+  for (const match of matches) {
+    try {
+      const payload = JSON.parse(match[1]);
+      const flightText = String(payload[1] || "");
+      let semanticMatch: RegExpExecArray | null;
+
+      while ((semanticMatch = semanticValueRegex.exec(flightText))) {
+        pushUsefulText(textParts, decodeJsonStringValue(semanticMatch[1]));
+      }
+    } catch {
+      // Next flight chunks are best-effort enrichment.
+    }
+  }
+
+  return textParts;
+}
+
+function extractReadableJavaScriptStrings(script: string): string[] {
+  const textParts: string[] = [];
+  const stringRegex = /(["'`])((?:\\.|(?!\1)[^\\]){4,260})\1/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = stringRegex.exec(script))) {
+    pushUsefulText(textParts, decodeJsonStringValue(match[2]));
+  }
+
+  return textParts;
+}
+
+async function fetchScriptAsset(url: string): Promise<string | null> {
+  await assertPublicHttpUrl(url);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/javascript,text/javascript,*/*",
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_SCRIPT_ASSET_SIZE) return null;
+
+    const text = await response.text();
+    if (text.length > MAX_SCRIPT_ASSET_SIZE) return null;
+
+    return text;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function extractScriptText($: cheerio.CheerioAPI, pageUrl: string, rootUrl: string): Promise<string[]> {
+  const textParts: string[] = [];
+  const scriptAssetUrls: string[] = [];
+
+  $("script").each((_, el) => {
+    const type = ($(el).attr("type") || "").toLowerCase();
+    const src = $(el).attr("src");
+    const inlineScript = $(el).text();
+
+    if (type.includes("ld+json") && inlineScript) {
+      textParts.push(...extractJsonLdText(inlineScript));
+    }
+
+    if (inlineScript.includes("self.__next_f.push")) {
+      textParts.push(...extractNextFlightText(inlineScript));
+    }
+
+    if (!src) return;
+
+    const normalized = normalizeCrawlUrl(src, pageUrl);
+    if (!normalized || !isSameOrigin(normalized, rootUrl)) return;
+
+    const pathname = new URL(normalized).pathname;
+    if (!pathname.startsWith("/_next/static/") || !pathname.endsWith(".js")) return;
+
+    scriptAssetUrls.push(normalized);
+  });
+
+  const uniqueAssetUrls = [...new Set(scriptAssetUrls)].slice(0, MAX_SCRIPT_ASSETS);
+  const scriptAssets = await Promise.all(uniqueAssetUrls.map((url) => fetchScriptAsset(url)));
+
+  for (const asset of scriptAssets) {
+    if (!asset) continue;
+    textParts.push(...extractReadableJavaScriptStrings(asset));
+  }
+
+  return [...new Set(textParts)];
 }
 
 function crawlPriority(url: string): number {
@@ -228,6 +454,7 @@ async function scrapePage(rawUrl: string, rootUrl: string): Promise<PageScrapeRe
     $('meta[property="og:description"]').attr("content")?.trim() ||
     "";
   const links = extractLinks($, url, rootUrl);
+  const scriptTextParts = await extractScriptText($, url, rootUrl);
 
   $(REMOVE_SELECTORS).remove();
 
@@ -261,6 +488,8 @@ async function scrapePage(rawUrl: string, rootUrl: string): Promise<PageScrapeRe
     const text = $(el).text().trim();
     if (text) textParts.push(text);
   });
+
+  textParts.push(...scriptTextParts);
 
   const rawText = textParts.join("\n");
   const cleanedText = cleanExtractedText(rawText);
@@ -305,31 +534,40 @@ export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
   const queued = new Set<string>([startUrl]);
   const visited = new Set<string>();
   const pages: PageScrapeResult[] = [];
-  const errors: string[] = [];
+  const errors: FailedScrapedPageSummary[] = [];
 
   while (queue.length > 0 && pages.length < MAX_CRAWL_PAGES) {
     const batch = queue.splice(0, MAX_CRAWL_CONCURRENCY);
-    const results = await Promise.allSettled(
+    const results = await Promise.all(
       batch.map(async (item) => {
         if (visited.has(item.url)) return null;
         visited.add(item.url);
-        return {
-          item,
-          page: await scrapePage(item.url, startUrl),
-        };
+
+        try {
+          return {
+            item,
+            page: await scrapePage(item.url, startUrl),
+            error: null,
+          };
+        } catch (err: unknown) {
+          return {
+            item,
+            page: null,
+            error: err instanceof Error ? err.message : "Unknown scrape error",
+          };
+        }
       })
     );
 
     for (const result of results) {
-      if (result.status === "rejected") {
-        const message = result.reason instanceof Error ? result.reason.message : "Unknown scrape error";
-        errors.push(message);
+      if (!result) continue;
+
+      if (result.error || !result.page) {
+        errors.push({ url: result.item.url, error: result.error || "Unknown scrape error" });
         continue;
       }
 
-      if (!result.value) continue;
-
-      const { item, page } = result.value;
+      const { item, page } = result;
       pages.push(page);
 
       if (pages.length >= MAX_CRAWL_PAGES || item.depth >= MAX_CRAWL_DEPTH) continue;
@@ -350,7 +588,7 @@ export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
   }
 
   if (pages.length === 0) {
-    throw new Error(errors[0] || "Could not extract meaningful text from this website.");
+    throw new Error(errors[0]?.error || "Could not extract meaningful text from this website.");
   }
 
   const combined = combinePages(pages);
@@ -372,5 +610,8 @@ export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
       wordCount,
       characterCount,
     })),
+    discoveredUrlCount: queued.size,
+    failedPageCount: errors.length,
+    failedPages: errors.slice(0, 10),
   };
 }

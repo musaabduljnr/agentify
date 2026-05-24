@@ -29,7 +29,7 @@ export function SourceMetadata({ source }: { source: KnowledgeSource }) {
         <div className="flex items-center gap-1 text-xs text-slate-500">
           <Files className="w-3 h-3" />
           <span className="font-medium">
-            {scrapedPageCount.toLocaleString()} page{scrapedPageCount === 1 ? "" : "s"}
+            {scrapedPageCount.toLocaleString()} reachable page{scrapedPageCount === 1 ? "" : "s"}
           </span>
         </div>
       )}
