@@ -304,16 +304,27 @@ export async function processWebsiteSource(sourceId: string) {
         character_count: result.characterCount,
         scraped_at: new Date().toISOString(),
         metadata: {
+          ...(source.metadata || {}),
           scraped_title: result.title,
           scraped_description: result.description,
+          scraped_page_count: result.pageCount,
+          scraped_pages: result.pages,
+          embedded: false,
+          chunk_count: 0,
         },
       })
       .eq("id", sourceId);
 
     if (updateError) return { error: updateError.message };
 
+    await supabase
+      .from("knowledge_chunks")
+      .delete()
+      .eq("source_id", sourceId)
+      .eq("business_id", business.id);
+
     revalidatePath("/dashboard/knowledge");
-    return { success: true, wordCount: result.wordCount };
+    return { success: true, wordCount: result.wordCount, pageCount: result.pageCount };
   } catch (err: any) {
     // 5. Handle errors
     await supabase

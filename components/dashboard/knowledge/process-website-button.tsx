@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Zap, RotateCcw } from "lucide-react";
+import { Loader2, RotateCcw, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { processWebsiteSource } from "@/lib/actions/knowledge";
 
 export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; status: string }) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{ success?: boolean; error?: string; pageCount?: number } | null>(null);
 
   if (status !== "pending" && status !== "failed") return null;
 
@@ -20,7 +20,7 @@ export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; s
     if (res.error) {
       setResult({ error: res.error });
     } else {
-      setResult({ success: true });
+      setResult({ success: true, pageCount: res.pageCount });
     }
     setLoading(false);
   };
@@ -59,7 +59,9 @@ export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; s
         <span className="text-[10px] text-red-500 font-medium max-w-[180px] truncate">{result.error}</span>
       )}
       {result?.success && (
-        <span className="text-[10px] text-emerald-500 font-medium">✓ Scraped!</span>
+        <span className="text-[10px] text-emerald-500 font-medium">
+          Scraped{result.pageCount ? ` ${result.pageCount} page${result.pageCount === 1 ? "" : "s"}` : ""}
+        </span>
       )}
     </div>
   );

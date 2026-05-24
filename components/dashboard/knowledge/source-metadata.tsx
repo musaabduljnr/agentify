@@ -1,12 +1,13 @@
 "use client";
 
-import { Clock, Hash, Type } from "lucide-react";
+import { Clock, Files, Hash, Type } from "lucide-react";
 import type { KnowledgeSource } from "@/lib/types";
 
 export function SourceMetadata({ source }: { source: KnowledgeSource }) {
   const meta = source.metadata as Record<string, any> | null;
   const wordCount = (source as any).word_count;
   const scrapedAt = (source as any).scraped_at;
+  const scrapedPageCount = Number(meta?.scraped_page_count || 0);
 
   if (!wordCount && !scrapedAt) return null;
 
@@ -22,6 +23,14 @@ export function SourceMetadata({ source }: { source: KnowledgeSource }) {
         <div className="flex items-center gap-1 text-xs text-slate-500">
           <Clock className="w-3 h-3" />
           <span className="font-medium">Scraped {new Date(scrapedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>
+        </div>
+      )}
+      {scrapedPageCount > 0 && (
+        <div className="flex items-center gap-1 text-xs text-slate-500">
+          <Files className="w-3 h-3" />
+          <span className="font-medium">
+            {scrapedPageCount.toLocaleString()} page{scrapedPageCount === 1 ? "" : "s"}
+          </span>
         </div>
       )}
       {meta?.scraped_title && (
