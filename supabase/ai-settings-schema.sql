@@ -7,10 +7,10 @@ create table if not exists public.ai_engine_settings (
   id uuid primary key default gen_random_uuid(),
   provider text not null default 'gemini'
     check (provider in ('gemini', 'openrouter', 'vertex', 'groq')),
-  chat_model text not null default 'gemini-1.5-flash',
+  chat_model text not null default 'gemini-2.5-flash',
   embedding_provider text not null default 'gemini'
     check (embedding_provider in ('gemini', 'vertex')),
-  embedding_model text not null default 'text-embedding-004',
+  embedding_model text not null default 'gemini-embedding-001',
   fallback_provider text default 'openrouter'
     check (fallback_provider in ('gemini', 'openrouter', 'vertex', 'groq')),
   fallback_chat_model text default 'openai/gpt-oss-20b:free',
@@ -75,9 +75,9 @@ insert into public.ai_engine_settings (
 )
 select
   'gemini',
-  'gemini-1.5-flash',
+  'gemini-2.5-flash',
   'gemini',
-  'gemini-embedding-2',
+  'gemini-embedding-001',
   'openrouter',
   'openai/gpt-oss-20b:free',
   true

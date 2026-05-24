@@ -14,7 +14,7 @@ interface AISettingsFormProps {
 }
 
 const PROVIDER_CHAT_MODELS: Record<string, string[]> = {
-  gemini: ["gemini-1.5-flash", "gemini-2.0-flash"],
+  gemini: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"],
   openrouter: [
     "openai/gpt-oss-20b:free",
     "deepseek/deepseek-v4-flash:free",
@@ -27,16 +27,16 @@ const PROVIDER_CHAT_MODELS: Record<string, string[]> = {
 };
 
 const PROVIDER_EMBEDDING_MODELS: Record<string, string[]> = {
-  gemini: ["text-embedding-004"],
+  gemini: ["gemini-embedding-001"],
   vertex: ["text-embedding-004"],
 };
 
 export function AISettingsForm({ initialSettings }: AISettingsFormProps) {
   const [provider, setProvider] = useState(initialSettings?.provider || "gemini");
-  const [chatModel, setChatModel] = useState(initialSettings?.chat_model || "gemini-1.5-flash");
+  const [chatModel, setChatModel] = useState(initialSettings?.chat_model || "gemini-2.5-flash");
   
   const [embeddingProvider, setEmbeddingProvider] = useState(initialSettings?.embedding_provider || "gemini");
-  const [embeddingModel, setEmbeddingModel] = useState(initialSettings?.embedding_model || "text-embedding-004");
+  const [embeddingModel, setEmbeddingModel] = useState(initialSettings?.embedding_model || "gemini-embedding-001");
   
   const [fallbackProvider, setFallbackProvider] = useState(initialSettings?.fallback_provider || "openrouter");
   const [fallbackChatModel, setFallbackChatModel] = useState(initialSettings?.fallback_chat_model || "openai/gpt-oss-20b:free");

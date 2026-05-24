@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
-const DEFAULT_GEMINI_CHAT_MODEL = "gemini-1.5-flash";
-const GEMINI_CHAT_FALLBACK_MODELS = ["gemini-1.5-flash"];
+const DEFAULT_GEMINI_CHAT_MODEL = "gemini-2.5-flash";
+const GEMINI_CHAT_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
 
 function isGeminiQuotaError(error: any): boolean {
   if (!error) return false;
@@ -122,7 +122,7 @@ export async function generateGeminiEmbedding({
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.embedContent({
-    model: model || "text-embedding-004",
+    model: model || "gemini-embedding-001",
     contents: text,
     config: {
       outputDimensionality: 768,

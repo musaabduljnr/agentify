@@ -23,7 +23,7 @@ export async function generateGeminiResponse({
   const config = await getChatProviderConfig();
   
   const primaryProvider = config.provider || "gemini";
-  const primaryModel = config.model || "gemini-2.0-flash";
+  const primaryModel = config.model || "gemini-2.5-flash";
 
   console.log(
     `[AI Engine] Routing chat generation to primary provider: ${primaryProvider} (${primaryModel})`

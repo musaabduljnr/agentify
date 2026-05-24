@@ -9,7 +9,7 @@ import { generateVertexEmbedding } from "@/lib/ai/providers/vertex";
 export async function generateEmbedding(text: string): Promise<number[]> {
   const config = await getEmbeddingProviderConfig();
   const provider = config.provider || "gemini";
-  const model = config.model || "text-embedding-004";
+  const model = config.model || "gemini-embedding-001";
 
   console.log(
     `[AI Engine] Routing embedding generation request to: ${provider} (${model})`

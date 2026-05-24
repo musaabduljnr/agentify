@@ -29,9 +29,9 @@ export async function getActiveAIEngineSettings(): Promise<AIEngineSettings> {
       // Safe fallback if table is empty or query errors
       return {
         provider: "gemini",
-        chat_model: "gemini-1.5-flash",
+        chat_model: "gemini-2.5-flash",
         embedding_provider: "gemini",
-        embedding_model: "text-embedding-004",
+        embedding_model: "gemini-embedding-001",
         fallback_provider: "openrouter",
         fallback_chat_model: "openai/gpt-oss-20b:free",
         is_active: true,
@@ -43,9 +43,9 @@ export async function getActiveAIEngineSettings(): Promise<AIEngineSettings> {
     console.error("getActiveAIEngineSettings error:", error);
     return {
       provider: "gemini",
-      chat_model: "gemini-1.5-flash",
+      chat_model: "gemini-2.5-flash",
       embedding_provider: "gemini",
-      embedding_model: "text-embedding-004",
+      embedding_model: "gemini-embedding-001",
       fallback_provider: "openrouter",
       fallback_chat_model: "openai/gpt-oss-20b:free",
       is_active: true,
