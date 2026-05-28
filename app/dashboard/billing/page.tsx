@@ -478,7 +478,7 @@ export default async function BillingPage({
 
         {history && history.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-widest">
                   <th className="py-4 px-4">Date</th>

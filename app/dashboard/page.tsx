@@ -143,7 +143,7 @@ export default async function DashboardOverview() {
             </div>
             <div className="overflow-x-auto">
               {recentConversations.length > 0 ? (
-                <table className="w-full text-left">
+                <table className="w-full text-left min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       <th className="px-6 py-4">Visitor</th>

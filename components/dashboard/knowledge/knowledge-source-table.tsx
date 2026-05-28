@@ -49,7 +49,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-slate-100">
               <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Title</th>
