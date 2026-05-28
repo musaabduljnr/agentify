@@ -33,8 +33,8 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
   const criticalCount = notifications.filter((item) => item.level === "critical").length;
 
   return (
-    <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-10">
-      <div className="flex items-center gap-4">
+    <header className="min-h-20 bg-white border-b border-slate-200 flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
+      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <button 
           className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-xl"
           onClick={onMenuClick}
@@ -42,7 +42,7 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
           <Menu className="w-6 h-6" />
         </button>
         
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex min-w-0 items-center gap-4 xl:gap-6">
           <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
             <Building2 className="w-4 h-4 text-slate-400" />
             <span className="text-xs font-bold text-slate-700 truncate max-w-[150px]">
@@ -59,7 +59,7 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-2 sm:gap-4">
         <div className="relative">
           <button
             onClick={() => setOpen((value) => !value)}
@@ -79,7 +79,7 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
           </button>
 
           {open && (
-            <div className="absolute right-0 top-12 z-50 w-[340px] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="absolute right-0 top-12 z-50 w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
               <div className="border-b border-slate-100 p-4">
                 <p className="text-sm font-extrabold text-slate-900">Notifications</p>
                 <p className="text-xs text-slate-500">Important business and account updates.</p>
@@ -103,9 +103,9 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
                       <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${levelStyles[notification.level]}`}>
                         <NotificationIcon level={notification.level} />
                       </span>
-                      <span>
-                        <span className="block text-sm font-bold text-slate-900">{notification.title}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{notification.message}</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-bold text-slate-900 break-words">{notification.title}</span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-slate-500 break-words">{notification.message}</span>
                       </span>
                     </Link>
                   ))
@@ -115,12 +115,12 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
           )}
         </div>
         
-        <div className="h-10 w-[1px] bg-slate-200 mx-2"></div>
+        <div className="hidden h-10 w-[1px] bg-slate-200 mx-2 sm:block"></div>
         
         <div className="flex items-center gap-3 pl-2">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-slate-900">{displayName}</p>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <div className="hidden max-w-[180px] text-right sm:block">
+            <p className="truncate text-sm font-bold text-slate-900">{displayName}</p>
+            <p className="truncate text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               {user?.email}
             </p>
           </div>

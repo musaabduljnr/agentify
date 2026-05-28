@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Filter, User as UserIcon, Bot, MessageSquare } from "lucide-react";
+import { Search, Filter, User as UserIcon, Bot, MessageSquare, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewingDetail, setViewingDetail] = useState(false);
 
   const filteredConversations = initialConversations.filter(c => 
     c.visitor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -88,7 +89,10 @@ export function ConversationManager({ initialConversations }: { initialConversat
                 return (
                   <div 
                     key={convo.id} 
-                    onClick={() => setSelectedId(convo.id)}
+                    onClick={() => {
+                      setSelectedId(convo.id);
+                      setViewingDetail(true);
+                    }}
                     className={cn(
                       "p-5 hover:bg-slate-50 transition-all cursor-pointer group relative",
                       isActive ? "bg-indigo-50/50" : ""
@@ -135,16 +139,24 @@ export function ConversationManager({ initialConversations }: { initialConversat
         ) : (
           <>
             <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+              <div className="flex items-center gap-3 min-w-0">
+                <button 
+                  type="button"
+                  onClick={() => setViewingDetail(false)}
+                  className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-xl mr-1 shrink-0"
+                  aria-label="Back to list"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                   <UserIcon className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">{selectedConversation.visitor_name || "Anonymous Visitor"}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedConversation.visitor_email || "No email"}</span>
-                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedConversation.status}</span>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-slate-900 text-sm truncate">{selectedConversation.visitor_name || "Anonymous Visitor"}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[120px]">{selectedConversation.visitor_email || "No email"}</span>
+                    <span className="w-1 h-1 bg-slate-300 rounded-full shrink-0"></span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest shrink-0">{selectedConversation.status}</span>
                   </div>
                 </div>
               </div>

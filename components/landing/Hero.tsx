@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Bot, Sparkles, Zap, Shield } from "lucide-react";
+import Link from "next/link";
 
 export function Hero() {
   return (
@@ -18,12 +19,16 @@ export function Hero() {
               Create a custom AI assistant trained on your business data. Embed it on your site in minutes and start converting visitors into leads automatically.
             </p>
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-              <Button size="lg" className="rounded-full px-8 h-14 text-lg">
-                Start free trial
-              </Button>
-              <Button size="lg" variant="outline" className="rounded-full px-8 h-14 text-lg border-slate-300 bg-white text-slate-900 hover:bg-slate-50">
-                View demo
-              </Button>
+              <Link href="/signup" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto rounded-full px-8 h-14 text-lg">
+                  Start free trial
+                </Button>
+              </Link>
+              <Link href="/demo" className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-full px-8 h-14 text-lg border-slate-300 bg-white text-slate-900 hover:bg-slate-50">
+                  View demo
+                </Button>
+              </Link>
             </div>
             
             <div className="mt-10 flex items-center gap-8 justify-center lg:justify-start grayscale opacity-60">
@@ -84,8 +89,7 @@ export function Hero() {
               </div>
             </div>
             
-            {/* Background elements */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-indigo-50 rounded-full blur-3xl -z-10 opacity-50"></div>
+            <div className="absolute inset-8 -z-10 rounded-3xl bg-indigo-50/70"></div>
           </div>
         </div>
       </div>

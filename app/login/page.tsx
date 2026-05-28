@@ -46,7 +46,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-200 p-10">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-10">
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
             <Bot className="w-10 h-10 text-indigo-600" />

@@ -10,10 +10,30 @@
   --foreground: #0f172a;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+* {
+  min-width: 0;
+}
+
+p,
+span,
+a,
+td,
+th,
+li,
+code,
+pre {
+  overflow-wrap: anywhere;
 }
 
 h1, h2, h3, h4, h5, h6 {

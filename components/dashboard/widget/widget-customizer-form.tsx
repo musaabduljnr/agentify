@@ -100,16 +100,16 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
 
   return (
     <>
-      <div className="mb-10 flex items-center justify-between">
+      <div className="mb-6 sm:mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Widget Customizer</h1>
-          <p className="text-slate-500">Style your chat widget to perfectly match your brand.</p>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-2">Widget Customizer</h1>
+          <p className="text-slate-500 text-sm">Style your chat widget to perfectly match your brand.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <Button 
             variant="outline" 
             onClick={handleReset}
-            className="rounded-2xl h-12 px-6 flex items-center gap-2 font-bold border-2 border-slate-200"
+            className="rounded-2xl h-10 sm:h-12 px-4 sm:px-6 flex items-center gap-2 font-bold border-2 border-slate-200 text-sm"
           >
             <Undo className="w-4 h-4" />
             Reset
@@ -117,7 +117,7 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
           <Button 
             disabled={isSaving}
             onClick={handleSave}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 px-6 flex items-center gap-2 font-bold"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-10 sm:h-12 px-4 sm:px-6 flex items-center gap-2 font-bold text-sm"
           >
             {isSaving ? "Saving..." : (
               <>
@@ -131,8 +131,8 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         {/* Left: Customization Options */}
-        <div className="lg:col-span-7 space-y-8">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+        <div className="lg:col-span-7 space-y-6 sm:space-y-8">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-8">
             <h3 className="text-lg font-bold text-slate-900 mb-8 flex items-center gap-2">
               <Palette className="w-5 h-5 text-indigo-600" />
               Look & Feel
@@ -223,7 +223,7 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-8">
             <h3 className="text-lg font-bold text-slate-900 mb-8 flex items-center gap-2">
               <Share2 className="w-5 h-5 text-indigo-600" />
               Hosted Chat Link
@@ -319,7 +319,7 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-8">
             <h3 className="text-lg font-bold text-slate-900 mb-8 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-indigo-600" />
               Chat Content
@@ -377,8 +377,8 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
           </div>
         </div>
 
-        {/* Right: Preview */}
-        <div className="lg:col-span-5 relative">
+        {/* Right: Preview (hidden on mobile, visible on lg+) */}
+        <div className="hidden lg:block lg:col-span-5 relative">
           <div className="sticky top-10">
             <div className={`bg-slate-100 rounded-3xl p-10 min-h-[600px] flex items-end border-2 border-slate-200 border-dashed ${config.position === 'bottom-right' ? 'justify-end' : 'justify-start'}`}>
               {/* Actual Widget Preview */}

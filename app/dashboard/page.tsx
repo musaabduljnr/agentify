@@ -180,15 +180,15 @@ export default async function DashboardOverview() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 flex items-center gap-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
               <TrendingUp className="w-8 h-8" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-slate-900 mb-1">Scale your business with more leads</h3>
               <p className="text-sm text-slate-500">Your AI assistant is working 24/7 to capture leads and answer customer questions.</p>
             </div>
-            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-6">
+            <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl px-6 w-full sm:w-auto shrink-0 justify-center">
               <Link href="/dashboard/leads">View Leads</Link>
             </Button>
           </div>

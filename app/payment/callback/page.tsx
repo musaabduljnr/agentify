@@ -74,7 +74,7 @@ function CallbackContent() {
               </div>
               <h2 className="text-2xl font-extrabold text-slate-900 mb-2">Verifying Payment</h2>
               <p className="text-slate-500 text-sm leading-relaxed">{message}</p>
-              <div className="mt-8 text-xs text-slate-400 font-medium bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 truncate max-w-full">
+              <div className="mt-8 text-xs text-slate-400 font-medium bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 break-all max-w-full">
                 Ref: {reference || "None"}
               </div>
             </>

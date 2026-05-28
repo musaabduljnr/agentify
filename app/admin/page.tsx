@@ -76,7 +76,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Grid of 8 Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatCard
           title="Total Users"
           value={stats.totalUsers.toLocaleString()}
@@ -168,8 +168,8 @@ export default async function AdminOverviewPage() {
                     });
                     return (
                       <tr key={b.id} className="text-slate-300 hover:bg-slate-900/40">
-                        <td className="py-3 font-semibold text-white">{b.name}</td>
-                        <td className="py-3 text-slate-400">{b.owner?.email || "—"}</td>
+                        <td className="py-3 font-semibold text-white truncate max-w-[120px]">{b.name}</td>
+                        <td className="py-3 text-slate-400 truncate max-w-[150px]">{b.owner?.email || "—"}</td>
                         <td className="py-3 text-right font-medium">{regDate}</td>
                       </tr>
                     );
@@ -207,7 +207,7 @@ export default async function AdminOverviewPage() {
                 <tbody className="divide-y divide-slate-900">
                   {stats.recentPayments.map((p: any) => (
                     <tr key={p.id} className="text-slate-300 hover:bg-slate-900/40">
-                      <td className="py-3 font-mono text-slate-400 select-all">{p.reference.substring(0, 15)}...</td>
+                      <td className="py-3 font-mono text-slate-400 select-all truncate max-w-[100px]">{p.reference.substring(0, 15)}...</td>
                       <td className="py-3 font-bold text-white">₦{p.amount.toLocaleString()}</td>
                       <td className="py-3 text-right">
                         <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest bg-emerald-950 border border-emerald-900 text-emerald-400">
@@ -250,10 +250,10 @@ export default async function AdminOverviewPage() {
                   {stats.recentLeads.map((l: any) => (
                     <tr key={l.id} className="text-slate-300 hover:bg-slate-900/40">
                       <td className="py-3">
-                        <p className="font-semibold text-white">{l.name || "Anonymous"}</p>
-                        <p className="text-[10px] text-slate-500">{l.email}</p>
+                        <p className="font-semibold text-white truncate max-w-[100px]">{l.name || "Anonymous"}</p>
+                        <p className="text-[10px] text-slate-500 truncate max-w-[100px]">{l.email}</p>
                       </td>
-                      <td className="py-3 text-slate-400">{l.businesses?.name}</td>
+                      <td className="py-3 text-slate-400 truncate max-w-[100px]">{l.businesses?.name}</td>
                       <td className="py-3 text-right">
                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
                           l.buying_intent === "high"
@@ -300,7 +300,7 @@ export default async function AdminOverviewPage() {
                 <tbody className="divide-y divide-slate-900">
                   {stats.highUsageBusinesses.map((s: any) => (
                     <tr key={s.id} className="text-slate-300 hover:bg-slate-900/40">
-                      <td className="py-3 font-semibold text-white">{s.businesses?.name}</td>
+                      <td className="py-3 font-semibold text-white truncate max-w-[120px]">{s.businesses?.name}</td>
                       <td className="py-3 capitalize text-slate-400">{s.plan.replace("_", " ")}</td>
                       <td className="py-3 text-right font-bold text-indigo-400">{s.current_usage.toLocaleString()} / {s.message_limit.toLocaleString()}</td>
                     </tr>

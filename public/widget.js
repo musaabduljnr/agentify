@@ -37,6 +37,7 @@
         ${config.position === "bottom-left" ? "left: 20px;" : "right: 20px;"}
         z-index: 999999;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        max-width: calc(100vw - 24px);
       }
       .agentify-bubble {
         width: 60px;
@@ -64,7 +65,8 @@
         ${config.position === "bottom-left" ? "left: 0;" : "right: 0;"}
         width: 380px;
         height: 600px;
-        max-height: calc(100vh - 120px);
+        max-width: calc(100vw - 24px);
+        max-height: calc(100vh - 80px);
         background: white;
         border-radius: 16px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
@@ -87,6 +89,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
+        min-width: 0;
       }
       .agentify-avatar {
         width: 40px;
@@ -115,10 +118,13 @@
       }
       .agentify-message {
         max-width: 80%;
+        min-width: 0;
         padding: 10px 14px;
         border-radius: 12px;
         font-size: 14px;
         line-height: 1.5;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
       }
       .agentify-message.user {
         align-self: flex-end;
@@ -144,6 +150,7 @@
       }
       .agentify-input {
         flex: 1;
+        min-width: 0;
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         padding: 8px 12px;
@@ -188,9 +195,18 @@
         color: #475569;
         cursor: pointer;
         transition: all 0.2s;
+        overflow-wrap: anywhere;
       }
       .agentify-suggested-item:hover {
         background: #e2e8f0;
+      }
+      .agentify-assistant-name {
+        font-weight: bold;
+        font-size: 16px;
+        max-width: 240px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .agentify-loading {
         display: flex;
@@ -211,9 +227,30 @@
         40% { transform: scale(1.0); }
       }
       @media (max-width: 480px) {
+        .agentify-widget-container {
+          bottom: 12px;
+          left: 12px;
+          right: 12px;
+          display: flex;
+          justify-content: ${config.position === "bottom-left" ? "flex-start" : "flex-end"};
+        }
         .agentify-panel {
-          width: calc(100vw - 40px);
-          height: calc(100vh - 100px);
+          position: fixed;
+          left: 12px;
+          right: 12px;
+          bottom: 76px;
+          width: calc(100vw - 24px);
+          height: calc(100vh - 92px);
+          max-height: 520px;
+        }
+        .agentify-header,
+        .agentify-messages,
+        .agentify-footer {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+        .agentify-assistant-name {
+          max-width: calc(100vw - 150px);
         }
       }
     `;
@@ -238,7 +275,7 @@
             ${config.avatarUrl ? `<img src="${config.avatarUrl}" />` : config.assistantName[0]}
           </div>
           <div>
-            <div style="font-weight: bold; font-size: 16px;">${config.assistantName}</div>
+            <div class="agentify-assistant-name">${config.assistantName}</div>
             <div style="font-size: 12px; opacity: 0.8;">Online</div>
           </div>
         </div>

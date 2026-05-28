@@ -1,5 +1,6 @@
 // app/api/admin/email-config/route.ts
 import { requireAdmin } from "@/lib/admin/require-admin";
+import { logErrorSync } from "@/lib/monitoring/log-error";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
       { status: 501 }
     );
   } catch (err) {
-    console.error(err);
+    logErrorSync(err, "email-config");
     return NextResponse.json({ success: false, error: "Invalid payload" }, { status: 400 });
   }
 }

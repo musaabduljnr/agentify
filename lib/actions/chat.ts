@@ -16,6 +16,7 @@ import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
 import { requireActiveSubscription } from "@/lib/billing/subscription";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
+import { sendLeadNotificationEmail, sendUsageWarningEmail } from "@/lib/email/resend";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -153,7 +154,7 @@ export async function runBusinessChat({
 }) {
   const supabase = createServiceClient();
 
-  // 0. Enforce subscription & message limits
+  // 0. Enforce subscription and load business context.
   try {
     await requireActiveSubscription(businessId);
   } catch (e: any) {
@@ -166,9 +167,25 @@ export async function runBusinessChat({
     };
   }
 
+  const { data: business, error: bErr } = await supabase
+    .from("businesses")
+    .select("*")
+    .eq("id", businessId)
+    .single();
+  
+  if (bErr || !business) throw new Error("Business not found");
+
   const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
   const usageCheck = await checkUsageLimit(businessId, usageType);
   if (!usageCheck.allowed) {
+    await sendUsageWarningEmail({
+      to: business.contact_email,
+      businessId,
+      label: "AI messages",
+      used: usageCheck.used,
+      limit: usageCheck.limit,
+    });
+
     return {
       success: false,
       conversationId: conversationId || "",
@@ -177,15 +194,6 @@ export async function runBusinessChat({
       limitReached: true,
     };
   }
-
-  // 1. Fetch business and assistant
-  const { data: business, error: bErr } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("id", businessId)
-    .single();
-  
-  if (bErr || !business) throw new Error("Business not found");
 
   const { data: assistant, error: aErr } = await supabase
     .from("assistants")
@@ -277,8 +285,19 @@ export async function runBusinessChat({
         // Don't block chat, just add metadata note
         metadata.lead_limit_reached = true;
       } else {
-        await supabase.from("leads").insert(leadUpdate);
-        await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
+        const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
+        if (!leadInsertError) {
+          await sendLeadNotificationEmail({
+            to: business.contact_email,
+            businessId,
+            businessName: business.name,
+            leadName: extractedInfo.name,
+            leadEmail: extractedInfo.email,
+            leadPhone: extractedInfo.phone,
+            interest: intentType !== "general_inquiry" ? requestedAction : null,
+          });
+          await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
+        }
       }
     }
 
@@ -342,11 +361,7 @@ export async function runBusinessChat({
     if (rpcError) throw new Error(`Knowledge search failed: ${rpcError.message}`);
     matchedChunks = data || [];
   } catch (knowledgeError: any) {
-    console.warn(
-      `[Knowledge Search Warning] Continuing chat without retrieved context: ${
-        knowledgeError.message || JSON.stringify(knowledgeError)
-      }`
-    );
+    logErrorSync(knowledgeError, "embedding-generation", { businessId });
   }
 
   // 5. Fetch Conversation History

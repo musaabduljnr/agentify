@@ -1,37 +1,42 @@
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const plans = [
   {
     name: "Free Trial",
-    price: "$0",
+    price: "Free",
     description: "Perfect for exploring the platform",
-    features: ["1 AI Assistant", "50 messages/mo", "Website scraping", "Basic customization"],
+    features: ["1 AI Assistant", "100 messages/mo", "Website scraping", "Hosted chat"],
     buttonText: "Start Trial",
+    href: "/signup",
     popular: false,
   },
   {
     name: "Starter",
-    price: "$29",
+    price: "NGN 5,000",
     description: "Great for small businesses",
-    features: ["1 AI Assistant", "500 messages/mo", "Lead capture", "Advanced customization", "Email support"],
+    features: ["1 AI Assistant", "5,000 messages/mo", "Lead capture", "Remove branding", "Email support"],
     buttonText: "Get Started",
+    href: "/signup",
     popular: true,
   },
   {
-    name: "Pro",
-    price: "$79",
+    name: "Growth",
+    price: "NGN 15,000",
     description: "For growing companies",
-    features: ["3 AI Assistants", "2,500 messages/mo", "Human fallback", "API Access", "Priority support"],
-    buttonText: "Go Pro",
+    features: ["3 AI Assistants", "25,000 messages/mo", "100 knowledge sources", "Custom domain", "Priority support"],
+    buttonText: "Choose Growth",
+    href: "/signup",
     popular: false,
   },
   {
-    name: "Agency",
-    price: "$199",
+    name: "Enterprise",
+    price: "Custom",
     description: "For agencies and enterprises",
-    features: ["Unlimited Assistants", "10,000 messages/mo", "White-labeling", "Dedicated manager", "Custom training"],
+    features: ["Unlimited Assistants", "Unlimited messages", "Custom integrations", "Dedicated support", "SLA guarantee"],
     buttonText: "Contact Us",
+    href: "mailto:support@agentify.app",
     popular: false,
   },
 ];
@@ -66,7 +71,7 @@ export function Pricing() {
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-4xl font-bold text-slate-900">{plan.price}</span>
-                  <span className="text-slate-500">/mo</span>
+                  {plan.price !== "Free" && plan.price !== "Custom" ? <span className="text-slate-500">/mo</span> : null}
                 </div>
                 <p className="text-sm text-slate-500">{plan.description}</p>
               </div>
@@ -80,12 +85,14 @@ export function Pricing() {
                 ))}
               </ul>
               
-              <Button 
-                variant={plan.popular ? "default" : "outline"} 
-                className={`w-full rounded-full ${plan.popular ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
-              >
-                {plan.buttonText}
-              </Button>
+              <Link href={plan.href}>
+                <Button
+                  variant={plan.popular ? "default" : "outline"}
+                  className={`w-full rounded-full ${plan.popular ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
+                >
+                  {plan.buttonText}
+                </Button>
+              </Link>
             </div>
           ))}
         </div>

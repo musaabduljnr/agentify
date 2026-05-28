@@ -38,7 +38,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="relative flex items-end gap-2 rounded-xl border bg-background p-2 shadow-lg ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+      className="relative flex min-w-0 items-end gap-2 rounded-xl border bg-background p-2 shadow-lg ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
     >
       <Textarea
         ref={textareaRef}
@@ -47,7 +47,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="min-h-[44px] w-full resize-none border-0 bg-transparent py-3 focus-visible:ring-0 focus-visible:ring-offset-0"
+        className="min-h-[44px] w-full min-w-0 resize-none border-0 bg-transparent py-3 focus-visible:ring-0 focus-visible:ring-offset-0"
       />
       <Button
         type="submit"

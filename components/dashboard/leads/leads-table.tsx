@@ -189,22 +189,22 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
 
       {/* Lead Detail Modal - Simplified for brevity but functional */}
       {selectedLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-t-[2.5rem] sm:rounded-[2.5rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] sm:max-h-[85vh] flex flex-col">
+            <div className="p-5 sm:p-8 border-b border-slate-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-[1.25rem] bg-indigo-600 text-white flex items-center justify-center text-xl font-bold shadow-lg shadow-indigo-200">
                   {(selectedLead.name || "A").split(' ').map(n => n[0]).join('')}
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">{selectedLead.name || "Anonymous Lead"}</h2>
+                  <h2 className="text-lg sm:text-2xl font-black text-slate-900 truncate">{selectedLead.name || "Anonymous Lead"}</h2>
                   <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Lead ID: {selectedLead.id.slice(0, 8)}</p>
                 </div>
               </div>
               <Button variant="ghost" className="rounded-2xl" onClick={() => setSelectedLead(null)}>Close</Button>
             </div>
             
-            <div className="p-8 grid grid-cols-2 gap-8">
+            <div className="p-5 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 overflow-y-auto flex-1">
               <div className="space-y-6">
                 <div>
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Contact Details</h4>
@@ -270,7 +270,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
               </div>
             </div>
 
-            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+            <div className="p-5 sm:p-8 bg-slate-50 border-t border-slate-100 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-4">
                 <Button 
                   variant="outline" 
@@ -289,7 +289,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
                   Delete
                 </Button>
               </div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center sm:text-right">
                 Captured {format(new Date(selectedLead.created_at), "MMM d, yyyy")} via {selectedLead.source}
               </div>
             </div>

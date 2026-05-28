@@ -77,10 +77,10 @@ export function Sidebar({ isOpen, setIsOpen, subscription }: SidebarProps) {
       )}
 
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto",
+        "fixed inset-y-0 left-0 z-50 w-[min(18rem,calc(100vw-2rem))] bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:w-72 lg:translate-x-0 lg:static lg:inset-auto",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="h-full flex flex-col p-6">
+        <div className="h-full overflow-y-auto flex flex-col p-4 sm:p-6">
           <div className="flex items-center justify-between mb-10">
             <Link href="/" className="flex items-center gap-2">
               <Bot className="w-8 h-8 text-indigo-600" />
@@ -122,7 +122,7 @@ export function Sidebar({ isOpen, setIsOpen, subscription }: SidebarProps) {
           </nav>
 
           <div className="mt-auto pt-6">
-            <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
+            <div className="bg-slate-50 rounded-3xl p-4 sm:p-6 border border-slate-100">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current Plan</span>
                 <span className={cn(

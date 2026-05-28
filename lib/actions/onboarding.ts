@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
+import { sendWelcomeEmail } from "@/lib/email/resend";
+import { logErrorSync } from "@/lib/monitoring/log-error";
 
 const onboardingSchema = z.object({
   businessName: z.string().min(2, "Business name is required"),
@@ -193,10 +195,16 @@ Your goal is to help visitors and collect leads.`,
 
     revalidatePath("/", "layout");
     revalidatePath("/dashboard", "layout");
+
+    await sendWelcomeEmail({
+      to: setup.user.email || data.contactEmail,
+      name: setup.user.user_metadata?.full_name || data.businessName,
+      userId: setup.user.id,
+    });
     
     return { success: true };
   } catch (error: any) {
-    console.error("Onboarding error:", error);
+    logErrorSync(error, "onboarding");
     return { error: error.message || "Failed to complete onboarding" };
   }
 }

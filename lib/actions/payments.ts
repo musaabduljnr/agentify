@@ -15,13 +15,14 @@ import {
 } from "@/lib/billing/platform";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
+import { sendPaymentEmail } from "@/lib/email/resend";
 
 function getAppBaseUrl(): string {
   const configuredUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "http://localhost:3000";
+    "https://agentify.app";
 
   const trimmedUrl = configuredUrl.trim().replace(/\/+$/, "");
   if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
@@ -94,8 +95,10 @@ export async function createCheckoutSession(
     if (provider === "paystack") {
       const planCode = planConfig.paystack_plan_code;
       if (!planCode) {
-        console.warn(
-          `[Paystack Warning] No paystack_plan_code configured for plan "${plan}". Falling back to one-time transaction checkout.`
+        logErrorSync(
+          new Error(`No paystack_plan_code configured for plan "${plan}". Falling back to one-time transaction checkout.`),
+          "payment-checkout",
+          { businessId: business.id, userId: user.id }
         );
       }
 
@@ -146,7 +149,7 @@ export async function createCheckoutSession(
       });
 
     if (insertError) {
-      console.error("Failed to record transaction in database:", insertError);
+      logErrorSync(insertError, "payment-checkout", { businessId: business.id, userId: user.id });
       return { error: "Failed to record payment transaction record." };
     }
 
@@ -188,7 +191,7 @@ export async function verifyPaymentReference(reference: string) {
     // Verify ownership of the business
     const { data: business } = await serviceClient
       .from("businesses")
-      .select("owner_id")
+      .select("owner_id, contact_email")
       .eq("id", transaction.business_id)
       .single();
 
@@ -265,6 +268,15 @@ export async function verifyPaymentReference(reference: string) {
 
       if (subError) throw subError;
 
+      await sendPaymentEmail({
+        to: user.email || business.contact_email,
+        businessId: transaction.business_id,
+        userId: user.id,
+        planName: String(transaction.plan),
+        status: "success",
+        amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
+      });
+
       revalidatePath("/dashboard/billing");
       return { success: true, plan: transaction.plan };
     } else {
@@ -279,6 +291,15 @@ export async function verifyPaymentReference(reference: string) {
           },
         })
         .eq("id", transaction.id);
+
+      await sendPaymentEmail({
+        to: user.email || business.contact_email,
+        businessId: transaction.business_id,
+        userId: user.id,
+        planName: String(transaction.plan),
+        status: "failed",
+        amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
+      });
 
       return { error: "Payment verification failed." };
     }
@@ -317,7 +338,7 @@ export async function getPaymentHistory() {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error("getPaymentHistory error:", error);
+    logErrorSync(error, "payment-history");
     return [];
   }
 }

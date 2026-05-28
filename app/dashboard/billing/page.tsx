@@ -195,7 +195,7 @@ export default async function BillingPage({
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 relative z-10">
               <div>
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                   <h3 className="text-xl font-bold text-slate-900">
                     {currentPlan.name} Plan
                   </h3>
@@ -367,7 +367,7 @@ export default async function BillingPage({
             Compare Plans
           </h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {plans.map((plan) => (
             <div
               key={plan.id}
@@ -505,7 +505,7 @@ export default async function BillingPage({
                         {tx.currency === "NGN" ? `₦${tx.amount.toLocaleString()}` : `${tx.currency} ${tx.amount}`}
                       </td>
                       <td className="py-4 px-4">
-                        <code className="text-xs text-slate-400 font-mono select-all bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                        <code className="text-xs text-slate-400 font-mono select-all bg-slate-50 px-2 py-1 rounded border border-slate-100 break-all">
                           {tx.reference}
                         </code>
                       </td>

@@ -115,19 +115,19 @@ export function HostedChatClient({
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-950">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen overflow-x-hidden bg-slate-50 text-slate-950">
+      <div className="mx-auto flex min-h-screen w-full max-w-6xl min-w-0 flex-col px-4 py-4 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-4 border-b border-slate-200 py-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm"
               style={{ backgroundColor: primaryColor }}
             >
               <Bot className="h-6 w-6" />
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-500">{businessName}</p>
-              <h1 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{title}</h1>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-500">{businessName}</p>
+              <h1 className="break-words text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{title}</h1>
             </div>
           </div>
           <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold uppercase tracking-widest text-emerald-700">
@@ -135,12 +135,12 @@ export function HostedChatClient({
           </div>
         </header>
 
-        <section className="grid flex-1 gap-6 py-6 lg:grid-cols-[320px_1fr]">
-          <aside className="space-y-5">
+        <section className="flex flex-col lg:grid min-w-0 flex-1 gap-6 py-6 lg:grid-cols-[320px_1fr]">
+          <aside className="min-w-0 space-y-5 order-2 lg:order-1">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Assistant</p>
-              <h2 className="mt-2 text-lg font-extrabold text-slate-950">{assistantName}</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+              <h2 className="mt-2 break-words text-lg font-extrabold text-slate-950">{assistantName}</h2>
+              <p className="mt-3 break-words text-sm leading-6 text-slate-600">{description}</p>
             </div>
 
             {suggestedQuestions.length > 0 && (
@@ -152,7 +152,7 @@ export function HostedChatClient({
                       key={question}
                       type="button"
                       onClick={() => sendMessage(question)}
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 break-words"
                     >
                       {question}
                     </button>
@@ -162,15 +162,15 @@ export function HostedChatClient({
             )}
           </aside>
 
-          <div className="flex min-h-[640px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex min-h-[520px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:min-h-[640px] order-1 lg:order-2">
             <div
               className="border-b border-slate-200 px-5 py-4 text-white"
               style={{ backgroundColor: primaryColor }}
             >
               <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="font-extrabold">{assistantName}</h2>
-                  <p className="text-xs font-semibold opacity-80">Replies from {businessName}</p>
+                <div className="min-w-0">
+                  <h2 className="truncate font-extrabold">{assistantName}</h2>
+                  <p className="truncate text-xs font-semibold opacity-80">Replies from {businessName}</p>
                 </div>
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
               </div>
@@ -187,14 +187,14 @@ export function HostedChatClient({
                       </div>
                     )}
                     <div
-                      className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
+                      className={`max-w-[82%] min-w-0 rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm break-words ${
                         isUser
                           ? "rounded-tr-sm text-white"
                           : "rounded-tl-sm border border-slate-200 bg-white text-slate-700"
                       }`}
                       style={isUser ? { backgroundColor: primaryColor } : undefined}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
                     </div>
                     {isUser && (
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-600">
@@ -216,7 +216,7 @@ export function HostedChatClient({
 
             <form onSubmit={handleSubmit} className="border-t border-slate-200 bg-white p-4">
               {error && <p className="mb-3 text-sm font-semibold text-red-600">{error}</p>}
-              <div className="flex items-end gap-3">
+              <div className="flex min-w-0 items-end gap-3">
                 <textarea
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
@@ -228,7 +228,7 @@ export function HostedChatClient({
                   }}
                   rows={1}
                   placeholder="Type your message..."
-                  className="max-h-32 min-h-12 flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none transition focus:border-slate-400"
+                  className="max-h-32 min-h-12 min-w-0 flex-1 resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium outline-none transition focus:border-slate-400"
                 />
                 <button
                   type="submit"

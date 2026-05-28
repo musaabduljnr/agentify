@@ -89,7 +89,7 @@ export default function SignupPage() {
         </div>
 
         {/* Right side: Form */}
-        <div className="flex-1 p-10 md:p-12">
+        <div className="flex-1 p-6 sm:p-10 md:p-12">
           <div className="mb-10">
             <h1 className="text-2xl font-bold text-slate-900">Create account</h1>
             <p className="text-slate-500">Get started for free, no credit card required.</p>
@@ -101,7 +101,7 @@ export default function SignupPage() {
                 {error}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 ml-1">First Name</label>
                 <input 
@@ -136,7 +136,7 @@ export default function SignupPage() {
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-700 ml-1">Password</label>
                 <input 

@@ -8,6 +8,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { type PlanId } from "@/lib/billing/plans";
 import { getEffectivePlanLimits } from "@/lib/billing/platform";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
+import { sendPaymentEmail } from "@/lib/email/resend";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -32,14 +33,14 @@ export async function POST(request: Request) {
     const signature = request.headers.get("x-paystack-signature") || "";
 
     if (!signature) {
-      console.error("[Paystack Webhook] Missing x-paystack-signature header.");
+      logErrorSync(new Error("Missing x-paystack-signature header."), "paystack-webhook");
       return new Response("Missing signature header.", { status: 400 });
     }
 
     // 2. Verify HMAC SHA512 Signature
     const isValid = verifyPaystackWebhookSignature(rawBody, signature);
     if (!isValid) {
-      console.error("[Paystack Webhook] Signature verification failed!");
+      logErrorSync(new Error("Signature verification failed."), "paystack-webhook");
       return new Response("Unauthorized signature mismatch.", { status: 401 });
     }
 
@@ -51,8 +52,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid webhook payload." }, { status: 400 });
     }
     const { event, data } = parsePaystackWebhook(payload);
-    console.log(`[Paystack Webhook Received] Event: ${event}`);
-
     const supabase = createServiceClient();
     const reference =
       typeof data.reference === "string" ? data.reference : undefined;
@@ -116,7 +115,6 @@ export async function POST(request: Request) {
 
       // Idempotency: skip if already verified as success
       if (tx.status === "success") {
-        console.log(`[Paystack Webhook] Reference ${reference} already marked success. Skipping.`);
         await markWebhookProcessed();
         return NextResponse.json({ received: true });
       }
@@ -190,9 +188,19 @@ export async function POST(request: Request) {
         })
         .eq("business_id", resolvedBusinessId);
 
-      console.log(
-        `[Paystack Webhook Success] Activated plan '${planId}' for business: ${resolvedBusinessId}`
-      );
+      const { data: businessOwner } = await supabase
+        .from("businesses")
+        .select("contact_email, owner:profiles(email)")
+        .eq("id", resolvedBusinessId)
+        .maybeSingle();
+
+      await sendPaymentEmail({
+        to: businessOwner?.contact_email || (businessOwner?.owner as { email?: string } | null)?.email,
+        businessId: resolvedBusinessId,
+        planName: planId,
+        status: "success",
+        amount: tx.amount ? `${tx.currency} ${Number(tx.amount).toLocaleString()}` : null,
+      });
     } 
     
     else if (event === "subscription.create") {
@@ -210,9 +218,6 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("provider_customer_id", customerCode);
-        console.log(
-          `[Paystack Webhook] Subscription created / updated active for customer: ${customerCode}`
-        );
       }
     } 
     
@@ -226,7 +231,6 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("provider_subscription_id", subscriptionCode);
-        console.log(`[Paystack Webhook] Subscription disabled for code: ${subscriptionCode}`);
       }
     } 
     
@@ -240,7 +244,26 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq("provider_subscription_id", subscriptionCode);
-        console.log(`[Paystack Webhook] Payment failed. Set past_due on: ${subscriptionCode}`);
+
+        const { data: subscriptionRow } = await supabase
+          .from("subscriptions")
+          .select("business_id, plan, business:businesses(contact_email, owner:profiles(email))")
+          .eq("provider_subscription_id", subscriptionCode)
+          .maybeSingle();
+
+        const business = subscriptionRow?.business as
+          | { contact_email?: string | null; owner?: { email?: string | null } | null }
+          | null
+          | undefined;
+
+        if (subscriptionRow?.business_id) {
+          await sendPaymentEmail({
+            to: business?.contact_email || business?.owner?.email,
+            businessId: subscriptionRow.business_id,
+            planName: String(subscriptionRow.plan || "Agentify"),
+            status: "past_due",
+          });
+        }
       }
     } 
     
@@ -264,7 +287,6 @@ export async function POST(request: Request) {
             updated_at: now.toISOString(),
           })
           .eq("provider_subscription_id", subscriptionCode);
-        console.log(`[Paystack Webhook] Invoice paid. Rollover completed for: ${subscriptionCode}`);
       }
     }
 

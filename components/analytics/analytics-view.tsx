@@ -106,7 +106,7 @@ export function AnalyticsView({ data, selectedDays }: AnalyticsViewProps) {
       </div>
 
       {/* Core Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {/* Total Conversations */}
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-all relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-50/50 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500"></div>
@@ -353,7 +353,7 @@ export function AnalyticsView({ data, selectedDays }: AnalyticsViewProps) {
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                   <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis dataKey="name" type="category" tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={120} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: '#475569', fontSize: 10, fontWeight: 'bold' }} axisLine={false} tickLine={false} width={90} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0' }}
                     itemStyle={{ fontSize: '11px' }}

@@ -104,16 +104,16 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 h-[calc(100vh-140px)] gap-6 overflow-hidden">
-      <div className="lg:col-span-3 flex flex-col bg-background rounded-2xl border shadow-sm overflow-hidden relative">
+    <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-4 lg:h-[calc(100vh-140px)] lg:overflow-hidden">
+      <div className="lg:col-span-3 flex min-h-[540px] min-w-0 flex-col bg-background rounded-2xl border shadow-sm overflow-hidden relative lg:min-h-0">
         {/* Header */}
-        <div className="p-4 border-b flex items-center justify-between bg-muted/20">
-          <div className="flex items-center gap-3">
+        <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3 bg-muted/20">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
               <Sparkles size={20} />
             </div>
-            <div>
-              <h3 className="font-bold text-sm leading-none">{initialAssistant.name}</h3>
+            <div className="min-w-0">
+              <h3 className="truncate font-bold text-sm leading-none">{initialAssistant.name}</h3>
               <p className="text-[11px] text-muted-foreground mt-1">
                 Tone: <span className="capitalize">{initialAssistant.tone}</span>
               </p>
@@ -127,7 +127,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
 
         {/* Warning if no knowledge */}
         {!hasKnowledge && (
-          <div className="bg-yellow-50 border-b border-yellow-100 p-3 flex items-center gap-3 px-6">
+          <div className="bg-yellow-50 border-b border-yellow-100 p-3 flex items-start gap-3 px-4 sm:px-6">
             <ShieldAlert size={16} className="text-yellow-600 shrink-0" />
             <p className="text-[11px] text-yellow-700 font-medium">
               No embedded knowledge found. Your assistant will answer from general knowledge or its system prompt.
@@ -146,7 +146,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
               <p className="text-sm text-muted-foreground max-w-sm">
                 This is a private testing environment. Your assistant will use the knowledge you&apos;ve added to answer questions.
               </p>
-              <div className="mt-8 p-4 bg-muted/50 rounded-lg border text-left max-w-md">
+              <div className="mt-8 w-full max-w-md p-4 bg-muted/50 rounded-lg border text-left">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 px-1">Try asking:</p>
                 <div className="space-y-2">
                   <button onClick={() => handleSendMessage("What does this business do?")} className="w-full text-left text-xs p-2 rounded hover:bg-background transition-colors border border-transparent hover:border-border">
@@ -185,7 +185,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
       </div>
 
       {/* Right Sidebar - Context Panel */}
-      <div className="lg:col-span-1 h-full overflow-hidden rounded-2xl border bg-background shadow-sm hidden lg:block">
+      <div className="lg:col-span-1 h-[320px] lg:h-full overflow-hidden rounded-2xl border bg-background shadow-sm">
         <RetrievedContextPanel chunks={activeChunks} />
       </div>
     </div>

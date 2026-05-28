@@ -147,8 +147,30 @@ export function SettingsForm({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-      <div className="lg:col-span-1 space-y-2">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-10">
+      {/* Horizontal scrollable tabs on mobile, vertical sidebar on lg+ */}
+      <div className="lg:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto">
+        <div className="flex gap-2 pb-2 min-w-max">
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                activeTab === item.id
+                  ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
+              )}
+            >
+              <item.icon className={cn("w-4 h-4", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="hidden lg:block lg:col-span-1 space-y-2">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -191,7 +213,7 @@ export function SettingsForm({
           </Button>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 md:p-10">
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-8 md:p-10">
           {activeTab === "business" && (
             <div className="space-y-8">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -272,7 +294,7 @@ export function SettingsForm({
           )}
         </div>
 
-        <div className="bg-red-50 rounded-3xl border border-red-100 p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-red-50 rounded-3xl border border-red-100 p-5 sm:p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
           <div>
             <h4 className="text-red-900 font-extrabold text-lg mb-1">Danger Zone</h4>
             <p className="text-red-700 text-sm font-medium">Permanently delete your business account and all associated data.</p>

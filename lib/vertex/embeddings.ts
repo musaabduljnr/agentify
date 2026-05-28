@@ -11,9 +11,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   const provider = config.provider || "gemini";
   const model = config.model || "gemini-embedding-001";
 
-  console.log(
-    `[AI Engine] Routing embedding generation request to: ${provider} (${model})`
-  );
+  if (process.env.NODE_ENV !== "production") {
+    console.log(
+      `[AI Engine] Routing embedding generation request to: ${provider} (${model})`
+    );
+  }
 
   switch (provider) {
     case "gemini":

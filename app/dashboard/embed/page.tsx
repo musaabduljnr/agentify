@@ -34,7 +34,7 @@ export default async function EmbedCodePage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8 space-y-8">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-5 sm:p-8 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
                   <Code2 className="w-6 h-6" />
@@ -97,7 +97,7 @@ export default async function EmbedCodePage() {
             <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               Installation Guides
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {["WordPress", "Shopify", "Webflow", "Wix", "React", "HTML/Plain"].map((platform) => (
                 <button 
                   key={platform}
@@ -138,7 +138,7 @@ export default async function EmbedCodePage() {
             <ol className="text-indigo-50 text-xs space-y-3 mb-8 relative z-10 list-decimal ml-4">
               <li>Create a file named <code className="bg-white/20 px-1 rounded">test-widget.html</code> in your project root.</li>
               <li>Paste the embed code into it.</li>
-              <li>Open the file in your browser using <code className="bg-white/20 px-1 rounded">http://localhost:3000/test-widget.html</code> or similar.</li>
+              <li>Open the file from the same local dev origin as your running app.</li>
             </ol>
             <div className="space-y-4 relative z-10">
               <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl font-bold h-12">

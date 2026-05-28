@@ -15,8 +15,8 @@ const features = [
     className: "md:col-span-2 md:row-span-2 bg-indigo-600 text-white",
   },
   {
-    title: "Embeddable Widget",
-    description: "Copy-paste a single line of code to add the assistant to any website platform.",
+    title: "Widget and hosted chat",
+    description: "Embed the assistant on your website or share a hosted chat link anywhere you sell.",
     icon: MessageSquare,
     className: "bg-white",
   },
@@ -59,7 +59,7 @@ export function Features() {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[250px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:auto-rows-[250px]">
           {features.map((feature, index) => (
             <div
               key={index}

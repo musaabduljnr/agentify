@@ -22,6 +22,7 @@ Set these in Vercel under Project Settings -> Environment Variables for the Prod
 | `PAYSTACK_GROWTH_PLAN_CODE` | Server only | Paystack plan code for the Growth subscription. |
 | `RESEND_API_KEY` | Server only | Resend API key for transactional email. |
 | `EMAIL_FROM` | Public email value | Verified sender, for example `Agentify <hello@yourdomain.com>`. |
+| `RESEND_VERIFIED_DOMAIN` | Server only | Optional guardrail. Set to the verified Resend domain, for example `yourdomain.com`, so production sends fail closed if `EMAIL_FROM` uses the wrong domain. |
 | `SUPPORT_EMAIL` | Public email value | Support inbox, for example `support@yourdomain.com`. |
 
 Optional environment variables already referenced by the codebase:
@@ -163,8 +164,22 @@ Payment verification paths:
 5. Add Vercel env vars:
    - `RESEND_API_KEY`
    - `EMAIL_FROM`, for example `Agentify <hello@yourdomain.com>`
+   - `RESEND_VERIFIED_DOMAIN`, for example `yourdomain.com`
    - `SUPPORT_EMAIL`, for example `support@yourdomain.com`
-6. Send a test transactional email from production and confirm inbox delivery.
+6. Confirm `EMAIL_FROM` uses an address on the verified domain.
+7. From an admin session, POST to `/api/admin/email-test` with each template name to verify rendering and delivery:
+   - `welcome`
+   - `lead-notification`
+   - `booking-support`
+   - `payment`
+   - `usage-warning`
+8. Send a real production smoke test and confirm inbox delivery.
+
+Email reliability notes:
+
+- Email sends are non-blocking for app flow. Failures are written through the centralized error logger with source `email-send`.
+- The app never returns `RESEND_API_KEY` or provider errors to public users.
+- Lead, payment, usage-warning, and onboarding welcome sends use React Email templates rendered server-side.
 
 ## Widget Production URL
 
@@ -232,6 +247,8 @@ Email:
 
 - [ ] Resend sender domain is verified.
 - [ ] `EMAIL_FROM` uses the verified domain.
+- [ ] `RESEND_VERIFIED_DOMAIN` matches the verified sending domain.
+- [ ] Welcome, lead notification, booking/support, payment, and usage warning templates render through `/api/admin/email-test`.
 - [ ] A production email send succeeds.
 - [ ] Email arrives in inbox and does not land in spam during smoke testing.
 

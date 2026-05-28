@@ -88,6 +88,12 @@ const ENV_SPECS: EnvSpec[] = [
     description: "Verified sender address for transactional email",
   },
   {
+    key: "RESEND_VERIFIED_DOMAIN",
+    required: false,
+    serverOnly: true,
+    description: "Optional verified Resend sender domain, used to validate EMAIL_FROM in production",
+  },
+  {
     key: "SUPPORT_EMAIL",
     required: true,
     description: "Public support email address",
@@ -210,6 +216,10 @@ export function isConfiguredEnvValue(value: string | undefined | null): value is
 export function getConfiguredOptionalEnv(key: string): string | null {
   const value = process.env[key];
   return isConfiguredEnvValue(value) ? value.trim() : null;
+}
+
+export function isServerOnlyEnvKey(key: string): boolean {
+  return ENV_SPECS.some((spec) => spec.key === key && spec.serverOnly);
 }
 
 /** Returns true if running in a production environment */

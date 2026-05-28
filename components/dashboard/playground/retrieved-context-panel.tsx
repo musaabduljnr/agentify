@@ -10,7 +10,7 @@ interface Chunk {
 
 export function RetrievedContextPanel({ chunks }: { chunks: Chunk[] }) {
   return (
-    <div className="flex flex-col h-full border-l bg-muted/30">
+    <div className="flex h-full min-w-0 flex-col border-l bg-muted/30">
       <div className="p-4 border-b bg-background flex items-center gap-2">
         <Database size={18} className="text-primary" />
         <h3 className="font-semibold text-sm">Retrieved Knowledge</h3>
@@ -27,8 +27,8 @@ export function RetrievedContextPanel({ chunks }: { chunks: Chunk[] }) {
             </div>
           ) : (
             chunks.map((chunk, i) => (
-              <div key={i} className="bg-background rounded-lg border p-3 shadow-sm text-xs relative group">
-                <div className="flex items-center justify-between mb-2">
+              <div key={i} className="bg-background rounded-lg border p-3 shadow-sm text-xs relative group min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <Badge variant="secondary" className="font-mono text-[10px]">
                     # {i + 1}
                   </Badge>
@@ -36,7 +36,7 @@ export function RetrievedContextPanel({ chunks }: { chunks: Chunk[] }) {
                     {Math.round(chunk.similarity * 100)}% Match
                   </Badge>
                 </div>
-                <p className="text-muted-foreground leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed break-words">
                   {chunk.content}
                 </p>
                 {chunk.metadata?.source_title && (

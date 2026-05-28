@@ -16,15 +16,15 @@ export function Navbar() {
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
           <Link href="#features" className="hover:text-indigo-600 transition-colors">Features</Link>
           <Link href="#pricing" className="hover:text-indigo-600 transition-colors">Pricing</Link>
-          <Link href="#demo" className="hover:text-indigo-600 transition-colors">Demo</Link>
+          <Link href="/demo" className="hover:text-indigo-600 transition-colors">Demo</Link>
         </nav>
 
-        <div className="flex items-center gap-4">
-          <Link href="/login">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Link href="/login" className="hidden sm:block">
             <Button variant="ghost" className="text-slate-600">Login</Button>
           </Link>
           <Link href="/signup">
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6">
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-4 sm:px-6">
               Get Started
             </Button>
           </Link>
