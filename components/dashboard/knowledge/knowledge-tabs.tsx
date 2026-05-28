@@ -21,7 +21,7 @@ export function KnowledgeTabs() {
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Tab Header */}
       <div className="border-b border-slate-100 px-6 pt-6">
-        <div className="flex gap-1 overflow-x-auto">
+        <div className="flex gap-1 overflow-x-auto flex-nowrap scrollbar-none pb-2">
           {tabs.map((tab) => (
             <button
               key={tab.id}

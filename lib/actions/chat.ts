@@ -16,7 +16,11 @@ import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
 import { requireActiveSubscription } from "@/lib/billing/subscription";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
-import { sendLeadNotificationEmail, sendUsageWarningEmail } from "@/lib/email/resend";
+import { sendTransactionalEmail } from "@/lib/email/send-email";
+import { NewLeadEmail } from "@/lib/email/templates/new-lead-email";
+import { BookingRequestEmail } from "@/lib/email/templates/booking-request-email";
+import { SupportRequestEmail } from "@/lib/email/templates/support-request-email";
+import { UsageWarningEmail } from "@/lib/email/templates/usage-warning-email";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -175,16 +179,51 @@ export async function runBusinessChat({
   
   if (bErr || !business) throw new Error("Business not found");
 
+  const { data: sub } = await supabase
+    .from("subscriptions")
+    .select("*")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
   const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
   const usageCheck = await checkUsageLimit(businessId, usageType);
   if (!usageCheck.allowed) {
-    await sendUsageWarningEmail({
-      to: business.contact_email,
-      businessId,
-      label: "AI messages",
-      used: usageCheck.used,
-      limit: usageCheck.limit,
-    });
+    if (sub) {
+      const now = new Date();
+      const periodStartStr = sub.current_period_start || sub.created_at;
+      const periodStart = new Date(periodStartStr);
+      const warningSent100AtStr = sub.metadata?.warning_sent_100_message;
+      let hasSent100 = false;
+      if (warningSent100AtStr) {
+        const warningSent100At = new Date(warningSent100AtStr);
+        if (warningSent100At >= periodStart) {
+          hasSent100 = true;
+        }
+      }
+
+      if (!hasSent100) {
+        const updatedMetadata = {
+          ...(sub.metadata || {}),
+          warning_sent_100_message: now.toISOString(),
+        };
+        await supabase
+          .from("subscriptions")
+          .update({ metadata: updatedMetadata })
+          .eq("id", sub.id);
+
+        sendTransactionalEmail({
+          businessId,
+          subject: "You’ve reached your Agentify usage limit",
+          templateName: "usage-warning-email",
+          react: UsageWarningEmail({
+            businessName: business.name,
+            usageType: "AI messages",
+            percentage: 100,
+            billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+          }),
+        }).catch(err => console.error("Error sending 100% warning email:", err));
+      }
+    }
 
     return {
       success: false,
@@ -252,6 +291,43 @@ export async function runBusinessChat({
     metadata.requested_action = requestedAction;
   }
 
+  const conversationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/conversations?id=${currentConversationId}`;
+
+  // Booking Request Alert Trigger
+  if (intentType === "booking" && !metadata.booking_email_sent) {
+    metadata.booking_email_sent = true;
+    sendTransactionalEmail({
+      businessId,
+      subject: "New booking request from your AI assistant",
+      templateName: "booking-request-email",
+      react: BookingRequestEmail({
+        businessName: business.name,
+        leadName: extractedInfo.name || conversation?.visitor_name,
+        leadEmail: extractedInfo.email || conversation?.visitor_email,
+        leadPhone: extractedInfo.phone || conversation?.visitor_phone,
+        requestedAction,
+        conversationUrl,
+      }),
+    }).catch(err => console.error("Error triggering booking email:", err));
+  }
+
+  // Support Request Alert Trigger
+  if (intentType === "support_ticket" && !metadata.support_email_sent) {
+    metadata.support_email_sent = true;
+    sendTransactionalEmail({
+      businessId,
+      subject: "New support request from your AI assistant",
+      templateName: "support-request-email",
+      react: SupportRequestEmail({
+        businessName: business.name,
+        leadName: extractedInfo.name || conversation?.visitor_name,
+        leadEmail: extractedInfo.email || conversation?.visitor_email,
+        issueSummary: message,
+        conversationUrl,
+      }),
+    }).catch(err => console.error("Error triggering support email:", err));
+  }
+
   // Handle contact info extraction
   if (extractedInfo.email || extractedInfo.phone || extractedInfo.name) {
     const leadUpdate: any = {
@@ -287,14 +363,19 @@ export async function runBusinessChat({
       } else {
         const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
         if (!leadInsertError) {
-          await sendLeadNotificationEmail({
-            to: business.contact_email,
+          await sendTransactionalEmail({
             businessId,
-            businessName: business.name,
-            leadName: extractedInfo.name,
-            leadEmail: extractedInfo.email,
-            leadPhone: extractedInfo.phone,
-            interest: intentType !== "general_inquiry" ? requestedAction : null,
+            subject: "New lead captured by Agentify",
+            templateName: "new-lead-email",
+            react: NewLeadEmail({
+              businessName: business.name,
+              leadName: extractedInfo.name,
+              leadEmail: extractedInfo.email,
+              leadPhone: extractedInfo.phone,
+              interest: intentType !== "general_inquiry" ? requestedAction : null,
+              intentType,
+              conversationUrl,
+            }),
           });
           await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
         }
@@ -414,6 +495,50 @@ export async function runBusinessChat({
     conversation_id: currentConversationId,
     source,
   });
+
+  // Check for 80% usage threshold warning
+  const finalCheck = await checkUsageLimit(businessId, usageType);
+  const limit = finalCheck.limit;
+  const used = finalCheck.used;
+  const percentage = limit > 0 ? (used / limit) * 100 : 0;
+
+  if (percentage >= 80 && sub) {
+    const now = new Date();
+    const periodStartStr = sub.current_period_start || sub.created_at;
+    const periodStart = new Date(periodStartStr);
+    const warningSent80AtStr = sub.metadata?.warning_sent_80_message;
+    let hasSent80 = false;
+
+    if (warningSent80AtStr) {
+      const warningSent80At = new Date(warningSent80AtStr);
+      if (warningSent80At >= periodStart) {
+        hasSent80 = true;
+      }
+    }
+
+    if (!hasSent80) {
+      const updatedMetadata = {
+        ...(sub.metadata || {}),
+        warning_sent_80_message: now.toISOString(),
+      };
+      await supabase
+        .from("subscriptions")
+        .update({ metadata: updatedMetadata })
+        .eq("id", sub.id);
+
+      sendTransactionalEmail({
+        businessId,
+        subject: "You’re nearing your Agentify usage limit",
+        templateName: "usage-warning-email",
+        react: UsageWarningEmail({
+          businessName: business.name,
+          usageType: "AI messages",
+          percentage: Math.round(percentage),
+          billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+        }),
+      }).catch(err => console.error("Error sending 80% warning email:", err));
+    }
+  }
 
   return {
     success: true,

@@ -93,7 +93,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
             className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-medium"
           />
         </div>
-        <div className="flex items-center gap-3 overflow-x-auto pb-2 md:pb-0">
+        <div className="flex items-center gap-3 overflow-x-auto flex-nowrap scrollbar-none pb-2 md:pb-0">
           {["All", "New", "Contacted", "Qualified", "Converted", "Closed"].map((tab) => (
             <button 
               key={tab} 

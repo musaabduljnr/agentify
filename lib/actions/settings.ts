@@ -138,3 +138,125 @@ export async function updatePrivacySettings(data: {
     return { error: error.message || "Failed to update privacy settings" };
   }
 }
+
+/**
+ * Retrieves the notification preferences and business support email from Supabase.
+ */
+export async function getNotificationPreferences() {
+  try {
+    const setup = await getCurrentBusinessSetup();
+    if (!setup.user || !setup.business) throw new Error("Unauthorized");
+
+    const supabase = await createClient();
+    
+    // 1. Fetch preferences
+    let { data: prefs } = await supabase
+      .from("notification_preferences")
+      .select("*")
+      .eq("business_id", setup.business.id)
+      .maybeSingle();
+
+    // 2. If missing, initialize defaults
+    if (!prefs) {
+      const { data: newPrefs, error: insertErr } = await supabase
+        .from("notification_preferences")
+        .insert({ business_id: setup.business.id })
+        .select()
+        .single();
+        
+      if (insertErr) throw insertErr;
+      prefs = newPrefs;
+    }
+
+    return {
+      preferences: prefs,
+      supportEmail: setup.business.support_email || "",
+      contactEmail: setup.business.contact_email || "",
+    };
+  } catch (err: any) {
+    return { error: err?.message || "Failed to load notification settings" };
+  }
+}
+
+/**
+ * Saves the modified notification preferences and support email to Supabase.
+ */
+export async function saveNotificationPreferences(data: {
+  email_new_leads: boolean;
+  email_support_requests: boolean;
+  email_booking_requests: boolean;
+  email_usage_warnings: boolean;
+  email_payment_updates: boolean;
+  support_email: string;
+}) {
+  try {
+    const setup = await getCurrentBusinessSetup();
+    if (!setup.user || !setup.business) throw new Error("Unauthorized");
+
+    const supabase = await createClient();
+
+    // 1. Update support_email in businesses
+    const supportEmail = data.support_email.trim();
+    if (supportEmail && !supportEmail.includes("@")) {
+      throw new Error("Enter a valid support email address.");
+    }
+
+    const { error: bizError } = await supabase
+      .from("businesses")
+      .update({ support_email: supportEmail || null })
+      .eq("id", setup.business.id);
+
+    if (bizError) throw bizError;
+
+    // 2. Update notification_preferences
+    const { error: prefsError } = await supabase
+      .from("notification_preferences")
+      .upsert({
+        business_id: setup.business.id,
+        email_new_leads: data.email_new_leads,
+        email_support_requests: data.email_support_requests,
+        email_booking_requests: data.email_booking_requests,
+        email_usage_warnings: data.email_usage_warnings,
+        email_payment_updates: data.email_payment_updates,
+        updated_at: new Date().toISOString(),
+      });
+
+    if (prefsError) throw prefsError;
+
+    revalidatePath("/dashboard/settings/notifications");
+    revalidatePath("/dashboard/settings");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err?.message || "Failed to save notification settings" };
+  }
+}
+
+/**
+ * Dispatches a live test email using Resend to verify configuration.
+ */
+export async function sendTestEmailAction() {
+  try {
+    const setup = await getCurrentBusinessSetup();
+    if (!setup.user || !setup.business) throw new Error("Unauthorized");
+
+    const { sendTransactionalEmail } = await import("@/lib/email/send-email");
+    const { WelcomeEmail } = await import("@/lib/email/templates/welcome-email");
+
+    const { success, error } = await sendTransactionalEmail({
+      businessId: setup.business.id,
+      subject: "Test Email — Agentify Configuration Successful",
+      templateName: "welcome-email",
+      react: WelcomeEmail({
+        businessName: setup.business.name,
+      }),
+    });
+
+    if (!success) {
+      throw new Error(error || "Resend delivery failed. Check your API key and sender domain settings.");
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { error: err?.message || "Test email delivery failed." };
+  }
+}

@@ -15,7 +15,9 @@ import {
 } from "@/lib/billing/platform";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
-import { sendPaymentEmail } from "@/lib/email/resend";
+import { sendTransactionalEmail } from "@/lib/email/send-email";
+import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
+import { PaymentFailedEmail } from "@/lib/email/templates/payment-failed-email";
 
 function getAppBaseUrl(): string {
   const configuredUrl =
@@ -191,7 +193,7 @@ export async function verifyPaymentReference(reference: string) {
     // Verify ownership of the business
     const { data: business } = await serviceClient
       .from("businesses")
-      .select("owner_id, contact_email")
+      .select("name, owner_id, contact_email")
       .eq("id", transaction.business_id)
       .single();
 
@@ -268,13 +270,17 @@ export async function verifyPaymentReference(reference: string) {
 
       if (subError) throw subError;
 
-      await sendPaymentEmail({
-        to: user.email || business.contact_email,
+      await sendTransactionalEmail({
         businessId: transaction.business_id,
-        userId: user.id,
-        planName: String(transaction.plan),
-        status: "success",
-        amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
+        to: user.email || business.contact_email,
+        subject: "Payment successful — your Agentify plan is active",
+        templateName: "payment-success-email",
+        react: PaymentSuccessEmail({
+          businessName: business?.name || "there",
+          plan: String(transaction.plan),
+          amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
+          billingUrl: `${getAppBaseUrl()}/dashboard/billing`,
+        }),
       });
 
       revalidatePath("/dashboard/billing");
@@ -292,13 +298,16 @@ export async function verifyPaymentReference(reference: string) {
         })
         .eq("id", transaction.id);
 
-      await sendPaymentEmail({
-        to: user.email || business.contact_email,
+      await sendTransactionalEmail({
         businessId: transaction.business_id,
-        userId: user.id,
-        planName: String(transaction.plan),
-        status: "failed",
-        amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
+        to: user.email || business.contact_email,
+        subject: "Payment failed — action needed",
+        templateName: "payment-failed-email",
+        react: PaymentFailedEmail({
+          businessName: business?.name || "there",
+          plan: String(transaction.plan),
+          billingUrl: `${getAppBaseUrl()}/dashboard/billing`,
+        }),
       });
 
       return { error: "Payment verification failed." };

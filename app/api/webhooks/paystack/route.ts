@@ -8,7 +8,9 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { type PlanId } from "@/lib/billing/plans";
 import { getEffectivePlanLimits } from "@/lib/billing/platform";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
-import { sendPaymentEmail } from "@/lib/email/resend";
+import { sendTransactionalEmail } from "@/lib/email/send-email";
+import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
+import { PaymentFailedEmail } from "@/lib/email/templates/payment-failed-email";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -190,16 +192,21 @@ export async function POST(request: Request) {
 
       const { data: businessOwner } = await supabase
         .from("businesses")
-        .select("contact_email, owner:profiles(email)")
+        .select("name, contact_email, owner:profiles(email)")
         .eq("id", resolvedBusinessId)
         .maybeSingle();
 
-      await sendPaymentEmail({
-        to: businessOwner?.contact_email || (businessOwner?.owner as { email?: string } | null)?.email,
+      await sendTransactionalEmail({
         businessId: resolvedBusinessId,
-        planName: planId,
-        status: "success",
-        amount: tx.amount ? `${tx.currency} ${Number(tx.amount).toLocaleString()}` : null,
+        to: businessOwner?.contact_email || (businessOwner?.owner as { email?: string } | null)?.email,
+        subject: "Payment successful — your Agentify plan is active",
+        templateName: "payment-success-email",
+        react: PaymentSuccessEmail({
+          businessName: businessOwner?.name || "there",
+          plan: planId,
+          amount: tx.amount ? `${tx.currency} ${Number(tx.amount).toLocaleString()}` : null,
+          billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+        }),
       });
     } 
     
@@ -247,21 +254,26 @@ export async function POST(request: Request) {
 
         const { data: subscriptionRow } = await supabase
           .from("subscriptions")
-          .select("business_id, plan, business:businesses(contact_email, owner:profiles(email))")
+          .select("business_id, plan, business:businesses(name, contact_email, owner:profiles(email))")
           .eq("provider_subscription_id", subscriptionCode)
           .maybeSingle();
 
         const business = subscriptionRow?.business as
-          | { contact_email?: string | null; owner?: { email?: string | null } | null }
+          | { name?: string | null; contact_email?: string | null; owner?: { email?: string | null } | null }
           | null
           | undefined;
 
         if (subscriptionRow?.business_id) {
-          await sendPaymentEmail({
-            to: business?.contact_email || business?.owner?.email,
+          await sendTransactionalEmail({
             businessId: subscriptionRow.business_id,
-            planName: String(subscriptionRow.plan || "Agentify"),
-            status: "past_due",
+            to: business?.contact_email || business?.owner?.email,
+            subject: "Payment failed — action needed",
+            templateName: "payment-failed-email",
+            react: PaymentFailedEmail({
+              businessName: business?.name || "there",
+              plan: String(subscriptionRow.plan || "Agentify"),
+              billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+            }),
           });
         }
       }

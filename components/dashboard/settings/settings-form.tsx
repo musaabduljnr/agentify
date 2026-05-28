@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   Bell,
@@ -149,7 +150,7 @@ export function SettingsForm({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-10">
       {/* Horizontal scrollable tabs on mobile, vertical sidebar on lg+ */}
-      <div className="lg:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto">
+      <div className="lg:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto scrollbar-none">
         <div className="flex gap-2 pb-2 min-w-max">
           {tabs.map((item) => (
             <button
@@ -253,15 +254,23 @@ export function SettingsForm({
           )}
 
           {activeTab === "notifications" && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <Bell className="w-6 h-6 text-indigo-600" />
                 Notifications
               </h3>
-              <Toggle checked={notificationForm.lead_email_alerts} onChange={(value) => setNotificationForm({ ...notificationForm, lead_email_alerts: value })} label="Lead alerts" description="Email me when the assistant captures a new lead." />
-              <Toggle checked={notificationForm.conversation_email_alerts} onChange={(value) => setNotificationForm({ ...notificationForm, conversation_email_alerts: value })} label="Conversation alerts" description="Email me when a visitor starts a new conversation." />
-              <Toggle checked={notificationForm.billing_email_alerts} onChange={(value) => setNotificationForm({ ...notificationForm, billing_email_alerts: value })} label="Billing alerts" description="Send payment, subscription, and usage limit notifications." />
-              <Toggle checked={notificationForm.weekly_summary} onChange={(value) => setNotificationForm({ ...notificationForm, weekly_summary: value })} label="Weekly summary" description="Receive a weekly digest of conversations, leads, and usage." />
+              <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                  We have upgraded our notification preferences to include a dedicated, premium Notification Center. You can now toggle custom new leads, booking requests, support tickets, usage limits, billing updates, and configure a custom support address.
+                </p>
+                <Link
+                  href="/dashboard/settings/notifications"
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-100 transition-all"
+                >
+                  <Bell className="w-4 h-4" />
+                  Open Notification Center
+                </Link>
+              </div>
             </div>
           )}
 

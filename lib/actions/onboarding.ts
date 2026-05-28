@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
-import { sendWelcomeEmail } from "@/lib/email/resend";
+import { sendTransactionalEmail } from "@/lib/email/send-email";
+import { WelcomeEmail } from "@/lib/email/templates/welcome-email";
 import { logErrorSync } from "@/lib/monitoring/log-error";
 
 const onboardingSchema = z.object({
@@ -196,11 +197,20 @@ Your goal is to help visitors and collect leads.`,
     revalidatePath("/", "layout");
     revalidatePath("/dashboard", "layout");
 
-    await sendWelcomeEmail({
-      to: setup.user.email || data.contactEmail,
-      name: setup.user.user_metadata?.full_name || data.businessName,
-      userId: setup.user.id,
-    });
+    // Send welcome email gracefully without blocking onboarding
+    try {
+      await sendTransactionalEmail({
+        businessId: businessId,
+        to: setup.user.email || data.contactEmail,
+        subject: "Welcome to Agentify",
+        templateName: "welcome-email",
+        react: WelcomeEmail({
+          businessName: data.businessName,
+        }),
+      });
+    } catch (emailErr) {
+      console.error("[ONBOARDING welcome email error]:", emailErr);
+    }
     
     return { success: true };
   } catch (error: any) {

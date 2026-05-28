@@ -76,3 +76,12 @@ h1, h2, h3, h4, h5, h6 {
 .animate-slide-up {
   animation: slide-up 0.5s ease-out forwards;
 }
+
+/* Hide scrollbar utility for clean touch-scrolling views */
+.scrollbar-none {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}

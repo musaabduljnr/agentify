@@ -537,3 +537,38 @@ export async function adminLogin(email: string, password: string) {
 
   return { success: true };
 }
+
+/**
+ * 12. Email Logs Actions for Admin Console
+ * Queries the email_logs table, joining business names and supporting template/status/business filtering.
+ */
+export async function getAdminEmailLogs(filters?: {
+  status?: string;
+  templateName?: string;
+  businessId?: string;
+}) {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  let query = supabase
+    .from("email_logs")
+    .select("*, businesses(name)")
+    .order("created_at", { ascending: false });
+
+  if (filters) {
+    if (filters.status && filters.status !== "all") {
+      query = query.eq("status", filters.status);
+    }
+    if (filters.templateName && filters.templateName !== "all") {
+      query = query.eq("template_name", filters.templateName);
+    }
+    if (filters.businessId && filters.businessId !== "all") {
+      query = query.eq("business_id", filters.businessId);
+    }
+  }
+
+  const { data: logs, error } = await query;
+  if (error) throw error;
+  return logs || [];
+}
+

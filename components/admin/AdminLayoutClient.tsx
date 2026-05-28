@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   BarChart3,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +110,7 @@ export default function AdminLayoutClient({
             <AdminSidebarLink href="/admin/conversations" label="Conversations" icon={<MessageSquareCode className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/conversations"} />
             <AdminSidebarLink href="/admin/leads" label="Leads" icon={<Contact2 className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/leads"} />
             <AdminSidebarLink href="/admin/ai-settings" label="AI Engine" icon={<Cpu className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/ai-settings"} />
+            <AdminSidebarLink href="/admin/email-logs" label="Email Logs" icon={<Mail className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/email-logs"} />
             <AdminSidebarLink href="/admin/settings" label="Settings" icon={<Settings className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/settings"} />
           </nav>
         </div>
