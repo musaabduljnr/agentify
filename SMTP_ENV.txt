@@ -1,0 +1,13 @@
+# =========================================================================
+# Agentify Nodemailer SMTP Environment Variables (Vercel Import Format)
+# =========================================================================
+# Copy and paste these lines directly into the Vercel Environment Variables panel.
+# Make sure to replace placeholders with your actual Gmail/SMTP credentials.
+
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=yourname@gmail.com
+SMTP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+EMAIL_FROM=Agentify <yourname@gmail.com>
+SUPPORT_EMAIL=support@yourdomain.com
