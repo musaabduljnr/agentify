@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/service";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
 
 export async function updateProfileSettings(data: {
@@ -147,7 +148,7 @@ export async function getNotificationPreferences() {
     const setup = await getCurrentBusinessSetup();
     if (!setup.user || !setup.business) throw new Error("Unauthorized");
 
-    const supabase = await createClient();
+    const supabase = createServiceClient();
     
     // 1. Fetch preferences
     let { data: prefs } = await supabase
@@ -194,6 +195,7 @@ export async function saveNotificationPreferences(data: {
     if (!setup.user || !setup.business) throw new Error("Unauthorized");
 
     const supabase = await createClient();
+    const serviceClient = createServiceClient();
 
     // 1. Update support_email in businesses
     const supportEmail = data.support_email.trim();
@@ -209,7 +211,7 @@ export async function saveNotificationPreferences(data: {
     if (bizError) throw bizError;
 
     // 2. Update notification_preferences
-    const { error: prefsError } = await supabase
+    const { error: prefsError } = await serviceClient
       .from("notification_preferences")
       .upsert({
         business_id: setup.business.id,
