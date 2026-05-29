@@ -1,5 +1,6 @@
 import { render } from "@react-email/render";
 import { getResendClient } from "@/lib/email/resend";
+import { getNodemailerTransporter } from "@/lib/email/nodemailer";
 import { getBusinessNotificationEmail, validateEmail } from "@/lib/email/recipients";
 import { logEmailSent, logEmailFailed } from "@/lib/email/email-log";
 import { createServiceClient } from "@/utils/supabase/service";
@@ -81,7 +82,10 @@ async function getOrInitializePreferences(businessId: string) {
 export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput
 ): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
-  const provider = "resend";
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASSWORD;
+  const useNodemailer = !!(smtpUser && smtpPass);
+  const provider = useNodemailer ? "nodemailer" : "resend";
   let finalTo = input.to ? input.to.trim() : null;
 
   try {
@@ -121,24 +125,7 @@ export async function sendTransactionalEmail(
       }
     }
 
-    // 3. Retrieve Resend Client
-    const resend = getResendClient();
-    if (!resend) {
-      const errMsg = "Resend client could not be initialized (missing API key).";
-      if (input.businessId) {
-        await logEmailFailed({
-          businessId: input.businessId,
-          recipient: finalTo,
-          subject: input.subject,
-          templateName: input.templateName,
-          provider,
-          errorMessage: errMsg,
-        });
-      }
-      return { success: false, error: errMsg };
-    }
-
-    // 4. Render React Email component to HTML string
+    // 3. Render React Email component to HTML string
     let htmlContent = "";
     try {
       htmlContent = await render(input.react);
@@ -159,49 +146,124 @@ export async function sendTransactionalEmail(
       return { success: false, error: errMsg };
     }
 
-    // 5. Send email via Resend
-    const sender = process.env.EMAIL_FROM || "noreply@yourdomain.com";
+    // 4. Send email via selected provider (Nodemailer vs Resend)
+    const sender = process.env.EMAIL_FROM || (useNodemailer ? smtpUser : "noreply@yourdomain.com");
     const textContent = input.fallbackText || input.subject;
 
-    const { data: responseData, error: sendError } = await resend.emails.send({
-      from: sender,
-      to: finalTo,
-      subject: input.subject,
-      html: htmlContent,
-      text: textContent,
-    });
+    if (useNodemailer) {
+      const transporter = getNodemailerTransporter();
+      if (!transporter) {
+        const errMsg = "Nodemailer transporter could not be initialized (missing SMTP configs).";
+        if (input.businessId) {
+          await logEmailFailed({
+            businessId: input.businessId,
+            recipient: finalTo,
+            subject: input.subject,
+            templateName: input.templateName,
+            provider,
+            errorMessage: errMsg,
+          });
+        }
+        return { success: false, error: errMsg };
+      }
 
-    if (sendError) {
-      const errMsg = sendError.message || "Failed to deliver email through Resend API.";
-      console.error(`[RESEND API ERROR]`, sendError);
-      
+      try {
+        const info = await transporter.sendMail({
+          from: sender,
+          to: finalTo,
+          subject: input.subject,
+          html: htmlContent,
+          text: textContent,
+        });
+
+        // 5. Log success to database
+        if (input.businessId) {
+          await logEmailSent({
+            businessId: input.businessId,
+            recipient: finalTo,
+            subject: input.subject,
+            templateName: input.templateName,
+            provider,
+            responseBody: { messageId: info.messageId, response: info.response },
+          });
+        }
+
+        return { success: true };
+      } catch (sendError: any) {
+        const errMsg = sendError.message || "Failed to deliver email through Nodemailer SMTP.";
+        console.error(`[NODEMAILER SMTP ERROR]`, sendError);
+        
+        if (input.businessId) {
+          await logEmailFailed({
+            businessId: input.businessId,
+            recipient: finalTo,
+            subject: input.subject,
+            templateName: input.templateName,
+            provider,
+            errorMessage: errMsg,
+            responseBody: sendError,
+          });
+        }
+        return { success: false, error: errMsg };
+      }
+    } else {
+      // Send via Resend
+      const resend = getResendClient();
+      if (!resend) {
+        const errMsg = "Resend client could not be initialized (missing API key).";
+        if (input.businessId) {
+          await logEmailFailed({
+            businessId: input.businessId,
+            recipient: finalTo,
+            subject: input.subject,
+            templateName: input.templateName,
+            provider,
+            errorMessage: errMsg,
+          });
+        }
+        return { success: false, error: errMsg };
+      }
+
+      const { data: responseData, error: sendError } = await resend.emails.send({
+        from: sender!,
+        to: finalTo,
+        subject: input.subject,
+        html: htmlContent,
+        text: textContent,
+      });
+
+      if (sendError) {
+        const errMsg = sendError.message || "Failed to deliver email through Resend API.";
+        console.error(`[RESEND API ERROR]`, sendError);
+        
+        if (input.businessId) {
+          await logEmailFailed({
+            businessId: input.businessId,
+            recipient: finalTo,
+            subject: input.subject,
+            templateName: input.templateName,
+            provider,
+            errorMessage: errMsg,
+            responseBody: sendError,
+          });
+        }
+        return { success: false, error: errMsg };
+      }
+
+      // 5. Log success to database
       if (input.businessId) {
-        await logEmailFailed({
+        await logEmailSent({
           businessId: input.businessId,
           recipient: finalTo,
           subject: input.subject,
           templateName: input.templateName,
           provider,
-          errorMessage: errMsg,
-          responseBody: sendError,
+          responseBody: responseData,
         });
       }
-      return { success: false, error: errMsg };
-    }
 
-    // 6. Log success to database
-    if (input.businessId) {
-      await logEmailSent({
-        businessId: input.businessId,
-        recipient: finalTo,
-        subject: input.subject,
-        templateName: input.templateName,
-        provider,
-        responseBody: responseData,
-      });
+      return { success: true };
     }
-
-    return { success: true };
 
   } catch (err: any) {
     const errMsg = err?.message || "An unexpected error occurred during email delivery flow.";
