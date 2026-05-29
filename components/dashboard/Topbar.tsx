@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell, Menu, User, Bot, Building2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { DashboardNotification } from "@/lib/queries/notifications";
 
@@ -30,6 +30,24 @@ function NotificationIcon({ level }: { level: DashboardNotification["level"] }) 
 export function Topbar({ onMenuClick, user, profile, business, assistant, notifications = [] }: TopbarProps) {
   const displayName = profile?.full_name || user?.email || "User";
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [open]);
   const criticalCount = notifications.filter((item) => item.level === "critical").length;
 
   return (
@@ -60,7 +78,7 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
       </div>
 
       <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-        <div className="relative">
+        <div className="relative" ref={containerRef}>
           <button
             onClick={() => setOpen((value) => !value)}
             className="relative p-2.5 text-slate-500 hover:bg-slate-50 rounded-2xl transition-colors"
