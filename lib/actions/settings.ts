@@ -213,15 +213,18 @@ export async function saveNotificationPreferences(data: {
     // 2. Update notification_preferences
     const { error: prefsError } = await serviceClient
       .from("notification_preferences")
-      .upsert({
-        business_id: setup.business.id,
-        email_new_leads: data.email_new_leads,
-        email_support_requests: data.email_support_requests,
-        email_booking_requests: data.email_booking_requests,
-        email_usage_warnings: data.email_usage_warnings,
-        email_payment_updates: data.email_payment_updates,
-        updated_at: new Date().toISOString(),
-      });
+      .upsert(
+        {
+          business_id: setup.business.id,
+          email_new_leads: data.email_new_leads,
+          email_support_requests: data.email_support_requests,
+          email_booking_requests: data.email_booking_requests,
+          email_usage_warnings: data.email_usage_warnings,
+          email_payment_updates: data.email_payment_updates,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "business_id" }
+      );
 
     if (prefsError) throw prefsError;
 
