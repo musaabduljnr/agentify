@@ -98,7 +98,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
             <button 
               key={tab} 
               onClick={() => setStatusFilter(tab)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest whitespace-nowrap transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest whitespace-nowrap transition-all shrink-0 ${
                 statusFilter === tab ? "bg-slate-900 text-white" : "bg-white text-slate-400 hover:bg-slate-50"
               }`}
             >

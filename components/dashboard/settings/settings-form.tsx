@@ -160,7 +160,7 @@ export function SettingsForm({
                 type="button"
                 onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all shrink-0",
                   activeTab === item.id
                     ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
                     : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
