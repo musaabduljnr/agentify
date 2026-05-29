@@ -36,12 +36,15 @@ export default function DemoPage() {
                     { icon: Zap, text: "Instant Responses" },
                     { icon: Shield, text: "Brand Safe" },
                     { icon: BarChart, text: "Lead Generation" }
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-indigo-300">
-                      <item.icon className="w-4 h-4" />
-                      {item.text}
-                    </div>
-                  ))}
+                  ].map((item, i) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={i} className="flex items-center gap-3 text-xs font-bold uppercase tracking-widest text-indigo-300">
+                        <Icon className="w-4 h-4" />
+                        {item.text}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <div className="pt-8 border-t border-white/10">

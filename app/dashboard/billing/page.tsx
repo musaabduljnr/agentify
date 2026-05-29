@@ -481,12 +481,12 @@ export default async function BillingPage({
             <table className="w-full text-left border-collapse min-w-[650px]">
               <thead>
                 <tr className="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  <th className="py-4 px-4">Date</th>
-                  <th className="py-4 px-4">Provider</th>
-                  <th className="py-4 px-4">Plan</th>
-                  <th className="py-4 px-4">Amount</th>
-                  <th className="py-4 px-4">Reference</th>
-                  <th className="py-4 px-4">Status</th>
+                  <th className="py-4 px-4 whitespace-nowrap">Date</th>
+                  <th className="py-4 px-4 whitespace-nowrap">Provider</th>
+                  <th className="py-4 px-4 whitespace-nowrap">Plan</th>
+                  <th className="py-4 px-4 whitespace-nowrap">Amount</th>
+                  <th className="py-4 px-4 whitespace-nowrap">Reference</th>
+                  <th className="py-4 px-4 whitespace-nowrap">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -498,20 +498,20 @@ export default async function BillingPage({
                   });
                   return (
                     <tr key={tx.id} className="text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-4 font-medium text-slate-800">{txDate}</td>
-                      <td className="py-4 px-4 capitalize">{tx.provider}</td>
-                      <td className="py-4 px-4 capitalize font-semibold text-slate-700">{tx.plan}</td>
-                      <td className="py-4 px-4 font-bold text-slate-900">
+                      <td className="py-4 px-4 font-medium text-slate-800 whitespace-nowrap">{txDate}</td>
+                      <td className="py-4 px-4 capitalize whitespace-nowrap">{tx.provider}</td>
+                      <td className="py-4 px-4 capitalize font-semibold text-slate-700 whitespace-nowrap">{tx.plan}</td>
+                      <td className="py-4 px-4 font-bold text-slate-900 whitespace-nowrap">
                         {tx.currency === "NGN" ? `₦${tx.amount.toLocaleString()}` : `${tx.currency} ${tx.amount}`}
                       </td>
-                      <td className="py-4 px-4">
-                        <code className="text-xs text-slate-400 font-mono select-all bg-slate-50 px-2 py-1 rounded border border-slate-100 break-all">
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <code className="text-xs text-slate-400 font-mono select-all bg-slate-50 px-2 py-1 rounded border border-slate-100 break-all whitespace-nowrap">
                           {tx.reference}
                         </code>
                       </td>
-                      <td className="py-4 px-4">
+                      <td className="py-4 px-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider border ${
+                          className={`inline-flex px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider border whitespace-nowrap ${
                             tx.status === "success"
                               ? "bg-emerald-50 text-emerald-600 border-emerald-100"
                               : tx.status === "pending"

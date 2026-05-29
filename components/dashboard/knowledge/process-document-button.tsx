@@ -38,7 +38,7 @@ export function ProcessDocumentButton({
         size="sm"
         onClick={handleProcess}
         disabled={loading}
-        className="h-8 text-xs font-bold w-full rounded-lg bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100"
+        className="h-8 text-xs font-bold w-full rounded-lg bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100 whitespace-nowrap"
       >
         {loading ? (
           <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />

@@ -112,11 +112,11 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
         <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
             <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-              <th className="px-8 py-5">Contact</th>
-              <th className="px-8 py-5">Contact Info</th>
-              <th className="px-8 py-5">Intent</th>
-              <th className="px-8 py-5">Status</th>
-              <th className="px-8 py-5 text-right">Action</th>
+              <th className="px-8 py-5 whitespace-nowrap">Contact</th>
+              <th className="px-8 py-5 whitespace-nowrap">Contact Info</th>
+              <th className="px-8 py-5 whitespace-nowrap">Intent</th>
+              <th className="px-8 py-5 whitespace-nowrap">Status</th>
+              <th className="px-8 py-5 text-right whitespace-nowrap">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -126,7 +126,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
                 onClick={() => setSelectedLead(lead)}
                 className="hover:bg-slate-50/50 transition-colors cursor-pointer group"
               >
-                <td className="px-8 py-6">
+                <td className="px-8 py-6 whitespace-nowrap">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-sm">
                       {(lead.name || "A").split(' ').map(n => n[0]).join('')}
@@ -137,7 +137,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
                     </div>
                   </div>
                 </td>
-                <td className="px-8 py-6">
+                <td className="px-8 py-6 whitespace-nowrap">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                       <Mail className="w-3 h-3" /> {lead.email || "No email"}
@@ -149,7 +149,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
                     )}
                   </div>
                 </td>
-                <td className="px-8 py-6">
+                <td className="px-8 py-6 whitespace-nowrap">
                   <div className="flex flex-col gap-1">
                     <span className="px-2 py-1 text-[9px] font-bold rounded-lg uppercase tracking-widest bg-blue-50 text-blue-600 w-fit">
                       {lead.metadata?.intent_type || "General Inquiry"}
@@ -159,7 +159,7 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
                     </span>
                   </div>
                 </td>
-                <td className="px-8 py-6">
+                <td className="px-8 py-6 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full ${
                       lead.status === "new" ? "bg-indigo-500" :
@@ -171,8 +171,8 @@ export function LeadsTable({ initialLeads }: { initialLeads: Lead[] }) {
                     <span className="text-sm font-bold text-slate-700 capitalize">{lead.status}</span>
                   </div>
                 </td>
-                <td className="px-8 py-6 text-right">
-                  <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl">
+                <td className="px-8 py-6 text-right whitespace-nowrap">
+                  <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical className="w-5 h-5" />
                   </Button>
                 </td>

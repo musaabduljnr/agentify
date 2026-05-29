@@ -128,14 +128,14 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Business Identity</th>
-                  <th className="py-4 px-6">Gateway Provider</th>
-                  <th className="py-4 px-6">Transaction Reference</th>
-                  <th className="py-4 px-6">Target Plan</th>
-                  <th className="py-4 px-6">Amount Billed</th>
-                  <th className="py-4 px-6">Transaction Status</th>
-                  <th className="py-4 px-6">Created Date</th>
-                  <th className="py-4 px-6 text-right">Actions Panel</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Identity</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Gateway Provider</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Transaction Reference</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Target Plan</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Amount Billed</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Transaction Status</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Created Date</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Actions Panel</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -148,24 +148,24 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
 
                   return (
                     <tr key={tx.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6 font-extrabold text-white text-sm">
+                      <td className="py-4 px-6 font-extrabold text-white text-sm whitespace-nowrap">
                         {tx.businesses?.name || "Deleted Business"}
                       </td>
-                      <td className="py-4 px-6 font-medium capitalize text-slate-400">
+                      <td className="py-4 px-6 font-medium capitalize text-slate-400 whitespace-nowrap">
                         {tx.provider}
                       </td>
-                      <td className="py-4 px-6 font-mono text-slate-400 select-all">
+                      <td className="py-4 px-6 font-mono text-slate-400 select-all whitespace-nowrap">
                         {tx.reference}
                       </td>
-                      <td className="py-4 px-6 capitalize font-semibold text-slate-300">
+                      <td className="py-4 px-6 capitalize font-semibold text-slate-300 whitespace-nowrap">
                         {tx.plan}
                       </td>
-                      <td className="py-4 px-6 font-black text-white text-sm">
+                      <td className="py-4 px-6 font-black text-white text-sm whitespace-nowrap">
                         ₦{tx.amount.toLocaleString()}
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider whitespace-nowrap ${
                             tx.status === "success"
                               ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                               : tx.status === "pending"
@@ -176,13 +176,13 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
                           {tx.status}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {txDate}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-right space-x-2">
+                      <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
                         {/* View JSON payload details */}
                         <Button
                           onClick={() => setSelectedResponse(tx.raw_response)}

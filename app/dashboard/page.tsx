@@ -146,27 +146,27 @@ export default async function DashboardOverview() {
                 <table className="w-full text-left min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <th className="px-6 py-4">Visitor</th>
-                      <th className="px-6 py-4">Last Message</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Time</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Visitor</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Last Message</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {recentConversations.map((convo) => (
                       <tr key={convo.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-bold text-slate-900 text-sm">{convo.visitor}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-slate-500 line-clamp-1">{convo.lastMessage}</div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-slate-500 line-clamp-1 max-w-[250px] truncate">{convo.lastMessage}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <span className={convo.status === "Lead" ? "px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-full" : "px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full"}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={convo.status === "Lead" ? "px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-full whitespace-nowrap" : "px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full whitespace-nowrap"}>
                             {convo.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right text-xs text-slate-400 font-medium">{convo.time}</td>
+                        <td className="px-6 py-4 text-right text-xs text-slate-400 font-medium whitespace-nowrap">{convo.time}</td>
                       </tr>
                     ))}
                   </tbody>

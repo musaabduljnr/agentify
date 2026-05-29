@@ -94,6 +94,7 @@ export function Sidebar({ isOpen, setIsOpen, subscription }: SidebarProps) {
           <nav className="flex-1 space-y-1">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
@@ -106,7 +107,7 @@ export function Sidebar({ isOpen, setIsOpen, subscription }: SidebarProps) {
                   )}
                   onClick={() => setIsOpen(false)}
                 >
-                  <item.icon className={cn("w-5 h-5", isActive ? "text-indigo-600" : "text-slate-400")} />
+                  <Icon className={cn("w-5 h-5", isActive ? "text-indigo-600" : "text-slate-400")} />
                   {item.label}
                 </Link>
               );

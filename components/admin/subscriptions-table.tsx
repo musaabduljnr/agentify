@@ -154,13 +154,13 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Business Name</th>
-                  <th className="py-4 px-6">Pricing Plan</th>
-                  <th className="py-4 px-6">Status State</th>
-                  <th className="py-4 px-6">Gateway Provider</th>
-                  <th className="py-4 px-6">Message Quota Usage</th>
-                  <th className="py-4 px-6">Period Renew Date</th>
-                  <th className="py-4 px-6 text-right">Actions Panel</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Name</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Pricing Plan</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Status State</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Gateway Provider</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Message Quota Usage</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Period Renew Date</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Actions Panel</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -176,22 +176,22 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
 
                   return (
                     <tr key={sub.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <p className="font-extrabold text-white text-sm">
                             {sub.businesses?.name || "Deleted Business"}
                           </p>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono select-all block mt-0.5">
+                        <span className="text-[10px] text-slate-500 font-mono select-all block mt-0.5 whitespace-nowrap">
                           Sub ID: {sub.id}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-bold text-white capitalize">
+                      <td className="py-4 px-6 font-bold text-white capitalize whitespace-nowrap">
                         {sub.plan.replace("_", " ")}
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider whitespace-nowrap ${
                             isSuspended
                               ? "bg-red-500/10 border-red-500/20 text-red-400"
                               : sub.status === "active"
@@ -202,14 +202,14 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                           {sub.status}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-medium capitalize text-slate-400">
+                      <td className="py-4 px-6 font-medium capitalize text-slate-400 whitespace-nowrap">
                         {sub.payment_provider || "manual"}
                       </td>
-                      <td className="py-4 px-6 font-bold text-white">
+                      <td className="py-4 px-6 font-bold text-white whitespace-nowrap">
                         <span className="text-indigo-400">{sub.current_usage}</span> / {sub.message_limit}
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {endPeriod}
                         </span>

@@ -82,12 +82,12 @@ export function ConversationsTable({ initialConversations }: ConversationsTableP
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Business Location</th>
-                  <th className="py-4 px-6">Source Origin</th>
-                  <th className="py-4 px-6">Visitor Identifier</th>
-                  <th className="py-4 px-6">Lead Collected</th>
-                  <th className="py-4 px-6">Activity Date</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Location</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Source Origin</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Visitor Identifier</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Lead Collected</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Activity Date</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -103,21 +103,21 @@ export function ConversationsTable({ initialConversations }: ConversationsTableP
 
                   return (
                     <tr key={chat.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6 font-extrabold text-white text-sm">
+                      <td className="py-4 px-6 font-extrabold text-white text-sm whitespace-nowrap">
                         {chat.businesses?.name || "Deleted Business"}
                       </td>
-                      <td className="py-4 px-6 font-medium capitalize text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-medium capitalize text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Globe className="w-3.5 h-3.5 text-slate-500" />
                           {(chat.source || "widget").replace("_", " ")}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-mono text-slate-400 select-all">
+                      <td className="py-4 px-6 font-mono text-slate-400 select-all whitespace-nowrap">
                         {chat.visitor_id || "Anonymous User"}
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider whitespace-nowrap ${
                             isLead
                               ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                               : "bg-slate-900 border-slate-800 text-slate-500"
@@ -126,13 +126,13 @@ export function ConversationsTable({ initialConversations }: ConversationsTableP
                           {isLead ? "Captured" : "No Lead"}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {chatDate}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 px-6 text-right whitespace-nowrap">
                         <Button
                           onClick={() => setSelectedChat(chat)}
                           variant="ghost"

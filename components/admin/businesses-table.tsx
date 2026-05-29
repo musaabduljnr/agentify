@@ -120,13 +120,13 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Business Name</th>
-                  <th className="py-4 px-6">Owner Account</th>
-                  <th className="py-4 px-6">Website URL</th>
-                  <th className="py-4 px-6">Active Plan</th>
-                  <th className="py-4 px-6">Widget Config</th>
-                  <th className="py-4 px-6">Onboarded</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Name</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Owner Account</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Website URL</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Active Plan</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Widget Config</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Onboarded</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -145,43 +145,43 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
 
                   return (
                     <tr key={biz.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <p className="font-extrabold text-white text-sm">{biz.name}</p>
-                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 uppercase tracking-widest text-slate-500">
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <p className="font-extrabold text-white text-sm whitespace-nowrap">{biz.name}</p>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 uppercase tracking-widest text-slate-500 whitespace-nowrap">
                             {biz.industry || "General"}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono select-all block mt-0.5">
+                        <span className="text-[10px] text-slate-500 font-mono select-all block mt-0.5 whitespace-nowrap">
                           slug: {biz.slug}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
-                        <p className="font-semibold text-slate-300">{biz.owner?.full_name || "—"}</p>
-                        <p className="text-[10px] text-slate-500 font-medium">{biz.owner?.email}</p>
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <p className="font-semibold text-slate-300 whitespace-nowrap">{biz.owner?.full_name || "—"}</p>
+                        <p className="text-[10px] text-slate-500 font-medium whitespace-nowrap">{biz.owner?.email}</p>
                       </td>
-                      <td className="py-4 px-6 font-semibold">
+                      <td className="py-4 px-6 font-semibold whitespace-nowrap">
                         {biz.website_url ? (
                           <a
                             href={biz.website_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center gap-1.5 text-indigo-400 hover:underline"
+                            className="flex items-center gap-1.5 text-indigo-400 hover:underline whitespace-nowrap"
                           >
                             <Globe className="w-3.5 h-3.5 shrink-0" />
                             {biz.website_url.replace(/https?:\/\/(www\.)?/, "")}
                           </a>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-slate-600 whitespace-nowrap">—</span>
                         )}
                       </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-white capitalize">
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="font-bold text-white capitalize whitespace-nowrap">
                             {sub.plan ? sub.plan.replace("_", " ") : "free_trial"}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap ${
                               isSuspended
                                 ? "bg-red-500/10 border-red-500/20 text-red-400"
                                 : sub.status === "active"
@@ -193,9 +193,9 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                           </span>
                         </div>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider whitespace-nowrap ${
                             widgetEnabled
                               ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400"
                               : "bg-slate-900 border-slate-800 text-slate-500"
@@ -204,7 +204,7 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                           {widgetEnabled ? "enabled" : "disabled"}
                         </span>
                         <span
-                          className={`ml-2 inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                          className={`ml-2 inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider whitespace-nowrap ${
                             hostedEnabled
                               ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                               : "bg-slate-900 border-slate-800 text-slate-500"
@@ -213,16 +213,16 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                           hosted {hostedEnabled ? "on" : "off"}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-400">
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
                         {biz.onboarding_completed ? (
-                          <span className="text-emerald-400 font-bold uppercase tracking-wider text-[9px]">
+                          <span className="text-emerald-400 font-bold uppercase tracking-wider text-[9px] whitespace-nowrap">
                             Completed
                           </span>
                         ) : (
-                          <span className="text-slate-500 italic">Incomplete</span>
+                          <span className="text-slate-500 italic whitespace-nowrap">Incomplete</span>
                         )}
                       </td>
-                      <td className="py-4 px-6 text-right space-x-2">
+                      <td className="py-4 px-6 text-right whitespace-nowrap space-x-2">
                         {/* Details Modal Trigger */}
                         <Button
                           onClick={() => setSelectedBusiness(biz)}

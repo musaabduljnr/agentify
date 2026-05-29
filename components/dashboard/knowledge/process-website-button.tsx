@@ -31,7 +31,7 @@ export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; s
         onClick={handleProcess}
         disabled={loading}
         size="sm"
-        className={`h-8 rounded-xl text-xs font-bold px-3 ${
+        className={`h-8 rounded-xl text-xs font-bold px-3 whitespace-nowrap ${
           status === "failed"
             ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
             : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200"

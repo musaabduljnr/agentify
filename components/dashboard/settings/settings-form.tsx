@@ -152,42 +152,48 @@ export function SettingsForm({
       {/* Horizontal scrollable tabs on mobile, vertical sidebar on lg+ */}
       <div className="lg:hidden -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto scrollbar-none">
         <div className="flex gap-2 pb-2 min-w-max">
-          {tabs.map((item) => (
+          {tabs.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                  activeTab === item.id
+                    ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
+                )}
+              >
+                <Icon className={cn("w-4 h-4", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="hidden lg:block lg:col-span-1 space-y-2">
+        {tabs.map((item) => {
+          const Icon = item.icon;
+          return (
             <button
               key={item.id}
               type="button"
               onClick={() => setActiveTab(item.id)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all",
+                "w-full flex items-center gap-3 px-6 py-4 rounded-2xl text-sm font-bold transition-all",
                 activeTab === item.id
                   ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
               )}
             >
-              <item.icon className={cn("w-4 h-4", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
+              <Icon className={cn("w-5 h-5", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
               {item.label}
             </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="hidden lg:block lg:col-span-1 space-y-2">
-        {tabs.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              "w-full flex items-center gap-3 px-6 py-4 rounded-2xl text-sm font-bold transition-all",
-              activeTab === item.id
-                ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
-                : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
-            )}
-          >
-            <item.icon className={cn("w-5 h-5", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
-            {item.label}
-          </button>
-        ))}
+          );
+        })}
 
         <div className="mt-10 p-6 bg-indigo-600 rounded-[2rem] text-white shadow-xl shadow-indigo-200">
           <h4 className="font-black mb-2">Need a Repair?</h4>
@@ -207,7 +213,7 @@ export function SettingsForm({
           <Button
             onClick={handleSave}
             disabled={loading}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 px-8 flex items-center gap-2 font-bold shadow-lg shadow-indigo-100 min-w-[160px]"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 px-8 flex items-center gap-2 font-bold shadow-lg shadow-indigo-100 min-w-[160px] whitespace-nowrap"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Settings
@@ -265,7 +271,7 @@ export function SettingsForm({
                 </p>
                 <Link
                   href="/dashboard/settings/notifications"
-                  className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-100 transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-100 transition-all whitespace-nowrap"
                 >
                   <Bell className="w-4 h-4" />
                   Open Notification Center
@@ -308,7 +314,7 @@ export function SettingsForm({
             <h4 className="text-red-900 font-extrabold text-lg mb-1">Danger Zone</h4>
             <p className="text-red-700 text-sm font-medium">Permanently delete your business account and all associated data.</p>
           </div>
-          <Button variant="outline" className="bg-white text-red-600 border border-red-200 hover:bg-red-600 hover:text-white rounded-2xl h-12 px-8 font-bold transition-all shrink-0">
+          <Button variant="outline" className="bg-white text-red-600 border border-red-200 hover:bg-red-600 hover:text-white rounded-2xl h-12 px-8 font-bold transition-all shrink-0 whitespace-nowrap">
             Delete Account
           </Button>
         </div>

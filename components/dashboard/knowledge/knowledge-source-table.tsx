@@ -52,12 +52,12 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
         <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-slate-100">
-              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Title</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Type</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">Details</th>
-              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell">Added</th>
-              <th className="text-right px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider">Actions</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Title</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Type</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Status</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Details</th>
+              <th className="text-left px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider hidden md:table-cell whitespace-nowrap">Added</th>
+              <th className="text-right px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -65,7 +65,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
               const Icon = typeIcons[source.type] || FileText;
               return (
                 <tr key={source.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-4 h-4 text-indigo-600" />
@@ -78,10 +78,10 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <span className="text-xs font-bold text-slate-500 capitalize bg-slate-50 px-2 py-1 rounded-lg">{source.type}</span>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex flex-col gap-2">
                       <StatusBadge status={source.status} />
                       {source.type === "website" && (
@@ -97,7 +97,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                       />
                     </div>
                   </td>
-                  <td className="px-4 py-4 hidden md:table-cell">
+                  <td className="px-4 py-4 hidden md:table-cell whitespace-nowrap">
                     <SourceMetadata source={source} />
                     <EmbeddingStatusBadge 
                       isEmbedded={source.metadata?.embedded}
@@ -105,10 +105,10 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                       embeddedAt={source.metadata?.embedded_at}
                     />
                   </td>
-                  <td className="px-4 py-4 hidden md:table-cell">
+                  <td className="px-4 py-4 hidden md:table-cell whitespace-nowrap">
                     <span className="text-xs text-slate-500">{new Date(source.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</span>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <div className="flex items-center justify-end gap-1">
                       <button
                         onClick={() => setViewSource(source)}

@@ -78,13 +78,13 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Lead Coordinates</th>
-                  <th className="py-4 px-6">Business Partner</th>
-                  <th className="py-4 px-6">Phone Number</th>
-                  <th className="py-4 px-6">Buying Intent Grade</th>
-                  <th className="py-4 px-6">Collected Origin</th>
-                  <th className="py-4 px-6">Collection Date</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Lead Coordinates</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Partner</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Phone Number</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Buying Intent Grade</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Collected Origin</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Collection Date</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -97,28 +97,28 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
 
                   return (
                     <tr key={lead.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <p className="font-extrabold text-white text-sm">
+                          <p className="font-extrabold text-white text-sm whitespace-nowrap">
                             {lead.name || "Anonymous Visitor"}
                           </p>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-medium font-mono select-all block mt-0.5">
+                        <span className="text-[10px] text-slate-500 font-medium font-mono select-all block mt-0.5 whitespace-nowrap">
                           {lead.email}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-semibold text-slate-300">
+                      <td className="py-4 px-6 font-semibold text-slate-300 whitespace-nowrap">
                         {lead.businesses?.name || "Deleted Business"}
                       </td>
-                      <td className="py-4 px-6 font-mono text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-mono text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Phone className="w-3.5 h-3.5 text-slate-500" />
                           {lead.phone || "—"}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-widest ${
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-widest whitespace-nowrap ${
                             lead.buying_intent === "high"
                               ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
                               : lead.buying_intent === "medium"
@@ -129,16 +129,16 @@ export function LeadsTable({ initialLeads }: LeadsTableProps) {
                           {lead.buying_intent || "low"}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-medium capitalize text-slate-400">
+                      <td className="py-4 px-6 font-medium capitalize text-slate-400 whitespace-nowrap">
                         {lead.metadata?.source || "Widget Prompt"}
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {leadDate}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 px-6 text-right whitespace-nowrap">
                         <Button
                           onClick={() => setSelectedLead(lead)}
                           variant="ghost"

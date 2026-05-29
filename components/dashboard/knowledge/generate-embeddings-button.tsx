@@ -40,7 +40,7 @@ export function GenerateEmbeddingsButton({
         onClick={handleGenerate}
         disabled={loading}
         size="sm"
-        className={`h-8 rounded-xl text-xs font-bold px-3 transition-all ${
+        className={`h-8 rounded-xl text-xs font-bold px-3 transition-all whitespace-nowrap ${
           isEmbedded 
             ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200"
             : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200"

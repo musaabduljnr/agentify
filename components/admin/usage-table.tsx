@@ -62,11 +62,11 @@ export function UsageTable({ initialLogs }: UsageTableProps) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Business Name</th>
-                  <th className="py-4 px-6">Resource Type</th>
-                  <th className="py-4 px-6">Consumption Amount</th>
-                  <th className="py-4 px-6">Trace Logs Metadata</th>
-                  <th className="py-4 px-6 text-right">Audit Date</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Name</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Resource Type</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Consumption Amount</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Trace Logs Metadata</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Audit Date</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -81,12 +81,12 @@ export function UsageTable({ initialLogs }: UsageTableProps) {
 
                   return (
                     <tr key={log.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6 font-extrabold text-white text-sm">
+                      <td className="py-4 px-6 font-extrabold text-white text-sm whitespace-nowrap">
                         {log.businesses?.name || "Deleted Business"}
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider whitespace-nowrap ${
                             log.type === "message"
                               ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400"
                               : log.type === "embedding"
@@ -99,16 +99,16 @@ export function UsageTable({ initialLogs }: UsageTableProps) {
                           {log.type.replace("_", " ")}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-bold text-white text-sm">
+                      <td className="py-4 px-6 font-bold text-white text-sm whitespace-nowrap">
                         +{log.amount.toLocaleString()} units
                       </td>
-                      <td className="py-4 px-6">
-                        <code className="text-xs text-slate-500 font-mono select-all bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-850 block max-w-xs truncate">
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <code className="text-xs text-slate-500 font-mono select-all bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-850 block max-w-xs truncate whitespace-nowrap">
                           {JSON.stringify(log.metadata || {})}
                         </code>
                       </td>
-                      <td className="py-4 px-6 text-right font-medium text-slate-400">
-                        <span className="flex items-center justify-end gap-1.5">
+                      <td className="py-4 px-6 text-right font-medium text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {logDate}
                         </span>

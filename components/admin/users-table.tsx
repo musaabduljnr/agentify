@@ -117,12 +117,12 @@ export function UsersTable({ initialUsers }: UsersTableProps) {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-850 text-slate-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-6">Name & Details</th>
-                  <th className="py-4 px-6">Email Address</th>
-                  <th className="py-4 px-6">Platform Role</th>
-                  <th className="py-4 px-6">Business Status</th>
-                  <th className="py-4 px-6">Joined Date</th>
-                  <th className="py-4 px-6 text-right">Actions</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Name & Details</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Email Address</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Platform Role</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Business Status</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Joined Date</th>
+                  <th className="py-4 px-6 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -137,46 +137,42 @@ export function UsersTable({ initialUsers }: UsersTableProps) {
 
                   return (
                     <tr key={user.id} className="text-slate-350 hover:bg-slate-900/30 transition-colors">
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <p className="font-extrabold text-white text-sm">{user.full_name || "—"}</p>
                         <span className="text-[10px] text-slate-500 font-medium font-mono truncate block max-w-[150px]">
                           ID: {user.id}
                         </span>
                       </td>
-                      <td className="py-4 px-6 font-semibold">
-                        <span className="flex items-center gap-1.5 text-slate-300">
+                      <td className="py-4 px-6 font-semibold whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 text-slate-300 whitespace-nowrap">
                           <Mail className="w-3.5 h-3.5 text-slate-500" />
                           {user.email}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         <span
-                          className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
-                            user.role === "admin"
-                              ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400"
-                              : "bg-slate-900 border-slate-800 text-slate-400"
-                          }`}
+                          className="inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border border-slate-800 bg-slate-900 text-slate-400 whitespace-nowrap"
                         >
                           {user.role}
                         </span>
                       </td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-6 whitespace-nowrap">
                         {user.businesses && user.businesses.length > 0 ? (
-                          <span className="flex items-center gap-1.5 font-bold text-white">
+                          <span className="flex items-center gap-1.5 font-bold text-white whitespace-nowrap">
                             <Building className="w-3.5 h-3.5 text-indigo-400" />
                             {user.businesses[0].name}
                           </span>
                         ) : (
-                          <span className="text-slate-500 italic">No business linked</span>
+                          <span className="text-slate-500 italic whitespace-nowrap">No business linked</span>
                         )}
                       </td>
-                      <td className="py-4 px-6 font-medium text-slate-400">
-                        <span className="flex items-center gap-1.5">
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
+                        <span className="flex items-center gap-1.5 whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 text-slate-500" />
                           {regDate}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-right">
+                      <td className="py-4 px-6 text-right whitespace-nowrap">
                         <div className="flex justify-end gap-2">
                           <Button
                             onClick={() => handleRoleToggle(user.id, user.role)}

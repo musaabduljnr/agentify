@@ -229,7 +229,7 @@ export default function NotificationsSettingsPage() {
             onClick={handleTestEmail}
             disabled={testing || saving}
             variant="outline"
-            className="rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold h-12 px-6 flex items-center gap-2"
+            className="rounded-2xl border-slate-200 text-slate-700 hover:bg-slate-50 font-bold h-12 px-6 flex items-center gap-2 whitespace-nowrap"
           >
             {testing ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> : <Send className="w-4 h-4" />}
             Send Test Email
@@ -238,7 +238,7 @@ export default function NotificationsSettingsPage() {
           <Button
             onClick={handleSave}
             disabled={saving || testing}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold h-12 px-8 flex items-center gap-2 shadow-md shadow-indigo-100"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold h-12 px-8 flex items-center gap-2 shadow-md shadow-indigo-100 whitespace-nowrap"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Settings

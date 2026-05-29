@@ -58,7 +58,7 @@ export function UpgradeButton({
         onClick={handleUpgrade}
         disabled={loading}
         variant={variant}
-        className={`w-full rounded-2xl h-11 font-bold transition-all shadow-sm ${className}`}
+        className={`w-full rounded-2xl h-11 font-bold transition-all shadow-sm whitespace-nowrap ${className}`}
       >
         {loading ? (
           <>
