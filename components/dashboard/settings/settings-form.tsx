@@ -183,14 +183,14 @@ export function SettingsForm({
               type="button"
               onClick={() => setActiveTab(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-6 py-4 rounded-2xl text-sm font-bold transition-all",
+                "w-full flex items-center gap-2 xl:gap-3 px-4 xl:px-6 py-3.5 rounded-2xl text-xs xl:text-sm font-bold transition-all whitespace-nowrap",
                 activeTab === item.id
                   ? "bg-white border border-slate-200 text-indigo-600 shadow-sm"
                   : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/70"
               )}
             >
-              <Icon className={cn("w-5 h-5", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
-              {item.label}
+              <Icon className={cn("w-4 h-4 xl:w-5 xl:h-5 shrink-0", activeTab === item.id ? "text-indigo-600" : "text-slate-400")} />
+              <span>{item.label}</span>
             </button>
           );
         })}
