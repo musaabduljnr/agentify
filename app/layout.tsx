@@ -68,7 +68,9 @@ export const viewport: Viewport = {
   colorScheme: "light",
 };
 
+import { Suspense } from "react";
 import { Toaster } from "sonner";
+import { NavigationLoader } from "@/components/ui/navigation-loader";
 
 export default function RootLayout({
   children,
@@ -80,6 +82,9 @@ export default function RootLayout({
       <body className={`${inter.variable} ${outfit.variable} font-sans antialiased text-slate-900`}>
         {children}
         <Toaster position="top-center" richColors />
+        <Suspense fallback={null}>
+          <NavigationLoader />
+        </Suspense>
       </body>
     </html>
   );
