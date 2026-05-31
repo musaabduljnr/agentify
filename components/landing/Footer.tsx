@@ -15,38 +15,38 @@ export function Footer() {
               Empowering businesses with intelligent AI assistants that work 24/7 to provide world-class support and capture leads.
             </p>
             <div className="flex items-center gap-4">
-              <Link href="#" className="hover:text-white transition-colors"><Twitter className="w-5 h-5" /></Link>
-              <Link href="#" className="hover:text-white transition-colors"><Github className="w-5 h-5" /></Link>
-              <Link href="#" className="hover:text-white transition-colors"><Linkedin className="w-5 h-5" /></Link>
+              <Link href="https://x.com/agentify" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors"><Twitter className="w-5 h-5" /></Link>
+              <Link href="https://github.com/musaabduljnr/agentify" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors"><Github className="w-5 h-5" /></Link>
+              <Link href="https://linkedin.com/company/agentify" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors"><Linkedin className="w-5 h-5" /></Link>
             </div>
           </div>
           
           <div>
             <h4 className="text-white font-bold mb-6">Product</h4>
             <ul className="space-y-4 text-sm">
-              <li><Link href="#features" className="hover:text-white transition-colors">Features</Link></li>
-              <li><Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Integrations</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Changelog</Link></li>
+              <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
+              <li><Link href="/#pricing" className="hover:text-white transition-colors">Pricing</Link></li>
+              <li><Link href="/integrations" className="hover:text-white transition-colors">Integrations</Link></li>
+              <li><Link href="/changelog" className="hover:text-white transition-colors">Changelog</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="text-white font-bold mb-6">Company</h4>
             <ul className="space-y-4 text-sm">
-              <li><Link href="#" className="hover:text-white transition-colors">About Us</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Blog</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Careers</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+              <li><Link href="/careers" className="hover:text-white transition-colors">Careers</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="text-white font-bold mb-6">Legal</h4>
             <ul className="space-y-4 text-sm">
-              <li><Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Terms of Service</Link></li>
-              <li><Link href="#" className="hover:text-white transition-colors">Cookie Policy</Link></li>
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
+              <li><Link href="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link></li>
             </ul>
           </div>
         </div>
