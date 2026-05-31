@@ -16,6 +16,7 @@ import {
   ShoppingBag
 } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 
 const categories = ["All", "CMS", "E-commerce", "Communication", "Automation"];
 
