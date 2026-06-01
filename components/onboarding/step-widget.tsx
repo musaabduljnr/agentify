@@ -14,10 +14,13 @@ export function StepWidget({ register, watch, setValue, errors }: any) {
   const selectedPosition = watch("position");
 
   const addQuestion = (e: any) => {
-    if (e.key === "Enter" && e.target.value) {
+    if (e.key === "Enter") {
       e.preventDefault();
-      setValue("suggestedQuestions", [...suggestedQuestions, e.target.value]);
-      e.target.value = "";
+      const val = e.target.value.trim();
+      if (val) {
+        setValue("suggestedQuestions", [...suggestedQuestions, val]);
+        e.target.value = "";
+      }
     }
   };
 

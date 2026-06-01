@@ -113,7 +113,14 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (step < 4) {
+              nextStep();
+            } else {
+              handleSubmit(onSubmit)(e);
+            }
+          }}>
             {renderStep()}
 
             {step < 5 && (
