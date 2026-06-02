@@ -1,47 +1,65 @@
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { 
+  getEffectivePlanConfigs, 
+  getBillingPlatformSettings, 
+  formatCurrencyAmount 
+} from "@/lib/billing/platform";
+import type { PlanId } from "@/lib/billing/plans";
 
-const plans = [
-  {
-    name: "Free Trial",
-    price: "Free",
+const planMeta = {
+  free_trial: {
     description: "Perfect for exploring the platform",
-    features: ["1 AI Assistant", "100 messages/mo", "Website scraping", "Hosted chat"],
     buttonText: "Start Trial",
     href: "/signup",
     popular: false,
   },
-  {
-    name: "Starter",
-    price: "NGN 5,000",
+  starter: {
     description: "Great for small businesses",
-    features: ["1 AI Assistant", "5,000 messages/mo", "Lead capture", "Remove branding", "Email support"],
     buttonText: "Get Started",
     href: "/signup",
     popular: true,
   },
-  {
-    name: "Growth",
-    price: "NGN 15,000",
+  growth: {
     description: "For growing companies",
-    features: ["3 AI Assistants", "25,000 messages/mo", "100 knowledge sources", "Custom domain", "Priority support"],
     buttonText: "Choose Growth",
     href: "/signup",
     popular: false,
   },
-  {
-    name: "Enterprise",
-    price: "Custom",
+  enterprise: {
     description: "For agencies and enterprises",
-    features: ["Unlimited Assistants", "Unlimited messages", "Custom integrations", "Dedicated support", "SLA guarantee"],
     buttonText: "Contact Us",
     href: "mailto:support@agentify.app",
     popular: false,
   },
-];
+};
 
-export function Pricing() {
+export async function Pricing() {
+  const configs = await getEffectivePlanConfigs();
+  const settings = await getBillingPlatformSettings();
+
+  const plans = (["free_trial", "starter", "growth", "enterprise"] as PlanId[]).map((planId) => {
+    const config = configs[planId];
+    const meta = planMeta[planId];
+    
+    let priceDisplay = formatCurrencyAmount(config.price_ngn, settings);
+    if (config.price_ngn === 0 || planId === "free_trial") {
+      priceDisplay = "Free";
+    }
+
+    return {
+      name: config.name,
+      price: priceDisplay,
+      description: meta.description,
+      features: config.features || [],
+      buttonText: meta.buttonText,
+      href: meta.href,
+      popular: meta.popular,
+      priceVal: config.price_ngn,
+    };
+  });
+
   return (
     <section id="pricing" className="py-24 bg-slate-50">
       <div className="container mx-auto px-4">
@@ -63,23 +81,23 @@ export function Pricing() {
               } flex flex-col`}
             >
               {plan.popular && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-indigo-650 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow">
                   Most Popular
                 </div>
               )}
               <div className="mb-8">
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{plan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-4xl font-bold text-slate-900">{plan.price}</span>
-                  {plan.price !== "Free" && plan.price !== "Custom" ? <span className="text-slate-500">/mo</span> : null}
+                  <span className="text-3xl font-black text-slate-900">{plan.price}</span>
+                  {plan.priceVal !== null && plan.priceVal !== 0 ? <span className="text-xs font-bold text-slate-500">/mo</span> : null}
                 </div>
-                <p className="text-sm text-slate-500">{plan.description}</p>
+                <p className="text-xs text-slate-500 font-semibold leading-relaxed">{plan.description}</p>
               </div>
               
               <ul className="space-y-4 mb-8 flex-1">
                 {plan.features.map((feature, fIndex) => (
-                  <li key={fIndex} className="flex items-center gap-3 text-sm text-slate-600">
-                    <Check className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                  <li key={fIndex} className="flex items-start gap-2.5 text-xs text-slate-600 font-semibold leading-relaxed">
+                    <Check className="w-4 h-4 text-indigo-600 flex-shrink-0 mt-0.5" />
                     <span>{feature}</span>
                   </li>
                 ))}
@@ -88,7 +106,7 @@ export function Pricing() {
               <Link href={plan.href}>
                 <Button
                   variant={plan.popular ? "default" : "outline"}
-                  className={`w-full rounded-full ${plan.popular ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
+                  className={`w-full rounded-2xl h-11 font-bold ${plan.popular ? 'bg-indigo-650 hover:bg-indigo-600 text-white shadow shadow-indigo-200 border-none' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
                 >
                   {plan.buttonText}
                 </Button>
