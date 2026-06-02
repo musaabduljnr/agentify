@@ -2,6 +2,7 @@ import DashboardLayoutClient from "@/components/dashboard/DashboardLayout";
 import { requireCompleteBusinessSetup } from "@/lib/queries/business";
 import { getUsageSummary } from "@/lib/billing/usage";
 import { getDashboardNotifications } from "@/lib/queries/notifications";
+import { ClaimDemoHandler } from "@/components/dashboard/ClaimDemoHandler";
 
 export default async function DashboardLayout({
   children,
@@ -49,6 +50,7 @@ export default async function DashboardLayout({
       subscription={subscriptionData}
       notifications={notifications}
     >
+      <ClaimDemoHandler userId={setup.user.id} />
       {children}
     </DashboardLayoutClient>
   );

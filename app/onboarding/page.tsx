@@ -3,6 +3,7 @@ import { Bot, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
 import { Button } from "@/components/ui/button";
+import { ClaimDemoHandler } from "@/components/dashboard/ClaimDemoHandler";
 
 export default async function OnboardingPage() {
   const setup = await getCurrentBusinessSetup();
@@ -11,6 +12,7 @@ export default async function OnboardingPage() {
   if (setup.isComplete) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        {setup.user && <ClaimDemoHandler userId={setup.user.id} />}
         <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-2xl p-12 max-w-md w-full text-center">
           <div className="w-20 h-20 bg-green-50 text-green-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <Bot className="w-12 h-12" />
@@ -53,6 +55,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-20 px-4">
+      {setup.user && <ClaimDemoHandler userId={setup.user.id} />}
       <div className="container mx-auto">
         <div className="flex flex-col items-center mb-12">
           <Link href="/" className="flex items-center gap-2 mb-4">
