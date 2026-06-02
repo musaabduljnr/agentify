@@ -6,6 +6,7 @@ import {
   resolveRedirectUrl,
 } from "./url-safety";
 import { cleanExtractedText, countWords } from "./text-cleaner";
+import { generateGeminiContent } from "../ai/providers/gemini";
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
 const FETCH_TIMEOUT = 10_000; // 10 seconds per page
@@ -457,42 +458,114 @@ async function scrapePage(rawUrl: string, rootUrl: string): Promise<PageScrapeRe
   const scriptTextParts = await extractScriptText($, url, rootUrl);
 
   $(REMOVE_SELECTORS).remove();
+  const cleanedHtml = $.html();
 
-  const textParts: string[] = [];
+  let extractedText = "";
+  let isAiExtracted = false;
 
-  textParts.push(`Source URL: ${url}`);
-  if (title) textParts.push(title);
-  if (description) textParts.push(description);
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      const maxHtmlLength = 250_000;
+      const truncatedHtml = cleanedHtml.length > maxHtmlLength
+        ? cleanedHtml.slice(0, maxHtmlLength) + "\n<!-- HTML TRUNCATED DUE TO SIZE LIMIT -->"
+        : cleanedHtml;
 
-  $("h1, h2, h3, h4, h5, h6").each((_, el) => {
-    const text = $(el).text().trim();
-    if (text) textParts.push(text);
-  });
+      const systemInstruction = `You are a high-fidelity web page scraper and content extractor.
+Your job is to read the clean HTML of a web page and convert it into a clean, comprehensive, structured Markdown document.
 
-  $("p").each((_, el) => {
-    const text = $(el).text().trim();
-    if (text && text.length > 10) textParts.push(text);
-  });
+CRITICAL INSTRUCTIONS:
+1. Identify and extract all products, services, pricing plans, service costs, subscriptions, rates, fees, discounts, and terms.
+2. Do not omit or summarize any pricing details, plan features, or product lists. Every pricing detail must be preserved exactly as it appears.
+3. Represent pricing tables, plans, grids, or comparison matrices as Markdown tables or structured lists.
+4. Extract all other useful page content, such as business hours, address, phone numbers, contact info, FAQs, team members, about info, etc.
+5. Filter out navigation headers, footers, social media links, page scripts, layout styling, cookie banner text, and ads.
+6. Return only the extracted markdown content without any introduction, explanations, or wrapper backticks.`;
 
-  $("li").each((_, el) => {
-    const text = $(el).text().trim();
-    if (text && text.length > 5) textParts.push(`- ${text}`);
-  });
+      const prompt = `Here is the clean HTML of the web page at URL: ${url}\n\nHTML:\n${truncatedHtml}`;
 
-  $("td, th").each((_, el) => {
-    const text = $(el).text().trim();
-    if (text && text.length > 3) textParts.push(text);
-  });
+      const geminiText = await generateGeminiContent({
+        prompt,
+        systemInstruction,
+        temperature: 0.1,
+        maxOutputTokens: 3000,
+      });
 
-  $("blockquote").each((_, el) => {
-    const text = $(el).text().trim();
-    if (text) textParts.push(text);
-  });
+      if (geminiText && geminiText.trim().length > 50) {
+        extractedText = geminiText.trim();
+        isAiExtracted = true;
+      }
+    } catch (err: any) {
+      console.warn(
+        `[AI Scraper Warning] Gemini content extraction failed for ${url}: ${
+          err.message || err
+        }. Falling back to Cheerio parser.`
+      );
+    }
+  }
 
-  textParts.push(...scriptTextParts);
+  let cleanedText = "";
+  if (isAiExtracted) {
+    const urlHeader = `Source URL: ${url}`;
+    cleanedText = extractedText.includes(url)
+      ? extractedText
+      : `${urlHeader}\n\n${extractedText}`;
+  } else {
+    const textParts: string[] = [];
 
-  const rawText = textParts.join("\n");
-  const cleanedText = cleanExtractedText(rawText);
+    textParts.push(`Source URL: ${url}`);
+    if (title) textParts.push(title);
+    if (description) textParts.push(description);
+
+    $("h1, h2, h3, h4, h5, h6").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text) textParts.push(text);
+    });
+
+    $("p").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 10) textParts.push(text);
+    });
+
+    $("li").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 5) textParts.push(`- ${text}`);
+    });
+
+    $("td, th").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 3) textParts.push(text);
+    });
+
+    $("blockquote").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text) textParts.push(text);
+    });
+
+    $("dt, dd, summary, details").each((_, el) => {
+      const text = $(el).text().trim();
+      if (text) textParts.push(text);
+    });
+
+    // Extract text from divs, spans, strongs, em, b, a that contain pricing/service terms
+    $("div, span, strong, em, b, a").each((_, el) => {
+      const $el = $(el);
+      const directText = $el.clone().children().remove().end().text().trim();
+      if (directText && directText.length > 0) {
+        const classOrId = ($el.attr("class") || "") + " " + ($el.attr("id") || "");
+        const isPricingContext = /price|pricing|cost|rate|fee|plan|package|subscription|tier|billing|menu/i.test(classOrId);
+        const hasCurrencyOrPrice = /[\$\£\€\₦\¥]|(?:usd|gbp|eur|cny|ngn)\b|\b(?:\d+(?:\.\d{2})?)\s*(?:\/mo|\/yr|per\b|month|year|each|qty)\b/i.test(directText);
+
+        if (isPricingContext || hasCurrencyOrPrice) {
+          textParts.push(directText);
+        }
+      }
+    });
+
+    textParts.push(...scriptTextParts);
+
+    const rawText = textParts.join("\n");
+    cleanedText = cleanExtractedText(rawText);
+  }
 
   if (!cleanedText || (countWords(cleanedText) < 3 && cleanedText.length < 20)) {
     throw new Error("Could not extract meaningful text from this page.");

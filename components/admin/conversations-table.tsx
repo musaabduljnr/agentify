@@ -13,6 +13,7 @@ import {
   Contact2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatMarkdownToReact } from "@/lib/markdown";
 
 interface ConversationsTableProps {
   initialConversations: any[];
@@ -204,7 +205,7 @@ export function ConversationsTable({ initialConversations }: ConversationsTableP
                               ? "bg-slate-900/60 border-slate-850 text-slate-200 rounded-tr-none" 
                               : "bg-indigo-500/5 border-indigo-500/10 text-slate-100 rounded-tl-none"
                           }`}>
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                            <div>{formatMarkdownToReact(msg.content)}</div>
                             <span className="text-[8px] text-slate-500 block mt-1 text-right">
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>

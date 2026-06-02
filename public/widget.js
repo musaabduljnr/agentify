@@ -14,6 +14,54 @@
   let visitorId = localStorage.getItem("agentify_visitor_id") || "v_" + Math.random().toString(36).substring(2, 11);
   localStorage.setItem("agentify_visitor_id", visitorId);
 
+  function formatMarkdown(text) {
+    if (!text) return "";
+    let escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+    escaped = escaped.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+    escaped = escaped.replace(/\*(.*?)\*/g, "<em>$1</em>");
+    escaped = escaped.replace(
+      /\[(.*?)\]\((https?:\/\/.*?)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" style="text-decoration: underline; color: inherit; font-weight: 600;">$1</a>'
+    );
+
+    const lines = escaped.split("\n");
+    let inList = false;
+    const formattedLines = lines.map((line) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+        const content = trimmed.substring(2);
+        let listLine = `<li>${content}</li>`;
+        if (!inList) {
+          inList = true;
+          listLine = `<ul style="list-style-type: disc; padding-left: 20px; margin: 8px 0; display: block;">${listLine}`;
+        }
+        return listLine;
+      } else {
+        let prefix = "";
+        if (inList) {
+          inList = false;
+          prefix = "</ul>";
+        }
+        return prefix + line;
+      }
+    });
+
+    if (inList) {
+      formattedLines.push("</ul>");
+    }
+
+    escaped = formattedLines.join("\n");
+    escaped = escaped.replace(/\n\n/g, '<div style="height: 8px;"></div>');
+    escaped = escaped.replace(/\n/g, "<br />");
+    return escaped;
+  }
+
   async function init() {
     try {
       const response = await fetch(`${baseUrl}/api/widget/config?businessId=${businessId}`);
@@ -284,7 +332,7 @@
         </div>
       </div>
       <div class="agentify-messages" id="agentify-messages-list">
-        <div class="agentify-message assistant">${config.welcomeText}</div>
+        <div class="agentify-message assistant">${formatMarkdown(config.welcomeText)}</div>
       </div>
       <div class="agentify-footer">
         <div class="agentify-suggested" id="agentify-suggested-list"></div>
@@ -370,7 +418,7 @@
     function addMessage(text, role) {
       const div = document.createElement("div");
       div.className = `agentify-message ${role}`;
-      div.innerText = text;
+      div.innerHTML = formatMarkdown(text);
       msgList.appendChild(div);
       msgList.scrollTop = msgList.scrollHeight;
     }

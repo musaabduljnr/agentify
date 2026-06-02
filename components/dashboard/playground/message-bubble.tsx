@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { User, Bot } from "lucide-react";
+import { formatMarkdownToReact } from "@/lib/markdown";
 
 interface Message {
   role: "user" | "assistant" | "system";
@@ -39,7 +40,7 @@ export function MessageBubble({ message }: { message: Message }) {
               : "bg-muted shadow-sm"
           )}
         >
-          <p className="whitespace-pre-wrap leading-relaxed break-words">{message.content}</p>
+          <div className="leading-relaxed break-words">{formatMarkdownToReact(message.content)}</div>
         </div>
         <span className="text-[10px] text-muted-foreground px-1">
           {new Date(message.created_at).toLocaleTimeString([], {

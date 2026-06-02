@@ -108,6 +108,60 @@ export async function generateGeminiChat({
   }
 }
 
+export async function generateGeminiContent({
+  model,
+  prompt,
+  systemInstruction,
+  temperature = 0.2,
+  maxOutputTokens = 2048,
+}: {
+  model?: string;
+  prompt: string;
+  systemInstruction?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing GEMINI_API_KEY in environment variables.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const selectedModel = model || "gemini-2.5-pro";
+
+  async function callGeminiContent(currentModel: string): Promise<string> {
+    const response = await ai.models.generateContent({
+      model: currentModel,
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: temperature,
+        maxOutputTokens: maxOutputTokens,
+      },
+    });
+
+    if (!response.text) {
+      throw new Error("Invalid response format from Gemini Content API.");
+    }
+
+    return response.text;
+  }
+
+  try {
+    return await callGeminiContent(selectedModel);
+  } catch (error) {
+    if (!isGeminiQuotaError(error)) throw error;
+
+    const fallbackModel = "gemini-2.5-flash";
+    if (selectedModel === fallbackModel) throw error;
+
+    console.warn(
+      `[Gemini Content Warning] ${selectedModel} quota/rate limit hit. Retrying content generation with ${fallbackModel}.`
+    );
+    return callGeminiContent(fallbackModel);
+  }
+}
+
 export async function generateGeminiEmbedding({
   model,
   text,
