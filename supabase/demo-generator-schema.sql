@@ -162,3 +162,7 @@ CREATE TRIGGER set_demo_conversations_updated_at
   BEFORE UPDATE ON public.demo_conversations 
   FOR EACH ROW 
   EXECUTE PROCEDURE handle_updated_at();
+
+-- Make businesses.owner_id nullable to support unclaimed/placeholder demo assistants
+-- This prevents unique constraint violations when admins generate multiple demos.
+ALTER TABLE public.businesses ALTER COLUMN owner_id DROP NOT NULL;

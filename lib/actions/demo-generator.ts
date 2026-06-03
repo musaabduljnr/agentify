@@ -84,7 +84,7 @@ export async function createDemoBusiness(formData: {
     const { data: placeholderBiz, error: bizError } = await serviceClient
       .from("businesses")
       .insert({
-        owner_id: adminProfile.id,
+        owner_id: null,
         name: businessName,
         slug: `demo-${slug}-${Math.floor(Math.random() * 10000)}`, // unique business slug
         website_url: websiteUrl,

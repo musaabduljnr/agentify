@@ -294,6 +294,7 @@ export async function updateAdminBillingSettings(input: {
 
   revalidatePath("/admin/settings");
   revalidatePath("/dashboard/billing");
+  revalidatePath("/");
   return { success: true };
 }
 
