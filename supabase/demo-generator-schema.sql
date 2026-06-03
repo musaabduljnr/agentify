@@ -82,9 +82,11 @@ ALTER TABLE public.demo_events ENABLE ROW LEVEL SECURITY;
 -- -------------------------------------------------------------------------
 
 -- Policies for public demo pages (anon access)
+DROP POLICY IF EXISTS "Anyone can view active demo businesses" ON public.demo_businesses;
 CREATE POLICY "Anyone can view active demo businesses" ON public.demo_businesses
   FOR SELECT USING (status = 'active');
 
+DROP POLICY IF EXISTS "Anyone can insert demo conversations" ON public.demo_conversations;
 CREATE POLICY "Anyone can insert demo conversations" ON public.demo_conversations
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -93,6 +95,7 @@ CREATE POLICY "Anyone can insert demo conversations" ON public.demo_conversation
     )
   );
 
+DROP POLICY IF EXISTS "Anyone can update demo conversations" ON public.demo_conversations;
 CREATE POLICY "Anyone can update demo conversations" ON public.demo_conversations
   FOR UPDATE USING (
     EXISTS (
@@ -101,6 +104,7 @@ CREATE POLICY "Anyone can update demo conversations" ON public.demo_conversation
     )
   );
 
+DROP POLICY IF EXISTS "Anyone can insert demo leads" ON public.demo_leads;
 CREATE POLICY "Anyone can insert demo leads" ON public.demo_leads
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -109,6 +113,7 @@ CREATE POLICY "Anyone can insert demo leads" ON public.demo_leads
     )
   );
 
+DROP POLICY IF EXISTS "Anyone can insert demo events" ON public.demo_events;
 CREATE POLICY "Anyone can insert demo events" ON public.demo_events
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -118,6 +123,7 @@ CREATE POLICY "Anyone can insert demo events" ON public.demo_events
   );
 
 -- Policies for Admins (all operations allowed)
+DROP POLICY IF EXISTS "Admins can manage all demo data" ON public.demo_businesses;
 CREATE POLICY "Admins can manage all demo data" ON public.demo_businesses
   FOR ALL USING (
     EXISTS (
@@ -126,6 +132,7 @@ CREATE POLICY "Admins can manage all demo data" ON public.demo_businesses
     )
   );
 
+DROP POLICY IF EXISTS "Admins can manage all demo conversations" ON public.demo_conversations;
 CREATE POLICY "Admins can manage all demo conversations" ON public.demo_conversations
   FOR ALL USING (
     EXISTS (
@@ -134,6 +141,7 @@ CREATE POLICY "Admins can manage all demo conversations" ON public.demo_conversa
     )
   );
 
+DROP POLICY IF EXISTS "Admins can manage all demo leads" ON public.demo_leads;
 CREATE POLICY "Admins can manage all demo leads" ON public.demo_leads
   FOR ALL USING (
     EXISTS (
@@ -142,6 +150,7 @@ CREATE POLICY "Admins can manage all demo leads" ON public.demo_leads
     )
   );
 
+DROP POLICY IF EXISTS "Admins can manage all demo events" ON public.demo_events;
 CREATE POLICY "Admins can manage all demo events" ON public.demo_events
   FOR ALL USING (
     EXISTS (
