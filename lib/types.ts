@@ -16,6 +16,17 @@ export type KnowledgeSource = {
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
+  crawl_mode?: "single" | "crawl" | null;
+  crawl_status?: "not_started" | "discovering" | "crawling" | "completed" | "failed" | "partial" | null;
+  crawl_depth?: number | null;
+  max_pages?: number | null;
+  pages_found?: number | null;
+  pages_scraped?: number | null;
+  pages_failed?: number | null;
+  crawl_started_at?: string | null;
+  crawl_completed_at?: string | null;
+  crawled_pages?: any[] | null;
+  failed_pages?: any[] | null;
 };
 
 export type Business = {

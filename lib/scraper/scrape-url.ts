@@ -72,7 +72,7 @@ export type ScrapeResult = {
   failedPages: FailedScrapedPageSummary[];
 };
 
-type PageScrapeResult = ScrapedPageSummary & {
+export type PageScrapeResult = ScrapedPageSummary & {
   description: string;
   text: string;
   links: string[];
@@ -455,7 +455,7 @@ function extractLinks($: cheerio.CheerioAPI, pageUrl: string, rootUrl: string): 
   });
 }
 
-async function scrapePage(rawUrl: string, rootUrl: string): Promise<PageScrapeResult> {
+export async function scrapePage(rawUrl: string, rootUrl: string): Promise<PageScrapeResult> {
   const { url, html } = await fetchHtml(rawUrl);
   const $ = cheerio.load(html);
 

@@ -5,6 +5,8 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { scrapeUrl } from "@/lib/scraper/scrape-url";
+import { crawlWebsite } from "@/lib/scraper/crawl-website";
+import { generateEmbeddingsForSourceInternal } from "@/lib/actions/knowledge";
 import { generateEmbedding } from "@/lib/vertex/embeddings";
 import { chunkText, estimateTokens } from "@/lib/embeddings/chunker";
 import { generateGeminiResponse } from "@/lib/vertex/gemini";
@@ -180,22 +182,33 @@ export async function createDemoBusiness(formData: {
       metadata: { created_by: adminProfile.id }
     });
 
-    // 5. Scrape and process website content
+    // 5. Scrape and process website content (using crawlWebsite by default)
     let scrapedText = "";
     let scrapTitle = "";
     let scrapDesc = "";
     let scrapeSucceeded = false;
+    let pagesCount = 0;
+    let crawledPagesData: any[] = [];
+    let failedPagesData: any[] = [];
 
     try {
-      const scrapeResult = await scrapeUrl(websiteUrl, { maxPages: 5 });
-      if (scrapeResult && scrapeResult.text) {
-        scrapedText = scrapeResult.text;
-        scrapTitle = scrapeResult.title || "";
-        scrapDesc = scrapeResult.description || "";
+      const crawlResult = await crawlWebsite({
+        startUrl: websiteUrl,
+        maxPages: 15,
+        depth: 2
+      });
+
+      if (crawlResult && crawlResult.combinedText) {
+        scrapedText = crawlResult.combinedText;
+        scrapTitle = crawlResult.pages[0]?.title || "";
+        scrapDesc = crawlResult.pages[0]?.description || "";
         scrapeSucceeded = true;
+        pagesCount = crawlResult.pagesScraped;
+        crawledPagesData = crawlResult.pages;
+        failedPagesData = crawlResult.failedPages;
       }
     } catch (scrapErr) {
-      console.error(`Failed to scrape URL ${websiteUrl} for demo:`, scrapErr);
+      console.error(`Failed to crawl URL ${websiteUrl} for demo:`, scrapErr);
     }
 
     if (scrapeSucceeded && scrapedText) {
@@ -205,14 +218,28 @@ export async function createDemoBusiness(formData: {
         .insert({
           business_id: placeholderBiz.id,
           type: "website",
-          title: scrapTitle || "Website Main Page",
+          title: scrapTitle || "Website Crawled Knowledge",
           source_url: websiteUrl,
           content: scrapedText,
           status: "trained",
+          crawl_mode: "crawl",
+          crawl_status: failedPagesData.length > 0 ? "partial" : "completed",
+          pages_found: crawledPagesData.length + failedPagesData.length,
+          pages_scraped: pagesCount,
+          pages_failed: failedPagesData.length,
+          crawled_pages: crawledPagesData,
+          failed_pages: failedPagesData,
           metadata: {
             scraped_title: scrapTitle,
             scraped_description: scrapDesc,
             scraped_at: new Date().toISOString(),
+            scraped_page_count: pagesCount,
+            scraped_pages: crawledPagesData.map(p => ({
+              url: p.url,
+              title: p.title,
+              wordCount: p.wordCount,
+              characterCount: p.characterCount
+            }))
           }
         })
         .select()
@@ -225,26 +252,11 @@ export async function createDemoBusiness(formData: {
           .update({ knowledge_source_count: 1 })
           .eq("id", demoBiz.id);
 
-        // 5.2 Chunk text & generate embeddings
-        const chunks = chunkText(scrapedText);
-        for (let i = 0; i < chunks.length; i++) {
-          try {
-            const embedding = await generateEmbedding(chunks[i]);
-            await serviceClient.from("knowledge_chunks").insert({
-              business_id: placeholderBiz.id,
-              source_id: source.id,
-              content: chunks[i],
-              embedding: embedding,
-              chunk_index: i,
-              token_estimate: estimateTokens(chunks[i]),
-              metadata: {
-                source_type: "website",
-                source_title: source.title,
-              }
-            });
-          } catch (chunkErr) {
-            console.error(`Chunk ${i} embedding failed for demo:`, chunkErr);
-          }
+        // 5.2 Generate embeddings by reusing the function
+        try {
+          await generateEmbeddingsForSourceInternal(source.id, placeholderBiz.id);
+        } catch (embedErr) {
+          console.error(`Embedding generation failed for demo source ${source.id}:`, embedErr);
         }
 
         // 5.3 AI Extraction: Extract details with Gemini
