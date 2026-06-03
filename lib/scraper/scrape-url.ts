@@ -25,13 +25,7 @@ const REMOVE_SELECTORS = [
   "noscript",
   "svg",
   "iframe",
-  "nav",
-  "footer",
-  "header",
   "aside",
-  "[role='navigation']",
-  "[role='banner']",
-  "[role='contentinfo']",
   ".cookie-banner",
   ".cookie-consent",
   "#cookie-notice",
@@ -307,20 +301,31 @@ async function extractScriptText($: cheerio.CheerioAPI, pageUrl: string, rootUrl
   const scriptAssetUrls: string[] = [];
 
   $("script").each((_, el) => {
-    const type = ($(el).attr("type") || "").toLowerCase();
-    const src = $(el).attr("src");
-    const inlineScript = $(el).text();
+    const $el = $(el);
+    const type = ($el.attr("type") || "").toLowerCase();
+    const id = ($el.attr("id") || "").toLowerCase();
+    const src = $el.attr("src");
+    const inlineScript = $el.text().trim();
 
-    if (type.includes("ld+json") && inlineScript) {
-      textParts.push(...extractJsonLdText(inlineScript));
-    }
+    if (inlineScript) {
+      if (type.includes("ld+json")) {
+        textParts.push(...extractJsonLdText(inlineScript));
+      } else if (id === "__next_data__" || type === "application/json" || type.includes("json")) {
+        try {
+          const jsonParts: string[] = [];
+          collectJsonText(JSON.parse(inlineScript), jsonParts);
+          textParts.push(...jsonParts);
+        } catch {
+          // If JSON parse fails, ignore
+        }
+      }
 
-    if (inlineScript.includes("self.__next_f.push")) {
-      textParts.push(...extractNextFlightText(inlineScript));
+      if (inlineScript.includes("self.__next_f.push")) {
+        textParts.push(...extractNextFlightText(inlineScript));
+      }
     }
 
     if (!src) return;
-
     const normalized = normalizeCrawlUrl(src, pageUrl);
     if (!normalized || !isSameOrigin(normalized, rootUrl)) return;
 
@@ -430,8 +435,13 @@ function extractLinks($: cheerio.CheerioAPI, pageUrl: string, rootUrl: string): 
   const links = new Set<string>();
 
   $("a[href]").each((_, el) => {
-    const href = $(el).attr("href");
+    const $el = $(el);
+    const href = $el.attr("href");
     if (!href) return;
+
+    // Skip links inside navigation, footer, or header containers to keep crawling focused on main content pages
+    const parentContainer = $el.parents("nav, footer, header, .footer, #footer, .nav, #nav, .header, #header, [role='navigation'], [role='banner'], [role='contentinfo']");
+    if (parentContainer.length > 0) return;
 
     const normalized = normalizeCrawlUrl(href, pageUrl);
     if (!normalized || !isSameOrigin(normalized, rootUrl)) return;
@@ -484,6 +494,7 @@ CRITICAL INSTRUCTIONS:
       const prompt = `Here is the clean HTML of the web page at URL: ${url}\n\nHTML:\n${truncatedHtml}`;
 
       const geminiText = await generateGeminiContent({
+        model: "gemini-2.5-flash",
         prompt,
         systemInstruction,
         temperature: 0.1,
@@ -546,6 +557,15 @@ CRITICAL INSTRUCTIONS:
       if (text) textParts.push(text);
     });
 
+    // Extract direct text from generic containers if it is substantial (length > 20)
+    $("div, span, section, article, main").each((_, el) => {
+      const $el = $(el);
+      const directText = $el.clone().children().remove().end().text().replace(/\s+/g, " ").trim();
+      if (directText && directText.length > 20) {
+        textParts.push(directText);
+      }
+    });
+
     // Extract text from divs, spans, strongs, em, b, a that contain pricing/service terms
     $("div, span, strong, em, b, a").each((_, el) => {
       const $el = $(el);
@@ -599,9 +619,14 @@ function combinePages(pages: PageScrapeResult[]): Pick<ScrapeResult, "text" | "w
   };
 }
 
-export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
+export async function scrapeUrl(
+  rawUrl: string,
+  options?: { maxPages?: number }
+): Promise<ScrapeResult> {
   const startUrl = normalizeUrl(rawUrl);
   await assertPublicHttpUrl(startUrl);
+
+  const maxPages = options?.maxPages ?? MAX_CRAWL_PAGES;
 
   const queue: CrawlQueueItem[] = [{ url: startUrl, depth: 0 }];
   const queued = new Set<string>([startUrl]);
@@ -609,7 +634,7 @@ export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
   const pages: PageScrapeResult[] = [];
   const errors: FailedScrapedPageSummary[] = [];
 
-  while (queue.length > 0 && pages.length < MAX_CRAWL_PAGES) {
+  while (queue.length > 0 && pages.length < maxPages) {
     const batch = queue.splice(0, MAX_CRAWL_CONCURRENCY);
     const results = await Promise.all(
       batch.map(async (item) => {
@@ -643,7 +668,7 @@ export async function scrapeUrl(rawUrl: string): Promise<ScrapeResult> {
       const { item, page } = result;
       pages.push(page);
 
-      if (pages.length >= MAX_CRAWL_PAGES || item.depth >= MAX_CRAWL_DEPTH) continue;
+      if (pages.length >= maxPages || item.depth >= MAX_CRAWL_DEPTH) continue;
 
       for (const link of page.links) {
         if (queued.has(link) || visited.has(link)) continue;

@@ -181,7 +181,7 @@ export async function createDemoBusiness(formData: {
     let scrapeSucceeded = false;
 
     try {
-      const scrapeResult = await scrapeUrl(websiteUrl);
+      const scrapeResult = await scrapeUrl(websiteUrl, { maxPages: 5 });
       if (scrapeResult && scrapeResult.text) {
         scrapedText = scrapeResult.text;
         scrapTitle = scrapeResult.title || "";
