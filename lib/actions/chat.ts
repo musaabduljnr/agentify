@@ -3,10 +3,12 @@
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { revalidatePath } from "next/cache";
-import { generateEmbedding } from "@/lib/vertex/embeddings";
-import { generateGeminiResponse } from "@/lib/vertex/gemini";
-import { buildBusinessPrompt } from "@/lib/ai/build-business-prompt";
-import { requireCompleteBusinessSetup } from "@/lib/queries/business";
+import { retrieveBusinessContext } from "@/lib/ai/rag/retrieve-context";
+import { getRecentConversationMessages } from "@/lib/ai/memory/message-history";
+import { summarizeConversationIfNeeded } from "@/lib/ai/memory/conversation-summary";
+import { buildBusinessSystemPrompt } from "@/lib/ai/prompts/business-system-prompt";
+import { generateChatResponse } from "@/lib/ai/engine/chat";
+import { runResponseQualityChecks } from "@/lib/ai/evaluation/quality-checks";
 import { 
   detectLeadIntent, 
   extractLeadInfo, 
@@ -21,6 +23,7 @@ import { NewLeadEmail } from "@/lib/email/templates/new-lead-email";
 import { BookingRequestEmail } from "@/lib/email/templates/booking-request-email";
 import { SupportRequestEmail } from "@/lib/email/templates/support-request-email";
 import { UsageWarningEmail } from "@/lib/email/templates/usage-warning-email";
+import { requireCompleteBusinessSetup } from "@/lib/queries/business";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -149,28 +152,61 @@ export async function runBusinessChat({
   conversationId,
   visitorId,
   source = "widget",
+  isDemo = false,
+  demoBusinessId,
 }: {
   message: string;
   businessId: string;
   conversationId?: string;
   visitorId?: string;
   source?: string;
+  isDemo?: boolean;
+  demoBusinessId?: string;
 }) {
   const supabase = createServiceClient();
+  let currentConversationId = conversationId;
 
-  // 0. Enforce subscription and load business context.
-  try {
-    await requireActiveSubscription(businessId);
-  } catch (e: any) {
-    return {
-      success: false,
-      conversationId: conversationId || "",
-      reply: e.message || "Your subscription is not active. Please update your billing to continue.",
-      assistantMessage: null,
-      limitReached: true,
-    };
+  // 1. Authorization & Expiry Validation
+  if (isDemo) {
+    if (!demoBusinessId) {
+      throw new Error("Missing demoBusinessId for demo chat session.");
+    }
+    const { data: demo, error: demoErr } = await supabase
+      .from("demo_businesses")
+      .select("*")
+      .eq("id", demoBusinessId)
+      .single();
+
+    if (demoErr || !demo) {
+      throw new Error("Demo assistant not found.");
+    }
+    if (demo.status !== "active") {
+      throw new Error(`This demo assistant is currently ${demo.status}.`);
+    }
+    const isExpired = new Date(demo.expires_at) < new Date();
+    if (isExpired) {
+      await supabase
+        .from("demo_businesses")
+        .update({ status: "expired" })
+        .eq("id", demoBusinessId);
+      throw new Error("This demo assistant has expired.");
+    }
+  } else {
+    // Normal subscription check
+    try {
+      await requireActiveSubscription(businessId);
+    } catch (e: any) {
+      return {
+        success: false,
+        conversationId: currentConversationId || "",
+        reply: e.message || "Your subscription is not active. Please update your billing to continue.",
+        assistantMessage: null,
+        limitReached: true,
+      };
+    }
   }
 
+  // 2. Fetch Business & Assistant Details
   const { data: business, error: bErr } = await supabase
     .from("businesses")
     .select("*")
@@ -178,61 +214,6 @@ export async function runBusinessChat({
     .single();
   
   if (bErr || !business) throw new Error("Business not found");
-
-  const { data: sub } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("business_id", businessId)
-    .maybeSingle();
-
-  const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
-  const usageCheck = await checkUsageLimit(businessId, usageType);
-  if (!usageCheck.allowed) {
-    if (sub) {
-      const now = new Date();
-      const periodStartStr = sub.current_period_start || sub.created_at;
-      const periodStart = new Date(periodStartStr);
-      const warningSent100AtStr = sub.metadata?.warning_sent_100_message;
-      let hasSent100 = false;
-      if (warningSent100AtStr) {
-        const warningSent100At = new Date(warningSent100AtStr);
-        if (warningSent100At >= periodStart) {
-          hasSent100 = true;
-        }
-      }
-
-      if (!hasSent100) {
-        const updatedMetadata = {
-          ...(sub.metadata || {}),
-          warning_sent_100_message: now.toISOString(),
-        };
-        await supabase
-          .from("subscriptions")
-          .update({ metadata: updatedMetadata })
-          .eq("id", sub.id);
-
-        sendTransactionalEmail({
-          businessId,
-          subject: "You’ve reached your Agentify usage limit",
-          templateName: "usage-warning-email",
-          react: UsageWarningEmail({
-            businessName: business.name,
-            usageType: "AI messages",
-            percentage: 100,
-            billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
-          }),
-        }).catch(err => console.error("Error sending 100% warning email:", err));
-      }
-    }
-
-    return {
-      success: false,
-      conversationId: conversationId || "",
-      reply: "You've reached your monthly AI message limit. Please upgrade your plan to continue.",
-      assistantMessage: null,
-      limitReached: true,
-    };
-  }
 
   const { data: assistant, error: aErr } = await supabase
     .from("assistants")
@@ -243,11 +224,66 @@ export async function runBusinessChat({
 
   if (aErr || !assistant) throw new Error("Assistant not found");
 
-  let currentConversationId = conversationId;
-  let conversation: any = null;
+  // 2.5 Usage Quota Checks (Non-demo)
+  const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
+  if (!isDemo) {
+    const usageCheck = await checkUsageLimit(businessId, usageType);
+    if (!usageCheck.allowed) {
+      // Trigger warning emails if needed
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("business_id", businessId)
+        .maybeSingle();
 
-  // 2. Create/Fetch conversation
+      if (sub) {
+        const now = new Date();
+        const periodStartStr = sub.current_period_start || sub.created_at;
+        const periodStart = new Date(periodStartStr);
+        const warningSent100AtStr = sub.metadata?.warning_sent_100_message;
+        let hasSent100 = false;
+        if (warningSent100AtStr && new Date(warningSent100AtStr) >= periodStart) {
+          hasSent100 = true;
+        }
+
+        if (!hasSent100) {
+          const updatedMetadata = {
+            ...(sub.metadata || {}),
+            warning_sent_100_message: now.toISOString(),
+          };
+          await supabase
+            .from("subscriptions")
+            .update({ metadata: updatedMetadata })
+            .eq("id", sub.id);
+
+          sendTransactionalEmail({
+            businessId,
+            subject: "You’ve reached your Agentify usage limit",
+            templateName: "usage-warning-email",
+            react: UsageWarningEmail({
+              businessName: business.name,
+              usageType: "AI messages",
+              percentage: 100,
+              billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+            }),
+          }).catch(err => console.error("Error sending 100% warning email:", err));
+        }
+      }
+
+      return {
+        success: false,
+        conversationId: currentConversationId || "",
+        reply: "You've reached your monthly AI message limit. Please upgrade your plan to continue.",
+        assistantMessage: null,
+        limitReached: true,
+      };
+    }
+  }
+
+  // 3. Resolve or Create Conversation
+  let conversation: any = null;
   if (!currentConversationId) {
+    // Create standard conversation
     const { data: conv, error: convError } = await supabase
       .from("conversations")
       .insert({
@@ -259,166 +295,99 @@ export async function runBusinessChat({
       .select()
       .single();
 
-    if (convError) throw new Error(`Failed to create conversation: ${convError.message}`);
+    if (convError || !conv) throw new Error(`Failed to create conversation: ${convError?.message}`);
     currentConversationId = conv.id;
     conversation = conv;
+
+    if (isDemo && demoBusinessId) {
+      // Create demo conversation
+      await supabase.from("demo_conversations").insert({
+        id: currentConversationId,
+        demo_business_id: demoBusinessId,
+        visitor_id: visitorId,
+        source: source,
+        first_message: message,
+        last_message: message,
+        message_count: 1,
+      });
+
+      // Update demo counts
+      const { data: demo } = await supabase
+        .from("demo_businesses")
+        .select("conversation_count")
+        .eq("id", demoBusinessId)
+        .single();
+
+      await supabase
+        .from("demo_businesses")
+        .update({
+          conversation_count: (demo?.conversation_count || 0) + 1,
+          last_activity_at: new Date().toISOString(),
+        })
+        .eq("id", demoBusinessId);
+
+      // Log event
+      await supabase.from("demo_events").insert({
+        demo_business_id: demoBusinessId,
+        visitor_id: visitorId,
+        event_type: "conversation_started",
+        metadata: { conversation_id: currentConversationId },
+      });
+    }
   } else {
-    const { data: existingConversation, error: existingConversationError } = await supabase
+    const { data: existingConversation } = await supabase
       .from("conversations")
       .select("*")
       .eq("id", currentConversationId)
       .eq("business_id", businessId)
       .maybeSingle();
 
-    if (existingConversationError || !existingConversation) {
-      throw new Error("Conversation not found for this business.");
-    }
+    if (!existingConversation) throw new Error("Conversation not found.");
     conversation = existingConversation;
-  }
 
-  // 2.1 Lead Intelligence & Capture
-  const metadata = (conversation?.metadata as any) || {};
-  const hasBuyingIntent = detectLeadIntent(message);
-  const { intentType, requestedAction } = detectConversationIntent(message);
-  const extractedInfo = extractLeadInfo(message);
-
-  let contactRequested = metadata.contact_requested || false;
-  let contactCaptured = metadata.contact_captured || false;
-
-  // Update intent in metadata
-  if (intentType !== "general_inquiry") {
-    metadata.intent_type = intentType;
-    metadata.requested_action = requestedAction;
-  }
-
-  const conversationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/conversations?id=${currentConversationId}`;
-
-  // Booking Request Alert Trigger
-  if (intentType === "booking" && !metadata.booking_email_sent) {
-    metadata.booking_email_sent = true;
-    sendTransactionalEmail({
-      businessId,
-      subject: "New booking request from your AI assistant",
-      templateName: "booking-request-email",
-      react: BookingRequestEmail({
-        businessName: business.name,
-        leadName: extractedInfo.name || conversation?.visitor_name,
-        leadEmail: extractedInfo.email || conversation?.visitor_email,
-        leadPhone: extractedInfo.phone || conversation?.visitor_phone,
-        requestedAction,
-        conversationUrl,
-      }),
-    }).catch(err => console.error("Error triggering booking email:", err));
-  }
-
-  // Support Request Alert Trigger
-  if (intentType === "support_ticket" && !metadata.support_email_sent) {
-    metadata.support_email_sent = true;
-    sendTransactionalEmail({
-      businessId,
-      subject: "New support request from your AI assistant",
-      templateName: "support-request-email",
-      react: SupportRequestEmail({
-        businessName: business.name,
-        leadName: extractedInfo.name || conversation?.visitor_name,
-        leadEmail: extractedInfo.email || conversation?.visitor_email,
-        issueSummary: message,
-        conversationUrl,
-      }),
-    }).catch(err => console.error("Error triggering support email:", err));
-  }
-
-  // Handle contact info extraction
-  if (extractedInfo.email || extractedInfo.phone || extractedInfo.name) {
-    const leadUpdate: any = {
-      business_id: businessId,
-      conversation_id: currentConversationId,
-      source: source,
-    };
-    if (extractedInfo.email) leadUpdate.email = extractedInfo.email;
-    if (extractedInfo.phone) leadUpdate.phone = extractedInfo.phone;
-    if (extractedInfo.name) leadUpdate.name = extractedInfo.name;
-    if (intentType !== "general_inquiry") leadUpdate.interest = requestedAction;
-
-    // Upsert lead
-    const { data: existingLead } = await supabase
-      .from("leads")
-      .select("id")
-      .eq("conversation_id", currentConversationId)
-      .eq("business_id", businessId)
-      .maybeSingle();
-
-    if (existingLead) {
-      await supabase
-        .from("leads")
-        .update(leadUpdate)
-        .eq("id", existingLead.id)
-        .eq("business_id", businessId);
-    } else {
-      // Check lead limit before creating new lead
-      const leadCheck = await checkUsageLimit(businessId, "lead");
-      if (!leadCheck.allowed) {
-        // Don't block chat, just add metadata note
-        metadata.lead_limit_reached = true;
-      } else {
-        const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
-        if (!leadInsertError) {
-          await sendTransactionalEmail({
-            businessId,
-            subject: "New lead captured by Agentify",
-            templateName: "new-lead-email",
-            react: NewLeadEmail({
-              businessName: business.name,
-              leadName: extractedInfo.name,
-              leadEmail: extractedInfo.email,
-              leadPhone: extractedInfo.phone,
-              interest: intentType !== "general_inquiry" ? requestedAction : null,
-              intentType,
-              conversationUrl,
-            }),
-          });
-          await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
-        }
-      }
-    }
-
-    if (extractedInfo.email || extractedInfo.phone) {
-      contactCaptured = true;
-      metadata.contact_captured = true;
-      metadata.email_collected_early = true;
-      
-      // Update conversation visitor info if possible
-      const convUpdate: any = { lead_captured: true };
-      if (extractedInfo.email) convUpdate.visitor_email = extractedInfo.email;
-      if (extractedInfo.name) convUpdate.visitor_name = extractedInfo.name;
-      if (extractedInfo.phone) convUpdate.visitor_phone = extractedInfo.phone;
-      
-      await supabase
-        .from("conversations")
-        .update(convUpdate)
+    if (isDemo && demoBusinessId) {
+      // Update demo conversation counts
+      const { data: demoConv } = await supabase
+        .from("demo_conversations")
+        .select("message_count")
         .eq("id", currentConversationId)
-        .eq("business_id", businessId);
+        .single();
+
+      await supabase
+        .from("demo_conversations")
+        .update({
+          last_message: message,
+          message_count: (demoConv?.message_count || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", currentConversationId);
+
+      // Update demo messages total
+      const { data: demo } = await supabase
+        .from("demo_businesses")
+        .select("total_message_count")
+        .eq("id", demoBusinessId)
+        .single();
+
+      await supabase
+        .from("demo_businesses")
+        .update({
+          total_message_count: (demo?.total_message_count || 0) + 1,
+          last_activity_at: new Date().toISOString(),
+        })
+        .eq("id", demoBusinessId);
+
+      // Log event
+      await supabase.from("demo_events").insert({
+        demo_business_id: demoBusinessId,
+        visitor_id: visitorId,
+        event_type: "message_sent",
+        metadata: { conversation_id: currentConversationId, length: message.length },
+      });
     }
   }
 
-  // If this is an early interaction and contact hasn't been requested
-  if (!contactRequested && !contactCaptured) {
-    metadata.contact_requested = true;
-    // We don't need to manually inject a message here, 
-    // the system prompt rules in buildBusinessPrompt will handle the AI asking.
-  }
-
-  // Update conversation metadata
-  await supabase
-    .from("conversations")
-    .update({ 
-      metadata,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", currentConversationId)
-    .eq("business_id", businessId);
-
-  // 3. Save user message
+  // 4. Save User Message
   const { error: userMsgError } = await supabase.from("messages").insert({
     conversation_id: currentConversationId,
     business_id: businessId,
@@ -428,123 +397,313 @@ export async function runBusinessChat({
 
   if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
 
-  // 4. RAG: Search knowledge base. If embeddings are unavailable or over quota,
-  // keep chat alive and answer from the base business profile instead.
-  let matchedChunks: { content: string; similarity: number }[] = [];
-  try {
-    const queryEmbedding = await generateEmbedding(message);
-    const { data, error: rpcError } = await supabase.rpc("match_knowledge_chunks", {
-      query_embedding: queryEmbedding,
-      match_business_id: businessId,
-      match_count: 5,
-    });
+  // 5. RAG Retrieval & Intent Classification
+  const { chunks, formattedContext, intent } = await retrieveBusinessContext({
+    businessId,
+    query: message,
+    matchCount: 5,
+    minSimilarity: 0.55,
+  });
 
-    if (rpcError) throw new Error(`Knowledge search failed: ${rpcError.message}`);
-    matchedChunks = data || [];
-  } catch (knowledgeError: any) {
-    logErrorSync(knowledgeError, "embedding-generation", { businessId });
+  // 6. Lead intelligence & Contact Extraction
+  const metadata = (conversation?.metadata as any) || {};
+  const hasBuyingIntent = detectLeadIntent(message);
+  const { intentType, requestedAction } = detectConversationIntent(message);
+  const extractedInfo = extractLeadInfo(message);
+
+  let contactRequested = metadata.contact_requested || false;
+  let contactCaptured = metadata.contact_captured || false;
+
+  if (intentType !== "general_inquiry") {
+    metadata.intent_type = intentType;
+    metadata.requested_action = requestedAction;
   }
 
-  // 5. Fetch Conversation History
-  const { data: historyMsgs } = await supabase
-    .from("messages")
-    .select("role, content")
-    .eq("conversation_id", currentConversationId)
-    .eq("business_id", businessId)
-    .order("created_at", { ascending: true }) // chronological order
-    .limit(20);
+  const conversationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/conversations?id=${currentConversationId}`;
 
-  const history = (historyMsgs || [])
-    .filter(m => m.role !== "system")
-    .map(m => ({
-      role: m.role === "assistant" ? "model" as const : "user" as const,
-      content: m.content
-    }));
+  // Alerts triggering (email alerts for high intent, non-demo only)
+  if (!isDemo) {
+    if (intentType === "booking" && !metadata.booking_email_sent) {
+      metadata.booking_email_sent = true;
+      sendTransactionalEmail({
+        businessId,
+        subject: "New booking request from your AI assistant",
+        templateName: "booking-request-email",
+        react: BookingRequestEmail({
+          businessName: business.name,
+          leadName: extractedInfo.name || conversation?.visitor_name,
+          leadEmail: extractedInfo.email || conversation?.visitor_email,
+          leadPhone: extractedInfo.phone || conversation?.visitor_phone,
+          requestedAction,
+          conversationUrl,
+        }),
+      }).catch(err => console.error("Error triggering booking email:", err));
+    }
 
-  // 6. Build Prompt & Generate AI Response
-  const systemPrompt = buildBusinessPrompt({
+    if (intentType === "support_ticket" && !metadata.support_email_sent) {
+      metadata.support_email_sent = true;
+      sendTransactionalEmail({
+        businessId,
+        subject: "New support request from your AI assistant",
+        templateName: "support-request-email",
+        react: SupportRequestEmail({
+          businessName: business.name,
+          leadName: extractedInfo.name || conversation?.visitor_name,
+          leadEmail: extractedInfo.email || conversation?.visitor_email,
+          issueSummary: message,
+          conversationUrl,
+        }),
+      }).catch(err => console.error("Error triggering support email:", err));
+    }
+  }
+
+  // Lead record updates
+  if (extractedInfo.email || extractedInfo.phone || extractedInfo.name) {
+    if (isDemo && demoBusinessId) {
+      // Upsert lead in demo_leads
+      const { data: existingLead } = await supabase
+        .from("demo_leads")
+        .select("id")
+        .eq("conversation_id", currentConversationId)
+        .maybeSingle();
+
+      const leadData: Record<string, any> = {
+        demo_business_id: demoBusinessId,
+        conversation_id: currentConversationId,
+        interest: requestedAction || "Demo Interaction",
+      };
+      if (extractedInfo.name) leadData.name = extractedInfo.name;
+      if (extractedInfo.email) leadData.email = extractedInfo.email;
+      if (extractedInfo.phone) leadData.phone = extractedInfo.phone;
+
+      if (existingLead) {
+        await supabase.from("demo_leads").update(leadData).eq("id", existingLead.id);
+      } else {
+        await supabase.from("demo_leads").insert(leadData);
+
+        const { data: demo } = await supabase
+          .from("demo_businesses")
+          .select("lead_count")
+          .eq("id", demoBusinessId)
+          .single();
+
+        await supabase
+          .from("demo_businesses")
+          .update({ lead_count: (demo?.lead_count || 0) + 1 })
+          .eq("id", demoBusinessId);
+
+        await supabase.from("demo_events").insert({
+          demo_business_id: demoBusinessId,
+          visitor_id: visitorId,
+          event_type: "lead_captured",
+          metadata: { conversation_id: currentConversationId, lead_info: extractedInfo },
+        });
+
+        await supabase
+          .from("demo_conversations")
+          .update({ lead_captured: true })
+          .eq("id", currentConversationId);
+      }
+    } else {
+      // Standard lead pipeline
+      const leadUpdate: any = {
+        business_id: businessId,
+        conversation_id: currentConversationId,
+        source: source,
+      };
+      if (extractedInfo.email) leadUpdate.email = extractedInfo.email;
+      if (extractedInfo.phone) leadUpdate.phone = extractedInfo.phone;
+      if (extractedInfo.name) leadUpdate.name = extractedInfo.name;
+      if (intentType !== "general_inquiry") leadUpdate.interest = requestedAction;
+
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("conversation_id", currentConversationId)
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+      if (existingLead) {
+        await supabase.from("leads").update(leadUpdate).eq("id", existingLead.id);
+      } else {
+        const leadCheck = await checkUsageLimit(businessId, "lead");
+        if (!leadCheck.allowed) {
+          metadata.lead_limit_reached = true;
+        } else {
+          const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
+          if (!leadInsertError) {
+            await sendTransactionalEmail({
+              businessId,
+              subject: "New lead captured by Agentify",
+              templateName: "new-lead-email",
+              react: NewLeadEmail({
+                businessName: business.name,
+                leadName: extractedInfo.name,
+                leadEmail: extractedInfo.email,
+                leadPhone: extractedInfo.phone,
+                interest: intentType !== "general_inquiry" ? requestedAction : null,
+                intentType,
+                conversationUrl,
+              }),
+            });
+            await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
+          }
+        }
+      }
+    }
+
+    if (extractedInfo.email || extractedInfo.phone) {
+      contactCaptured = true;
+      metadata.contact_captured = true;
+      metadata.email_collected_early = true;
+      
+      const convUpdate: any = { lead_captured: true };
+      if (extractedInfo.email) convUpdate.visitor_email = extractedInfo.email;
+      if (extractedInfo.name) convUpdate.visitor_name = extractedInfo.name;
+      if (extractedInfo.phone) convUpdate.visitor_phone = extractedInfo.phone;
+      
+      await supabase
+        .from("conversations")
+        .update(convUpdate)
+        .eq("id", currentConversationId);
+    }
+  }
+
+  if (!contactRequested && !contactCaptured) {
+    metadata.contact_requested = true;
+  }
+
+  await supabase
+    .from("conversations")
+    .update({ 
+      metadata,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", currentConversationId);
+
+  // 7. Conversation Summary & Memory History
+  const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId);
+  const history = await getRecentConversationMessages(currentConversationId!, 8);
+
+  // 8. Generate Prompt & Call AI Engine
+  let promptInstructions = buildBusinessSystemPrompt({
     business,
     assistant,
-    contextChunks: matchedChunks || [],
+    contextText: formattedContext,
+    isDemo,
+    metadata: {
+      ...metadata,
+      email_collected_early: metadata.email_collected_early,
+      phone_collected: !!(extractedInfo.phone || conversation?.visitor_phone),
+    }
   });
 
-  const assistantResponse = await generateGeminiResponse({
-    systemInstruction: systemPrompt,
+  if (summary) {
+    promptInstructions = `[Conversation Summary of previous messages: ${summary}]\n\n` + promptInstructions;
+  }
+
+  // Call the core AI router
+  const chatResponse = await generateChatResponse({
+    provider: assistant.provider,
+    model: assistant.chat_model,
+    systemInstruction: promptInstructions,
     userMessage: message,
-    history: history,
+    history,
     temperature: Number(assistant.temperature) || 0.4,
+    businessId,
+    conversationId: currentConversationId,
   });
 
-  // 6. Save assistant message
+  // 9. Quality Evaluation Check
+  const quality = runResponseQualityChecks(chatResponse.text, business, formattedContext);
+  const finalReply = quality.sanitizedText;
+
+  // 10. Save Assistant Response
   const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
     .from("messages")
     .insert({
       conversation_id: currentConversationId,
       business_id: businessId,
       role: "assistant",
-      content: assistantResponse,
-      retrieved_chunks: matchedChunks || [],
+      content: finalReply,
+      retrieved_chunks: chunks || [],
+      metadata: {
+        intent,
+        quality_passed: quality.passed,
+        quality_reason: quality.reason || null,
+        provider: chatResponse.provider,
+        model: chatResponse.model,
+        latency_ms: chatResponse.latencyMs,
+      }
     })
     .select()
     .single();
 
   if (assistantMsgError) throw new Error(`Failed to save assistant response: ${assistantMsgError.message}`);
 
-  // 7. Increment usage after successful AI response
-  await incrementUsage(businessId, usageType, 1, {
-    conversation_id: currentConversationId,
-    source,
-  });
+  // 11. Usage Increments (Non-demo)
+  if (!isDemo) {
+    await incrementUsage(businessId, usageType, 1, {
+      conversation_id: currentConversationId,
+      source,
+    });
 
-  // Check for 80% usage threshold warning
-  const finalCheck = await checkUsageLimit(businessId, usageType);
-  const limit = finalCheck.limit;
-  const used = finalCheck.used;
-  const percentage = limit > 0 ? (used / limit) * 100 : 0;
+    // Check for 80% usage threshold warning
+    const finalCheck = await checkUsageLimit(businessId, usageType);
+    const limit = finalCheck.limit;
+    const used = finalCheck.used;
+    const percentage = limit > 0 ? (used / limit) * 100 : 0;
 
-  if (percentage >= 80 && sub) {
-    const now = new Date();
-    const periodStartStr = sub.current_period_start || sub.created_at;
-    const periodStart = new Date(periodStartStr);
-    const warningSent80AtStr = sub.metadata?.warning_sent_80_message;
-    let hasSent80 = false;
-
-    if (warningSent80AtStr) {
-      const warningSent80At = new Date(warningSent80AtStr);
-      if (warningSent80At >= periodStart) {
-        hasSent80 = true;
-      }
-    }
-
-    if (!hasSent80) {
-      const updatedMetadata = {
-        ...(sub.metadata || {}),
-        warning_sent_80_message: now.toISOString(),
-      };
-      await supabase
+    if (percentage >= 80) {
+      const { data: sub } = await supabase
         .from("subscriptions")
-        .update({ metadata: updatedMetadata })
-        .eq("id", sub.id);
+        .select("*")
+        .eq("business_id", businessId)
+        .maybeSingle();
 
-      sendTransactionalEmail({
-        businessId,
-        subject: "You’re nearing your Agentify usage limit",
-        templateName: "usage-warning-email",
-        react: UsageWarningEmail({
-          businessName: business.name,
-          usageType: "AI messages",
-          percentage: Math.round(percentage),
-          billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
-        }),
-      }).catch(err => console.error("Error sending 80% warning email:", err));
+      if (sub) {
+        const now = new Date();
+        const periodStartStr = sub.current_period_start || sub.created_at;
+        const periodStart = new Date(periodStartStr);
+        const warningSent80AtStr = sub.metadata?.warning_sent_80_message;
+        let hasSent80 = false;
+        if (warningSent80AtStr && new Date(warningSent80AtStr) >= periodStart) {
+          hasSent80 = true;
+        }
+
+        if (!hasSent80) {
+          const updatedMetadata = {
+            ...(sub.metadata || {}),
+            warning_sent_80_message: now.toISOString(),
+          };
+          await supabase
+            .from("subscriptions")
+            .update({ metadata: updatedMetadata })
+            .eq("id", sub.id);
+
+          sendTransactionalEmail({
+            businessId,
+            subject: "You’re nearing your Agentify usage limit",
+            templateName: "usage-warning-email",
+            react: UsageWarningEmail({
+              businessName: business.name,
+              usageType: "AI messages",
+              percentage: Math.round(percentage),
+              billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+            }),
+          }).catch(err => console.error("Error sending 80% warning email:", err));
+        }
+      }
     }
   }
 
   return {
     success: true,
     conversationId: currentConversationId,
-    reply: assistantResponse,
+    reply: finalReply,
     assistantMessage: savedAssistantMsg,
+    intent,
+    latencyMs: chatResponse.latencyMs,
   };
 }
 

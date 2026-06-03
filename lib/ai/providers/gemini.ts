@@ -191,3 +191,37 @@ export async function generateGeminiEmbedding({
 
   return embedding;
 }
+
+export async function generateGeminiEmbeddingsBatch({
+  model,
+  texts,
+}: {
+  model: string;
+  texts: string[];
+}): Promise<number[][]> {
+  const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
+  if (!apiKey) {
+    throw new Error("Missing GEMINI_API_KEY in database configurations or environment variables.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.embedContent({
+    model: model || "gemini-embedding-001",
+    contents: texts,
+    config: {
+      outputDimensionality: 768,
+    },
+  });
+
+  const embeddings = response.embeddings;
+  if (!embeddings || !Array.isArray(embeddings)) {
+    throw new Error("Invalid response format from Gemini Batch Embeddings.");
+  }
+
+  return embeddings.map((e, idx) => {
+    if (!e.values || !Array.isArray(e.values)) {
+      throw new Error(`Invalid embedding values for text at index ${idx} from Gemini Batch Embeddings.`);
+    }
+    return e.values;
+  });
+}

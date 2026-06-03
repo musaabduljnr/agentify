@@ -27,6 +27,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | undefined>();
   const [activeChunks, setActiveChunks] = useState<any[]>([]);
+  const [activeIntent, setActiveIntent] = useState<any | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +48,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
     setMessages(prev => [...prev, userMsg]);
     setIsLoading(true);
     setActiveChunks([]);
+    setActiveIntent(null);
 
     try {
       const result = await sendDashboardTestMessage({
@@ -74,6 +76,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
         setConversationId(result.conversationId);
         setMessages(prev => [...prev, result.assistantMessage as Message]);
         setActiveChunks(result.retrievedChunks || []);
+        setActiveIntent(result.intent || null);
       }
     } catch (error) {
       toast.error("Failed to send message. Please try again.");
@@ -86,6 +89,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
     setMessages([]);
     setConversationId(undefined);
     setActiveChunks([]);
+    setActiveIntent(null);
   };
 
   if (!initialAssistant) {
@@ -186,7 +190,7 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
 
       {/* Right Sidebar - Context Panel */}
       <div className="lg:col-span-1 h-[320px] lg:h-full overflow-hidden rounded-2xl border bg-background shadow-sm">
-        <RetrievedContextPanel chunks={activeChunks} />
+        <RetrievedContextPanel chunks={activeChunks} intent={activeIntent} />
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
-import { getAIEngineSettings } from "@/lib/actions/admin";
+import { getAIEngineSettings, getAIEngineLogsStats } from "@/lib/actions/admin";
 import { AISettingsForm } from "@/components/admin/ai-settings-form";
 import { Cpu } from "lucide-react";
 
 export default async function AdminAISettingsPage() {
   const settings = await getAIEngineSettings();
+  const logsStats = await getAIEngineLogsStats();
 
   return (
     <div className="space-y-10">
@@ -23,7 +24,7 @@ export default async function AdminAISettingsPage() {
       </div>
 
       {/* Dynamic Settings Form Component */}
-      <AISettingsForm initialSettings={settings} />
+      <AISettingsForm initialSettings={settings} logsStats={logsStats} />
     </div>
   );
 }

@@ -573,3 +573,73 @@ export async function getAdminEmailLogs(filters?: {
   return logs || [];
 }
 
+/**
+ * 13. AI Engine Logs & Metrics Actions
+ */
+export async function getAIEngineLogsStats() {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  const [
+    { data: recentLogs, error: logsErr },
+    { data: statsData, error: statsErr }
+  ] = await Promise.all([
+    supabase
+      .from("ai_interaction_logs")
+      .select("*, businesses(name)")
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase
+      .from("ai_interaction_logs")
+      .select("status, latency_ms, provider, model")
+  ]);
+
+  if (logsErr) throw logsErr;
+  if (statsErr) throw statsErr;
+
+  const logs = recentLogs || [];
+  const stats = statsData || [];
+
+  const totalRequests = stats.length;
+  const successfulRequests = stats.filter(s => s.status === "success" || s.status === "fallback_success").length;
+  const failedRequests = stats.filter(s => s.status === "failed").length;
+  const fallbackRequests = stats.filter(s => s.status === "fallback_success").length;
+
+  const successRate = totalRequests > 0 ? (successfulRequests / totalRequests) * 100 : 100;
+  const avgLatency = totalRequests > 0 ? stats.reduce((sum, s) => sum + (s.latency_ms || 0), 0) / totalRequests : 0;
+
+  // Group by provider/model to see health status
+  const providerHealth: Record<string, { total: number; success: number; avgLatency: number }> = {};
+  stats.forEach(s => {
+    const key = `${s.provider} (${s.model})`;
+    if (!providerHealth[key]) {
+      providerHealth[key] = { total: 0, success: 0, avgLatency: 0 };
+    }
+    providerHealth[key].total += 1;
+    if (s.status === "success" || s.status === "fallback_success") {
+      providerHealth[key].success += 1;
+    }
+    providerHealth[key].avgLatency += (s.latency_ms || 0);
+  });
+
+  const providerMetrics = Object.entries(providerHealth).map(([key, data]) => ({
+    providerModel: key,
+    successRate: data.total > 0 ? (data.success / data.total) * 100 : 100,
+    avgLatency: data.total > 0 ? data.avgLatency / data.total : 0,
+    totalRequests: data.total,
+  }));
+
+  return {
+    logs,
+    metrics: {
+      totalRequests,
+      successRate,
+      avgLatency,
+      failedRequests,
+      fallbackRequests,
+    },
+    providerMetrics,
+  };
+}
+
+
