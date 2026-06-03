@@ -10,6 +10,7 @@ import { chunkText, estimateTokens } from "@/lib/embeddings/chunker";
 import { generateGeminiResponse } from "@/lib/vertex/gemini";
 import { buildBusinessPrompt } from "@/lib/ai/build-business-prompt";
 import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
+import { getConfig } from "@/lib/config/platform-config";
 
 // Helper to slugify business name
 function slugify(text: string): string {
@@ -50,6 +51,11 @@ export async function createDemoBusiness(formData: {
   contactPhone?: string;
 }) {
   try {
+    const demoGenEnabled = await getConfig("feature_flags", "enable_demo_generator");
+    if (demoGenEnabled === "false") {
+      throw new Error("Demo Generator is globally disabled.");
+    }
+
     const adminProfile = await requireAdmin();
     const supabase = await createClient();
     const serviceClient = createServiceClient();
@@ -335,6 +341,10 @@ export async function getDemoBusinesses(filters?: {
   industry?: string;
 }) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -378,6 +388,10 @@ export async function getDemoBusinesses(filters?: {
  */
 export async function getDemoBusinessDetail(id: string) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -448,6 +462,10 @@ export async function updateDemoCRM(
   }
 ) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -477,6 +495,10 @@ export async function updateDemoCRM(
  */
 export async function deleteDemoBusiness(id: string) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -515,6 +537,10 @@ export async function deleteDemoBusiness(id: string) {
  */
 export async function pauseDemoBusiness(id: string, pause: boolean) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -549,6 +575,10 @@ export async function pauseDemoBusiness(id: string, pause: boolean) {
  */
 export async function extendDemoBusiness(id: string) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -587,6 +617,10 @@ export async function extendDemoBusiness(id: string) {
  */
 export async function archiveDemoBusiness(id: string) {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 
@@ -728,6 +762,10 @@ export async function claimDemoAssistant(slug: string, userId: string) {
  */
 export async function getAdminDemoAnalytics() {
   try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
     await requireAdmin();
     const serviceClient = createServiceClient();
 

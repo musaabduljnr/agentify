@@ -1,3 +1,5 @@
+import { getSecretWithEnvFallback } from "@/lib/config/platform-config";
+
 export async function generateGroqChat({
   model,
   systemInstruction,
@@ -11,9 +13,9 @@ export async function generateGroqChat({
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
 }): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = await getSecretWithEnvFallback("ai", "groq_api_key", "GROQ_API_KEY");
   if (!apiKey) {
-    throw new Error("Missing GROQ_API_KEY in environment variables.");
+    throw new Error("Missing GROQ_API_KEY in database configurations or environment variables.");
   }
 
   // Format messages for OpenAI standard compatibility

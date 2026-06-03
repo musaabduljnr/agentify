@@ -5,6 +5,7 @@ import { runBusinessChat } from "@/lib/actions/chat";
 import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { z } from "zod";
+import { getConfig } from "@/lib/config/platform-config";
 
 type WidgetChatResponse = Awaited<ReturnType<typeof runBusinessChat>> & {
   limitReached?: boolean;
@@ -58,6 +59,17 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: "Invalid widget chat request." }, { status: 400 });
     }
     const { businessId, conversationId, visitorId, message, pageUrl, source } = parsed.data;
+
+    // Check global feature flags
+    const widgetEnabled = await getConfig("feature_flags", "enable_widget");
+    if (source === "widget" && widgetEnabled === "false") {
+      return jsonWithCors({ error: "Widget operations are globally disabled." }, { status: 403 });
+    }
+
+    const hostedChatEnabled = await getConfig("feature_flags", "enable_hosted_chat");
+    if (source === "hosted_chat" && hostedChatEnabled === "false") {
+      return jsonWithCors({ error: "Hosted chat operations are globally disabled." }, { status: 403 });
+    }
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const rateLimitKey = `${businessId}:${visitorId || ip}`;

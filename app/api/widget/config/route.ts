@@ -4,6 +4,7 @@ import { corsHeaders, jsonWithCors } from "@/lib/http/cors";
 import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { z } from "zod";
+import { getConfig } from "@/lib/config/platform-config";
 
 const widgetConfigQuerySchema = z.object({
   businessId: z.string().uuid(),
@@ -41,6 +42,11 @@ function isAllowedHost(hostname: string, allowedDomains: string[] | null | undef
 
 export async function GET(req: NextRequest) {
   try {
+    const widgetEnabled = await getConfig("feature_flags", "enable_widget");
+    if (widgetEnabled === "false") {
+      return jsonWithCors({ error: "Widget operations are globally disabled." }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const parsed = widgetConfigQuerySchema.safeParse({
       businessId: searchParams.get("businessId"),

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { startOfDay, subDays, eachDayOfInterval, format, isSameDay } from "date-fns";
+import { getConfig } from "@/lib/config/platform-config";
 
 async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -60,6 +61,11 @@ export interface AnalyticsData {
 
 export async function getBusinessAnalytics(days: number = 30): Promise<AnalyticsData | null> {
   try {
+    const analyticsEnabled = await getConfig("feature_flags", "enable_analytics");
+    if (analyticsEnabled === "false") {
+      return null;
+    }
+
     const business = await getCurrentBusiness();
     if (!business) return null;
 

@@ -20,7 +20,14 @@ function UnavailablePage() {
   );
 }
 
+import { getConfig } from "@/lib/config/platform-config";
+
 export default async function HostedChatPage({ params }: { params: Promise<{ slug: string }> }) {
+  const hostedChatEnabled = await getConfig("feature_flags", "enable_hosted_chat");
+  if (hostedChatEnabled === "false") {
+    return <UnavailablePage />;
+  }
+
   const { slug } = await params;
   const normalizedSlug = slug.toLowerCase();
 

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { getSecretWithEnvFallback } from "@/lib/config/platform-config";
 
 let resendClient: Resend | null = null;
 
@@ -7,15 +8,15 @@ let resendClient: Resend | null = null;
  * Throws a clear error in development if the key is missing,
  * but returns null gracefully in production to avoid crashing the entire application.
  */
-export function getResendClient(): Resend | null {
+export async function getResendClient(): Promise<Resend | null> {
   if (resendClient) {
     return resendClient;
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = await getSecretWithEnvFallback("resend", "api_key", "RESEND_API_KEY");
 
-  if (!apiKey) {
-    const errorMsg = "RESEND_API_KEY is not defined in the environment variables.";
+  if (!apiKey || apiKey.includes("your_resend_api_key")) {
+    const errorMsg = "RESEND_API_KEY is not defined in database platform configurations or environment variables.";
     if (process.env.NODE_ENV === "development") {
       throw new Error(`[EMAIL SERVICE DEV ERROR] ${errorMsg}`);
     } else {

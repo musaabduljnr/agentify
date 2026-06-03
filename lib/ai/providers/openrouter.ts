@@ -1,3 +1,5 @@
+import { getConfigWithEnvFallback, getSecretWithEnvFallback } from "@/lib/config/platform-config";
+
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-20b:free";
 const DEPRECATED_OPENROUTER_MODELS = new Set([
   "meta-llama/llama-3.1-8b-instruct:free",
@@ -18,9 +20,9 @@ export async function generateOpenRouterChat({
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
 }): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = await getSecretWithEnvFallback("ai", "openrouter_api_key", "OPENROUTER_API_KEY");
   if (!apiKey) {
-    throw new Error("Missing OPENROUTER_API_KEY in environment variables.");
+    throw new Error("Missing OPENROUTER_API_KEY in database configurations or environment variables.");
   }
 
   // Format messages for OpenAI standard compatibility
@@ -38,12 +40,14 @@ export async function generateOpenRouterChat({
     ? DEFAULT_OPENROUTER_MODEL
     : requestedModel;
 
+  const referrerUrl = await getConfigWithEnvFallback("platform", "app_url", "NEXT_PUBLIC_APP_URL") || "https://agentifyhq.vercel.app";
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app",
+      "HTTP-Referer": referrerUrl,
       "X-Title": "Agentify AI",
     },
     body: JSON.stringify({

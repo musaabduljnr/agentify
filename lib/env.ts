@@ -16,8 +16,8 @@ type EnvSpec = {
 const ENV_SPECS: EnvSpec[] = [
   {
     key: "NEXT_PUBLIC_APP_URL",
-    required: true,
-    description: "Public base URL of the application, such as https://agentify.co",
+    required: false,
+    description: "Public base URL of the application, such as https://agentify.co (Optional: falls back to database platform.app_url)",
   },
   {
     key: "NEXT_PUBLIC_SUPABASE_URL",
@@ -37,9 +37,9 @@ const ENV_SPECS: EnvSpec[] = [
   },
   {
     key: "GEMINI_API_KEY",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "Gemini API key - server-side only",
+    description: "Gemini API key - server-side only (Optional: falls back to database ai.gemini_api_key)",
   },
   {
     key: "OPENROUTER_API_KEY",
@@ -49,14 +49,14 @@ const ENV_SPECS: EnvSpec[] = [
   },
   {
     key: "PAYSTACK_SECRET_KEY",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "Paystack secret key - required for payment processing",
+    description: "Paystack secret key - required for payment processing (Optional: falls back to database paystack.secret_key)",
   },
   {
     key: "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY",
-    required: true,
-    description: "Paystack public key - safe to expose to the browser",
+    required: false,
+    description: "Paystack public key - safe to expose to the browser (Optional: falls back to database paystack.public_key)",
   },
   {
     key: "PAYSTACK_WEBHOOK_SECRET",
@@ -78,14 +78,14 @@ const ENV_SPECS: EnvSpec[] = [
   },
   {
     key: "RESEND_API_KEY",
-    required: true,
+    required: false,
     serverOnly: true,
-    description: "Resend API key - required for transactional emails",
+    description: "Resend API key - required for transactional emails (Optional: falls back to database resend.api_key)",
   },
   {
     key: "EMAIL_FROM",
-    required: true,
-    description: "Verified sender address for transactional email",
+    required: false,
+    description: "Verified sender address for transactional email (Optional: falls back to database email.from_email)",
   },
   {
     key: "RESEND_VERIFIED_DOMAIN",
@@ -95,8 +95,8 @@ const ENV_SPECS: EnvSpec[] = [
   },
   {
     key: "SUPPORT_EMAIL",
-    required: true,
-    description: "Public support email address",
+    required: false,
+    description: "Public support email address (Optional: falls back to database platform.support_email)",
   },
 ];
 

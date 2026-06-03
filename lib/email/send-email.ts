@@ -4,6 +4,7 @@ import { getNodemailerTransporter } from "@/lib/email/nodemailer";
 import { getBusinessNotificationEmail, validateEmail } from "@/lib/email/recipients";
 import { logEmailSent, logEmailFailed } from "@/lib/email/email-log";
 import { createServiceClient } from "@/utils/supabase/service";
+import { getConfig, getConfigWithEnvFallback, getSecretWithEnvFallback } from "@/lib/config/platform-config";
 
 // Maps email template names to notification preferences table columns
 const TEMPLATE_PREF_MAP: Record<string, string> = {
@@ -82,10 +83,18 @@ async function getOrInitializePreferences(businessId: string) {
 export async function sendTransactionalEmail(
   input: SendTransactionalEmailInput
 ): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASSWORD;
-  const useNodemailer = !!(smtpUser && smtpPass);
-  const provider = useNodemailer ? "nodemailer" : "resend";
+  // Check if emails are globally enabled
+  const emailsEnabled = await getConfig("feature_flags", "enable_emails");
+  if (emailsEnabled === "false") {
+    console.log("[EMAIL SKIP] Emails are globally disabled via feature flags.");
+    return { success: true, skipped: true };
+  }
+
+  const dbProvider = await getConfig("email", "default_provider");
+  const smtpUser = await getConfigWithEnvFallback("smtp", "username", "SMTP_USER");
+  const smtpPass = await getSecretWithEnvFallback("smtp", "password", "SMTP_PASSWORD");
+  const provider = dbProvider || (smtpUser && smtpPass ? "smtp" : "resend");
+  const useNodemailer = provider === "smtp";
   let finalTo = input.to ? input.to.trim() : null;
 
   try {
@@ -146,12 +155,16 @@ export async function sendTransactionalEmail(
       return { success: false, error: errMsg };
     }
 
-    // 4. Send email via selected provider (Nodemailer vs Resend)
-    const sender = process.env.EMAIL_FROM || (useNodemailer ? smtpUser : "noreply@yourdomain.com");
+    const fromEmail = (await getConfigWithEnvFallback("email", "from_email", "EMAIL_FROM")) ||
+      (useNodemailer ? (smtpUser || "noreply@yourdomain.com") : "noreply@yourdomain.com");
+    const fromName = (await getConfig("email", "from_name")) || "";
+    const sender = fromName ? `"${fromName}" <${fromEmail}>` : fromEmail;
+    
+    const replyTo = await getConfig("email", "reply_to_email") || undefined;
     const textContent = input.fallbackText || input.subject;
 
     if (useNodemailer) {
-      const transporter = getNodemailerTransporter();
+      const transporter = await getNodemailerTransporter();
       if (!transporter) {
         const errMsg = "Nodemailer transporter could not be initialized (missing SMTP configs).";
         if (input.businessId) {
@@ -174,6 +187,7 @@ export async function sendTransactionalEmail(
           subject: input.subject,
           html: htmlContent,
           text: textContent,
+          replyTo,
         });
 
         // 5. Log success to database
@@ -208,7 +222,7 @@ export async function sendTransactionalEmail(
       }
     } else {
       // Send via Resend
-      const resend = getResendClient();
+      const resend = await getResendClient();
       if (!resend) {
         const errMsg = "Resend client could not be initialized (missing API key).";
         if (input.businessId) {
@@ -230,6 +244,7 @@ export async function sendTransactionalEmail(
         subject: input.subject,
         html: htmlContent,
         text: textContent,
+        replyTo: replyTo,
       });
 
       if (sendError) {

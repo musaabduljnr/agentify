@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { getSecretWithEnvFallback } from "@/lib/config/platform-config";
 
 const DEFAULT_GEMINI_CHAT_MODEL = "gemini-2.5-flash";
 const GEMINI_CHAT_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
@@ -51,9 +52,9 @@ export async function generateGeminiChat({
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
 }): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY in environment variables.");
+    throw new Error("Missing GEMINI_API_KEY in database configurations or environment variables.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -121,9 +122,9 @@ export async function generateGeminiContent({
   temperature?: number;
   maxOutputTokens?: number;
 }): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY in environment variables.");
+    throw new Error("Missing GEMINI_API_KEY in database configurations or environment variables.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -169,9 +170,9 @@ export async function generateGeminiEmbedding({
   model: string;
   text: string;
 }): Promise<number[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY in environment variables.");
+    throw new Error("Missing GEMINI_API_KEY in database configurations or environment variables.");
   }
 
   const ai = new GoogleGenAI({ apiKey });

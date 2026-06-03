@@ -21,6 +21,7 @@ import {
   BarChart3,
   Mail,
   Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +100,7 @@ export default function AdminLayoutClient({
               <X className="w-5 h-5" />
             </button>
           </div>
-
+ 
           {/* Navigation Links */}
           <nav className="p-4 space-y-1">
             <AdminSidebarLink href="/admin" label="Overview" icon={<BarChart3 className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin"} />
@@ -113,6 +114,7 @@ export default function AdminLayoutClient({
             <AdminSidebarLink href="/admin/leads" label="Leads" icon={<Contact2 className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/leads"} />
             <AdminSidebarLink href="/admin/ai-settings" label="AI Engine" icon={<Cpu className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/ai-settings"} />
             <AdminSidebarLink href="/admin/email-logs" label="Email Logs" icon={<Mail className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/email-logs"} />
+            <AdminSidebarLink href="/admin/configuration" label="Config Center" icon={<SlidersHorizontal className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/configuration"} />
             <AdminSidebarLink href="/admin/settings" label="Settings" icon={<Settings className="w-4 h-4" />} onClick={() => setIsSidebarOpen(false)} isActive={pathname === "/admin/settings"} />
           </nav>
         </div>

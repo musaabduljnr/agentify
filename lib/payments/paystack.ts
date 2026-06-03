@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { getConfiguredOptionalEnv, isConfiguredEnvValue } from "@/lib/env";
+import { getSecretWithEnvFallback } from "@/lib/config/platform-config";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -22,9 +22,9 @@ export class PaystackProviderError extends Error {
 }
 
 export async function initializePaystackTransaction(input: PaystackInitializeInput) {
-  const secretKey = process.env.PAYSTACK_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("PAYSTACK_SECRET_KEY is not defined in the environment variables.");
+  const secretKey = await getSecretWithEnvFallback("paystack", "secret_key", "PAYSTACK_SECRET_KEY");
+  if (!secretKey || secretKey.includes("placeholder")) {
+    throw new Error("Paystack Secret Key is not configured in database settings or environment variables.");
   }
 
   // Paystack expects amount in Kobo
@@ -73,9 +73,9 @@ export async function initializePaystackTransaction(input: PaystackInitializeInp
 }
 
 export async function verifyPaystackTransaction(reference: string) {
-  const secretKey = process.env.PAYSTACK_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error("PAYSTACK_SECRET_KEY is not defined in the environment variables.");
+  const secretKey = await getSecretWithEnvFallback("paystack", "secret_key", "PAYSTACK_SECRET_KEY");
+  if (!secretKey || secretKey.includes("placeholder")) {
+    throw new Error("Paystack Secret Key is not configured in database settings or environment variables.");
   }
 
   const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
@@ -95,10 +95,10 @@ export async function verifyPaystackTransaction(reference: string) {
   return data.data;
 }
 
-export function verifyPaystackWebhookSignature(rawBody: string, signature: string): boolean {
-  const secret = getConfiguredOptionalEnv("PAYSTACK_WEBHOOK_SECRET") || process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) return false;
-  if (!isConfiguredEnvValue(secret)) return false;
+export async function verifyPaystackWebhookSignature(rawBody: string, signature: string): Promise<boolean> {
+  const secret = await getSecretWithEnvFallback("paystack", "webhook_secret", "PAYSTACK_WEBHOOK_SECRET")
+    || await getSecretWithEnvFallback("paystack", "secret_key", "PAYSTACK_SECRET_KEY");
+  if (!secret || secret.includes("placeholder")) return false;
 
   const hash = crypto
     .createHmac("sha512", secret)

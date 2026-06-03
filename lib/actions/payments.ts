@@ -18,9 +18,12 @@ import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
 import { PaymentFailedEmail } from "@/lib/email/templates/payment-failed-email";
+import { getConfig, getSecretWithEnvFallback } from "@/lib/config/platform-config";
 
-function getAppBaseUrl(): string {
+async function getAppBaseUrl(): Promise<string> {
+  const dbUrl = await getConfig("platform", "app_url");
   const configuredUrl =
+    dbUrl ||
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
@@ -43,6 +46,11 @@ export async function createCheckoutSession(
   provider: "paystack" | "flutterwave" = "paystack"
 ) {
   try {
+    // 0. Check feature flag
+    const paymentsEnabled = await getConfig("feature_flags", "enable_payments");
+    if (paymentsEnabled === "false") {
+      return { error: "Payments are temporarily disabled. Please try again later." };
+    }
     // 1. Get authenticated user
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -104,7 +112,7 @@ export async function createCheckoutSession(
         );
       }
 
-      const callbackUrl = `${getAppBaseUrl()}/payment/callback`;
+      const callbackUrl = `${await getAppBaseUrl()}/payment/callback`;
 
       const paystackRes = await initializePaystackTransaction({
         email: user.email || business.contact_email || "billing@agentify.com",
@@ -124,7 +132,7 @@ export async function createCheckoutSession(
       rawResponse = paystackRes;
     } else if (provider === "flutterwave") {
       // Flutterwave is secondary and throws error if keys are missing
-      const flwSecret = process.env.FLUTTERWAVE_SECRET_KEY;
+      const flwSecret = await getSecretWithEnvFallback("flutterwave", "secret_key", "FLUTTERWAVE_SECRET_KEY");
       if (!flwSecret || flwSecret.includes("placeholder")) {
         return { error: "Flutterwave payment is not enabled yet." };
       }
@@ -279,7 +287,7 @@ export async function verifyPaymentReference(reference: string) {
           businessName: business?.name || "there",
           plan: String(transaction.plan),
           amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
-          billingUrl: `${getAppBaseUrl()}/dashboard/billing`,
+          billingUrl: `${await getAppBaseUrl()}/dashboard/billing`,
         }),
       });
 
@@ -306,7 +314,7 @@ export async function verifyPaymentReference(reference: string) {
         react: PaymentFailedEmail({
           businessName: business?.name || "there",
           plan: String(transaction.plan),
-          billingUrl: `${getAppBaseUrl()}/dashboard/billing`,
+          billingUrl: `${await getAppBaseUrl()}/dashboard/billing`,
         }),
       });
 

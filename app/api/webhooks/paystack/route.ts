@@ -5,6 +5,7 @@ import {
   verifyPaystackWebhookSignature,
 } from "@/lib/payments/paystack";
 import { createServiceClient } from "@/utils/supabase/service";
+import { getConfig } from "@/lib/config/platform-config";
 import { type PlanId } from "@/lib/billing/plans";
 import { getEffectivePlanLimits } from "@/lib/billing/platform";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Verify HMAC SHA512 Signature
-    const isValid = verifyPaystackWebhookSignature(rawBody, signature);
+    const isValid = await verifyPaystackWebhookSignature(rawBody, signature);
     if (!isValid) {
       logErrorSync(new Error("Signature verification failed."), "paystack-webhook");
       return new Response("Unauthorized signature mismatch.", { status: 401 });
@@ -196,6 +197,9 @@ export async function POST(request: Request) {
         .eq("id", resolvedBusinessId)
         .maybeSingle();
 
+      const dbUrl = await getConfig("platform", "app_url");
+      const appUrlVal = dbUrl || process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
+
       await sendTransactionalEmail({
         businessId: resolvedBusinessId,
         to: businessOwner?.contact_email || (businessOwner?.owner as { email?: string } | null)?.email,
@@ -205,7 +209,7 @@ export async function POST(request: Request) {
           businessName: businessOwner?.name || "there",
           plan: planId,
           amount: tx.amount ? `${tx.currency} ${Number(tx.amount).toLocaleString()}` : null,
-          billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+          billingUrl: `${appUrlVal}/dashboard/billing`,
         }),
       });
     } 
@@ -263,6 +267,9 @@ export async function POST(request: Request) {
           | null
           | undefined;
 
+        const dbUrl = await getConfig("platform", "app_url");
+        const appUrlVal = dbUrl || process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
+
         if (subscriptionRow?.business_id) {
           await sendTransactionalEmail({
             businessId: subscriptionRow.business_id,
@@ -272,7 +279,7 @@ export async function POST(request: Request) {
             react: PaymentFailedEmail({
               businessName: business?.name || "there",
               plan: String(subscriptionRow.plan || "Agentify"),
-              billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+              billingUrl: `${appUrlVal}/dashboard/billing`,
             }),
           });
         }
