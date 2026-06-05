@@ -394,7 +394,7 @@ async function fetchHtml(rawUrl: string): Promise<{ url: string; html: string }>
         throw new Error("Too many redirects while fetching the website.");
       }
 
-      url = normalizeUrl(resolveRedirectUrl(url, response.headers.get("location")));
+      url = resolveRedirectUrl(url, response.headers.get("location"));
       await assertPublicHttpUrl(url);
     }
   } catch (err: unknown) {
