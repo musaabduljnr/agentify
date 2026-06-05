@@ -1,11 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Search, Filter, User as UserIcon, Bot, MessageSquare, ArrowLeft } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, Filter, User as UserIcon, Bot, MessageSquare, ArrowLeft, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { getDashboardConversation } from "@/lib/actions/chat";
+import { 
+  getDashboardConversation, 
+  toggleManualTakeover, 
+  sendManualMessage, 
+  getBusinessConversations 
+} from "@/lib/actions/chat";
 import { formatDistanceToNow } from "date-fns";
 
 interface Conversation {
@@ -15,7 +20,9 @@ interface Conversation {
   source: string;
   status: string;
   lead_captured: boolean;
+  is_manual_takeover: boolean;
   updated_at: string;
+  metadata?: Record<string, any>;
   last_message?: {
     content: string;
     created_at: string;
@@ -26,28 +33,74 @@ interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  metadata?: Record<string, any>;
   created_at: string;
 }
 
 export function ConversationManager({ initialConversations }: { initialConversations: Conversation[] }) {
+  const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [selectedId, setSelectedId] = useState<string | null>(initialConversations[0]?.id || null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewingDetail, setViewingDetail] = useState(false);
+  
+  // Manual Takeover state variables
+  const [isManual, setIsManual] = useState(false);
+  const [replyInput, setReplyInput] = useState("");
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
-  const filteredConversations = initialConversations.filter(c => 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const filteredConversations = conversations.filter(c => 
     c.visitor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.visitor_email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const selectedConversation = initialConversations.find(c => c.id === selectedId);
+  const selectedConversation = conversations.find(c => c.id === selectedId);
 
+  // Sync isManual state whenever selectedConversation changes
+  useEffect(() => {
+    if (selectedConversation) {
+      setIsManual(selectedConversation.is_manual_takeover || false);
+    }
+  }, [selectedId, selectedConversation]);
+
+  // Load messages initially when selected ID changes
   useEffect(() => {
     if (selectedId) {
       loadMessages(selectedId);
     }
   }, [selectedId]);
+
+  // Poll for message and list updates every 4 seconds
+  useEffect(() => {
+    if (!selectedId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const msgs = await getDashboardConversation(selectedId);
+        setMessages(msgs as any);
+
+        const convs = await getBusinessConversations();
+        setConversations(convs as any);
+      } catch (err) {
+        console.error("Dashboard conversations polling error:", err);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [selectedId]);
+
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    if (scrollRef.current) {
+      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [messages]);
 
   const loadMessages = async (id: string) => {
     setIsLoading(true);
@@ -61,10 +114,63 @@ export function ConversationManager({ initialConversations }: { initialConversat
     }
   };
 
+  const handleToggleTakeover = async () => {
+    if (!selectedId) return;
+    const newManualState = !isManual;
+    setIsManual(newManualState); // Optimistic Update
+
+    try {
+      const res = await toggleManualTakeover({
+        conversationId: selectedId,
+        isManual: newManualState,
+      });
+
+      if (res.error) {
+        setIsManual(!newManualState); // Revert
+        alert(res.error);
+      } else {
+        // Refresh conversations list to update dashboard state
+        const convs = await getBusinessConversations();
+        setConversations(convs as any);
+      }
+    } catch (err) {
+      setIsManual(!newManualState); // Revert
+      console.error(err);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!selectedId || !replyInput.trim() || isSendingReply) return;
+    setIsSendingReply(true);
+
+    try {
+      const res = await sendManualMessage({
+        conversationId: selectedId,
+        content: replyInput.trim(),
+      });
+
+      if (res.error) {
+        alert(res.error);
+      } else {
+        setReplyInput("");
+        await loadMessages(selectedId);
+        const convs = await getBusinessConversations();
+        setConversations(convs as any);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 border border-slate-200 rounded-3xl bg-white shadow-sm overflow-hidden h-[calc(100vh-280px)] min-h-[600px]">
       {/* Left: Chat List */}
-      <div className="lg:col-span-4 border-r border-slate-100 flex flex-col h-full bg-slate-50/10">
+      <div className={cn(
+        "lg:col-span-4 border-r border-slate-100 flex flex-col h-full bg-slate-50/10",
+        viewingDetail ? "hidden lg:flex" : "flex"
+      )}>
         <div className="p-4 border-b border-slate-100">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -111,13 +217,18 @@ export function ConversationManager({ initialConversations }: { initialConversat
                     <p className="text-xs text-slate-500 line-clamp-1 group-hover:text-slate-700">
                       {convo.last_message?.content || "No messages yet"}
                     </p>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
                       <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[9px] font-bold rounded uppercase tracking-wider">
                         {convo.source.replace("_", " ")}
                       </span>
-                      {(convo as any).metadata?.intent_type && (
+                      {convo.is_manual_takeover && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded uppercase tracking-wider">
+                          Manual
+                        </span>
+                      )}
+                      {convo.metadata?.intent_type && (
                         <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[9px] font-bold rounded uppercase tracking-wider">
-                          {(convo as any).metadata.intent_type.replace("_", " ")}
+                          {convo.metadata.intent_type.replace("_", " ")}
                         </span>
                       )}
                     </div>
@@ -130,7 +241,10 @@ export function ConversationManager({ initialConversations }: { initialConversat
       </div>
 
       {/* Right: Chat Detail */}
-      <div className="lg:col-span-8 flex flex-col h-full bg-slate-50/30">
+      <div className={cn(
+        "lg:col-span-8 flex flex-col h-full bg-slate-50/30",
+        viewingDetail ? "flex" : "hidden lg:flex"
+      )}>
         {!selectedConversation ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-10 text-center">
             <MessageSquare size={48} className="mb-4 opacity-10" />
@@ -138,7 +252,8 @@ export function ConversationManager({ initialConversations }: { initialConversat
           </div>
         ) : (
           <>
-            <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between">
+            {/* Header */}
+            <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
                 <button 
                   type="button"
@@ -160,9 +275,38 @@ export function ConversationManager({ initialConversations }: { initialConversat
                   </div>
                 </div>
               </div>
+              
+              {/* Takeover Control Toggle Button */}
+              <Button
+                type="button"
+                variant={isManual ? "destructive" : "outline"}
+                onClick={handleToggleTakeover}
+                className="rounded-2xl font-bold h-10 px-4 flex items-center gap-1.5 text-xs shrink-0"
+              >
+                {isManual ? (
+                  <>
+                    <Bot className="w-4 h-4" />
+                    Resume AI
+                  </>
+                ) : (
+                  <>
+                    <UserIcon className="w-4 h-4" />
+                    Take Over Chat
+                  </>
+                )}
+              </Button>
             </div>
 
-            <ScrollArea className="flex-1 p-6">
+            {/* Manual Control Banner Alert */}
+            {isManual && (
+              <div className="bg-amber-50 border-b border-amber-100 px-6 py-2.5 text-xs font-semibold text-amber-800 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                AI replies are paused for this conversation. You are in manual control.
+              </div>
+            )}
+
+            {/* Messages Scroll Area */}
+            <ScrollArea ref={scrollRef} className="flex-1 p-6">
               {isLoading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map(i => (
@@ -176,23 +320,32 @@ export function ConversationManager({ initialConversations }: { initialConversat
                 <div className="space-y-6">
                   {messages.map((msg) => {
                     const isAssistant = msg.role === "assistant";
+                    const isManualMsg = msg.metadata?.is_manual || false;
                     return (
                       <div key={msg.id} className={cn("flex items-start gap-3", isAssistant ? "" : "flex-row-reverse")}>
                         <div className={cn(
                           "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm",
-                          isAssistant ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-500"
+                          isAssistant 
+                            ? isManualMsg ? "bg-amber-600 text-white" : "bg-indigo-600 text-white" 
+                            : "bg-slate-200 text-slate-500"
                         )}>
-                          {isAssistant ? <Bot className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
+                          {isAssistant 
+                            ? isManualMsg ? <UserIcon className="w-4 h-4" /> : <Bot className="w-4 h-4" /> 
+                            : <UserIcon className="w-4 h-4" />}
                         </div>
                         <div className={cn("space-y-1 max-w-[80%]", isAssistant ? "" : "text-right")}>
                           <div className={cn(
-                            "p-3 rounded-2xl text-sm leading-relaxed text-left",
-                            isAssistant ? "bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm" : "bg-indigo-600 text-white rounded-tr-none"
+                            "p-3 rounded-2xl text-sm leading-relaxed text-left shadow-sm",
+                            isAssistant 
+                              ? isManualMsg 
+                                ? "bg-amber-50/50 border border-amber-200 text-slate-800 rounded-tl-none" 
+                                : "bg-white border border-slate-200 text-slate-700 rounded-tl-none" 
+                              : "bg-indigo-600 text-white rounded-tr-none"
                           )}>
                             {msg.content}
                           </div>
                           <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest px-1">
-                            {isAssistant ? "AI Assistant" : "Visitor"} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {isAssistant ? isManualMsg ? "Support Agent (Human)" : "AI Assistant" : "Visitor"} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       </div>
@@ -201,6 +354,31 @@ export function ConversationManager({ initialConversations }: { initialConversat
                 </div>
               )}
             </ScrollArea>
+
+            {/* Input Form for Manual Responses */}
+            <div className="p-4 bg-white border-t border-slate-150 flex gap-2 items-center">
+              <input
+                type="text"
+                placeholder={isManual ? "Type your response..." : "Take over chat to reply manually..."}
+                value={replyInput}
+                onChange={(e) => setReplyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSendReply();
+                  }
+                }}
+                disabled={!isManual || isSendingReply}
+                className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all disabled:opacity-50"
+              />
+              <Button
+                onClick={handleSendReply}
+                disabled={!isManual || !replyInput.trim() || isSendingReply}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 h-10 font-bold flex items-center justify-center shrink-0 shadow-sm transition active:scale-95"
+              >
+                <Send className="w-4 h-4 mr-1.5" />
+                Send
+              </Button>
+            </div>
           </>
         )}
       </div>

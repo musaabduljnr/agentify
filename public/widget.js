@@ -295,6 +295,17 @@
         background: #f8fafc;
         border-color: #cbd5e1;
       }
+      .agentify-manual-badge {
+        font-size: 10px;
+        color: ${config.primaryColor};
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-top: 4px;
+        font-weight: bold;
+        display: inline-block;
+        width: fit-content;
+      }
       @keyframes agentify-pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: .5; }
@@ -397,6 +408,34 @@
       });
     }
 
+    let pollingInterval = null;
+    let renderedMessageCount = 0;
+
+    function startHistoryPolling() {
+      if (pollingInterval) clearInterval(pollingInterval);
+      if (!conversationId) return;
+
+      pollingInterval = setInterval(async () => {
+        if (!panel.classList.contains("active")) return;
+
+        try {
+          const res = await fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}`);
+          const data = await res.json();
+
+          if (data.messages && data.messages.length > renderedMessageCount) {
+            msgList.innerHTML = `<div class="agentify-message assistant">${formatMarkdown(config.welcomeText)}</div>`;
+            renderedMessageCount = 0;
+
+            data.messages.forEach((msg) => {
+              addMessage(msg.content, msg.role === "assistant" ? "assistant" : "user", msg.metadata);
+            });
+          }
+        } catch (err) {
+          console.error("Widget polling error:", err);
+        }
+      }, 4000);
+    }
+
     async function sendMessage() {
       const message = input.value.trim();
       if (!message) return;
@@ -429,12 +468,16 @@
         const data = await res.json();
         loading.remove();
 
+        if (data.conversationId && !conversationId) {
+          conversationId = data.conversationId;
+          localStorage.setItem(`agentify_conv_${businessId}`, conversationId);
+          startHistoryPolling();
+        }
+
         if (data.reply) {
           addMessage(data.reply, "assistant");
-          if (data.conversationId) {
-            conversationId = data.conversationId;
-            localStorage.setItem(`agentify_conv_${businessId}`, conversationId);
-          }
+        } else if (data.isManualTakeover) {
+          // AI is paused. Do nothing, wait for manual poll.
         } else {
           addMessage("Sorry, something went wrong. Please try again.", "assistant");
         }
@@ -444,17 +487,32 @@
       }
     }
 
-    function addMessage(text, role) {
+    function addMessage(text, role, metadata) {
       const div = document.createElement("div");
       div.className = `agentify-message ${role}`;
+
+      const isManual = metadata && metadata.is_manual;
+      if (isManual) {
+        div.classList.add("manual");
+      }
+
       div.innerHTML = formatMarkdown(text);
+
+      if (isManual) {
+        const badge = document.createElement("div");
+        badge.className = "agentify-manual-badge";
+        badge.innerText = "Support Agent";
+        div.appendChild(badge);
+      }
+
       msgList.appendChild(div);
       msgList.scrollTop = msgList.scrollHeight;
+      renderedMessageCount++;
 
       // Handle showing/hiding continue button
       const continueContainer = panel.querySelector("#agentify-continue-container");
       if (continueContainer) {
-        if (role === "assistant") {
+        if (role === "assistant" && !isManual) {
           continueContainer.innerHTML = `
             <button class="agentify-continue-btn" id="agentify-continue-btn">
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="${config.primaryColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; display: inline-block; vertical-align: middle; animation: agentify-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/><path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5Z"/><path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/></svg>
@@ -479,6 +537,26 @@
       if (e.key === "Enter") sendMessage();
     };
     sendBtn.onclick = sendMessage;
+
+    // Start history polling if already have a conversationId
+    if (conversationId) {
+      fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.messages && data.messages.length > 0) {
+            msgList.innerHTML = `<div class="agentify-message assistant">${formatMarkdown(config.welcomeText)}</div>`;
+            renderedMessageCount = 0;
+            data.messages.forEach(msg => {
+              addMessage(msg.content, msg.role === "assistant" ? "assistant" : "user", msg.metadata);
+            });
+          }
+          startHistoryPolling();
+        })
+        .catch(err => {
+          console.error("Widget initial load error:", err);
+          startHistoryPolling();
+        });
+    }
   }
 
   init();

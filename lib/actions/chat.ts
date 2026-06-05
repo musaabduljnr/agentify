@@ -397,6 +397,16 @@ export async function runBusinessChat({
 
   if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
 
+  // If manual takeover is active, save the user message but skip AI response generation
+  if (conversation?.is_manual_takeover) {
+    return {
+      success: true,
+      conversationId: currentConversationId,
+      reply: null,
+      assistantMessage: null,
+    };
+  }
+
   // 5. RAG Retrieval & Intent Classification
   const isContinuation = message.toLowerCase().trim() === "continue";
   let ragQuery = message;
@@ -802,4 +812,79 @@ export async function getBusinessConversations() {
     ...conv,
     last_message: conv.messages?.[conv.messages.length - 1] || null
   }));
+}
+
+export async function toggleManualTakeover({
+  conversationId,
+  isManual,
+}: {
+  conversationId: string;
+  isManual: boolean;
+}) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+    const supabase = await createClient();
+
+    const { error } = await supabase
+      .from("conversations")
+      .update({ is_manual_takeover: isManual })
+      .eq("id", conversationId)
+      .eq("business_id", business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/conversations");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to toggle manual takeover" };
+  }
+}
+
+export async function sendManualMessage({
+  conversationId,
+  content,
+}: {
+  conversationId: string;
+  content: string;
+}) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+    const supabase = await createClient();
+
+    // 1. Verify conversation belongs to this business
+    const { data: conv, error: convErr } = await supabase
+      .from("conversations")
+      .select("id")
+      .eq("id", conversationId)
+      .eq("business_id", business.id)
+      .single();
+
+    if (convErr || !conv) throw new Error("Conversation not found");
+
+    // 2. Insert manual message with metadata is_manual: true
+    const { error: msgErr } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        business_id: business.id,
+        role: "assistant",
+        content,
+        metadata: { is_manual: true },
+      });
+
+    if (msgErr) throw msgErr;
+
+    // 3. Update conversation's updated_at timestamp to bubble it to the top
+    await supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", conversationId);
+
+    revalidatePath("/dashboard/conversations");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Failed to send manual message" };
+  }
 }
