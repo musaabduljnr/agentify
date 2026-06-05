@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Filter, User as UserIcon, Bot, MessageSquare, ArrowLeft, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { 
   getDashboardConversation, 
@@ -199,7 +198,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
             />
           </div>
         </div>
-        <ScrollArea className="flex-1">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="divide-y divide-slate-50">
             {filteredConversations.length === 0 ? (
               <div className="p-10 text-center text-slate-400 text-sm italic">
@@ -253,7 +252,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
               })
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Right: Chat Detail */}
@@ -322,7 +321,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
             )}
 
             {/* Messages Scroll Area */}
-            <ScrollArea ref={scrollRef} className="flex-1 p-6">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 min-h-0">
               {isLoading ? (
                 <div className="space-y-4">
                   {[1, 2, 3].map(i => (
@@ -369,7 +368,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
                   })}
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
             {/* Input Form for Manual Responses */}
             <div className="p-4 bg-white border-t border-slate-150 flex gap-2 items-center">
