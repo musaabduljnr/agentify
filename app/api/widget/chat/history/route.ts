@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     // Fetch conversation status/metadata to check is_manual_takeover
     const { data: conversation, error: convErr } = await supabase
       .from("conversations")
-      .select("is_manual_takeover")
+      .select("is_manual_takeover, metadata")
       .eq("id", conversationId)
       .maybeSingle();
 
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
 
     return jsonWithCors({
       messages: messages || [],
-      isManualTakeover: conversation?.is_manual_takeover || false,
+      isManualTakeover: conversation?.is_manual_takeover || conversation?.metadata?.is_manual_takeover === true || false,
     });
   } catch (error: any) {
     return jsonWithCors({ error: error.message || "Failed to retrieve history" }, { status: 500 });

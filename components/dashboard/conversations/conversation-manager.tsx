@@ -144,6 +144,22 @@ export function ConversationManager({ initialConversations }: { initialConversat
     setIsSendingReply(true);
 
     try {
+      // If AI replies are currently active, auto-takeover the chat first
+      if (!isManual) {
+        setIsManual(true); // Optimistic Update
+        const takeoverRes = await toggleManualTakeover({
+          conversationId: selectedId,
+          isManual: true,
+        });
+        
+        if (takeoverRes.error) {
+          setIsManual(false); // Revert
+          alert("Failed to auto-takeover conversation: " + takeoverRes.error);
+          setIsSendingReply(false);
+          return;
+        }
+      }
+
       const res = await sendManualMessage({
         conversationId: selectedId,
         content: replyInput.trim(),
@@ -359,7 +375,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
             <div className="p-4 bg-white border-t border-slate-150 flex gap-2 items-center">
               <input
                 type="text"
-                placeholder={isManual ? "Type your response..." : "Take over chat to reply manually..."}
+                placeholder="Type your response..."
                 value={replyInput}
                 onChange={(e) => setReplyInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -367,12 +383,12 @@ export function ConversationManager({ initialConversations }: { initialConversat
                     handleSendReply();
                   }
                 }}
-                disabled={!isManual || isSendingReply}
+                disabled={isSendingReply}
                 className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all disabled:opacity-50"
               />
               <Button
                 onClick={handleSendReply}
-                disabled={!isManual || !replyInput.trim() || isSendingReply}
+                disabled={!replyInput.trim() || isSendingReply}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 h-10 font-bold flex items-center justify-center shrink-0 shadow-sm transition active:scale-95"
               >
                 <Send className="w-4 h-4 mr-1.5" />

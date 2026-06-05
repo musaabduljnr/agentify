@@ -398,12 +398,14 @@ export async function runBusinessChat({
   if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
 
   // If manual takeover is active, save the user message but skip AI response generation
-  if (conversation?.is_manual_takeover) {
+  const isManualTakeover = conversation?.is_manual_takeover || conversation?.metadata?.is_manual_takeover === true;
+  if (isManualTakeover) {
     return {
       success: true,
       conversationId: currentConversationId,
       reply: null,
       assistantMessage: null,
+      isManualTakeover: true,
     };
   }
 
@@ -826,13 +828,55 @@ export async function toggleManualTakeover({
     if (!business) throw new Error("No business found");
     const supabase = await createClient();
 
-    const { error } = await supabase
+    // 1. Fetch current metadata
+    const { data: conv, error: fetchErr } = await supabase
       .from("conversations")
-      .update({ is_manual_takeover: isManual })
+      .select("metadata")
       .eq("id", conversationId)
-      .eq("business_id", business.id);
+      .eq("business_id", business.id)
+      .single();
 
-    if (error) throw error;
+    if (fetchErr) throw fetchErr;
+
+    const currentMetadata = conv?.metadata || {};
+    const updatedMetadata = {
+      ...currentMetadata,
+      is_manual_takeover: isManual,
+    };
+
+    // 2. Try to update both is_manual_takeover and metadata (for migration resilience)
+    try {
+      const { error: primaryError } = await supabase
+        .from("conversations")
+        .update({ 
+          is_manual_takeover: isManual,
+          metadata: updatedMetadata
+        })
+        .eq("id", conversationId)
+        .eq("business_id", business.id);
+
+      if (primaryError) {
+        if (primaryError.message?.includes("is_manual_takeover") || primaryError.code === "42703") {
+          const { error: fallbackError } = await supabase
+            .from("conversations")
+            .update({ metadata: updatedMetadata })
+            .eq("id", conversationId)
+            .eq("business_id", business.id);
+          
+          if (fallbackError) throw fallbackError;
+        } else {
+          throw primaryError;
+        }
+      }
+    } catch (dbErr) {
+      const { error: fallbackError } = await supabase
+        .from("conversations")
+        .update({ metadata: updatedMetadata })
+        .eq("id", conversationId)
+        .eq("business_id", business.id);
+      
+      if (fallbackError) throw fallbackError;
+    }
 
     revalidatePath("/dashboard/conversations");
     return { success: true };
