@@ -167,6 +167,20 @@ export function ChatPlayground({ initialAssistant, hasKnowledge }: ChatPlaygroun
               {messages.map((msg, i) => (
                 <MessageBubble key={i} message={msg} />
               ))}
+              {messages[messages.length - 1]?.role === "assistant" && !isLoading && (
+                <div className="flex justify-start pl-11">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSendMessage("Continue")}
+                    className="h-8 text-xs font-bold border-slate-200 text-slate-700 flex items-center gap-1.5 rounded-xl hover:bg-slate-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 animate-pulse text-indigo-500" />
+                    Continue response
+                  </Button>
+                </div>
+              )}
               {isLoading && (
                 <div className="flex flex-row gap-3 mb-4 animate-pulse">
                   <div className="flex h-8 w-8 items-center justify-center rounded-md border bg-muted">

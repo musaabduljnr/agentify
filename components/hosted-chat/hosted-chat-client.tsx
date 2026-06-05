@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Send, User, Settings, X } from "lucide-react";
+import { Bot, Send, User, Settings, X, Sparkles } from "lucide-react";
 import { formatMarkdownToReact } from "@/lib/markdown";
 
 type Message = {
@@ -180,6 +180,18 @@ export function HostedChatClient({
               </div>
             );
           })}
+          {messages[messages.length - 1]?.role === "assistant" && !isSending && (
+            <div className="flex justify-start pl-[42px] shrink-0">
+              <button
+                type="button"
+                onClick={() => sendMessage("Continue")}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-indigo-650 hover:text-indigo-800 text-xs font-bold shadow-sm transition active:scale-[0.98]"
+              >
+                <Sparkles className="h-3.5 w-3.5 animate-pulse text-indigo-500" />
+                Continue response
+              </button>
+            </div>
+          )}
           {isSending && (
             <div className="flex items-center gap-2.5 text-xs font-bold text-slate-400">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white shadow-sm border border-slate-100 animate-pulse">

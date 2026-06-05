@@ -274,6 +274,31 @@
         0%, 80%, 100% { transform: scale(0); }
         40% { transform: scale(1.0); }
       }
+      .agentify-continue-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 6px 12px;
+        font-size: 12px;
+        color: ${config.primaryColor};
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.2s;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        margin-left: 20px;
+        margin-bottom: 8px;
+      }
+      .agentify-continue-btn:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+      }
+      @keyframes agentify-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: .5; }
+      }
       @media (max-width: 480px) {
         .agentify-widget-container {
           bottom: 12px;
@@ -334,6 +359,7 @@
       <div class="agentify-messages" id="agentify-messages-list">
         <div class="agentify-message assistant">${formatMarkdown(config.welcomeText)}</div>
       </div>
+      <div id="agentify-continue-container" style="display: none; background: #f8fafc;"></div>
       <div class="agentify-footer">
         <div class="agentify-suggested" id="agentify-suggested-list"></div>
         <div class="agentify-input-wrapper">
@@ -377,6 +403,9 @@
 
       input.value = "";
       addMessage(message, "user");
+
+      const continueContainer = panel.querySelector("#agentify-continue-container");
+      if (continueContainer) continueContainer.style.display = "none";
       
       const loading = document.createElement("div");
       loading.className = "agentify-message assistant agentify-loading";
@@ -421,6 +450,29 @@
       div.innerHTML = formatMarkdown(text);
       msgList.appendChild(div);
       msgList.scrollTop = msgList.scrollHeight;
+
+      // Handle showing/hiding continue button
+      const continueContainer = panel.querySelector("#agentify-continue-container");
+      if (continueContainer) {
+        if (role === "assistant") {
+          continueContainer.innerHTML = `
+            <button class="agentify-continue-btn" id="agentify-continue-btn">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="${config.primaryColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; display: inline-block; vertical-align: middle; animation: agentify-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/><path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5Z"/><path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z"/></svg>
+              Continue response
+            </button>
+          `;
+          continueContainer.style.display = "block";
+          const btn = continueContainer.querySelector("#agentify-continue-btn");
+          if (btn) {
+            btn.onclick = () => {
+              input.value = "Continue";
+              sendMessage();
+            };
+          }
+        } else {
+          continueContainer.style.display = "none";
+        }
+      }
     }
 
     input.onkeypress = (e) => {
