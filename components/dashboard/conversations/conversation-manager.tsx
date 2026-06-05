@@ -183,7 +183,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 border border-slate-200 rounded-3xl bg-white shadow-sm overflow-hidden h-[calc(100vh-280px)] min-h-[600px]">
       {/* Left: Chat List */}
       <div className={cn(
-        "lg:col-span-4 border-r border-slate-100 flex flex-col h-full bg-slate-50/10",
+        "lg:col-span-4 border-r border-slate-100 flex flex-col h-full min-h-0 bg-slate-50/10",
         viewingDetail ? "hidden lg:flex" : "flex"
       )}>
         <div className="p-4 border-b border-slate-100">
@@ -257,7 +257,7 @@ export function ConversationManager({ initialConversations }: { initialConversat
 
       {/* Right: Chat Detail */}
       <div className={cn(
-        "lg:col-span-8 flex flex-col h-full bg-slate-50/30",
+        "lg:col-span-8 flex flex-col h-full min-h-0 bg-slate-50/30",
         viewingDetail ? "flex" : "hidden lg:flex"
       )}>
         {!selectedConversation ? (
