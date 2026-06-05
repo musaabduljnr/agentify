@@ -398,9 +398,27 @@ export async function runBusinessChat({
   if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
 
   // 5. RAG Retrieval & Intent Classification
+  const isContinuation = message.toLowerCase().trim() === "continue";
+  let ragQuery = message;
+
+  if (isContinuation && currentConversationId) {
+    const { data: recentMsgs } = await supabase
+      .from("messages")
+      .select("role, content")
+      .eq("conversation_id", currentConversationId)
+      .order("created_at", { ascending: false })
+      .limit(3);
+
+    if (recentMsgs && recentMsgs.length >= 3) {
+      if (recentMsgs[2].role === "user") {
+        ragQuery = recentMsgs[2].content;
+      }
+    }
+  }
+
   const { chunks, formattedContext, intent } = await retrieveBusinessContext({
     businessId,
-    query: message,
+    query: ragQuery,
     matchCount: 5,
     minSimilarity: 0.55,
   });
@@ -600,6 +618,10 @@ export async function runBusinessChat({
 
   if (summary) {
     promptInstructions = `[Conversation Summary of previous messages: ${summary}]\n\n` + promptInstructions;
+  }
+
+  if (isContinuation) {
+    promptInstructions += `\n\n# CONTINUATION INSTRUCTION\n- The user has requested that you "Continue" your response from where you stopped. Please resume writing your previous response from exactly where it was cut off or stopped. Do NOT repeat the parts you have already written; simply resume writing and complete the explanation smoothly. Ensure the continuation connects naturally to the last sentence of your previous message.`;
   }
 
   // Call the core AI router
