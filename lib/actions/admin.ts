@@ -642,4 +642,82 @@ export async function getAIEngineLogsStats() {
   };
 }
 
+/**
+ * 14. Get filtered AI Engine interaction logs for the dashboard
+ */
+export async function getAdminAIEngineLogs(filters?: {
+  status?: string;
+  provider?: string;
+  businessId?: string;
+  search?: string;
+}) {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  let query = supabase
+    .from("ai_interaction_logs")
+    .select("*, businesses(name)")
+    .order("created_at", { ascending: false });
+
+  if (filters) {
+    if (filters.status && filters.status !== "all") {
+      query = query.eq("status", filters.status);
+    }
+    if (filters.provider && filters.provider !== "all") {
+      query = query.eq("provider", filters.provider);
+    }
+    if (filters.businessId && filters.businessId !== "all") {
+      query = query.eq("business_id", filters.businessId);
+    }
+    if (filters.search) {
+      query = query.ilike("error_message", `%${filters.search}%`);
+    }
+  }
+
+  const { data: logs, error } = await query.limit(150);
+  if (error) throw error;
+  return logs || [];
+}
+
+/**
+ * 15. Get filtered AI System Crash Logs from centralized error logs
+ */
+export async function getAdminAISystemErrors(filters?: {
+  source?: string;
+  businessId?: string;
+  search?: string;
+}) {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  let query = supabase
+    .from("error_logs")
+    .select("*, businesses(name)")
+    .order("created_at", { ascending: false });
+
+  // Filter default to AI-related sources
+  const aiSources = ["widget-chat", "ai-provider", "embedding-generation", "widget-config"];
+  
+  if (filters && filters.source && filters.source !== "all") {
+    query = query.eq("source", filters.source);
+  } else {
+    query = query.in("source", aiSources);
+  }
+
+  if (filters) {
+    if (filters.businessId && filters.businessId !== "all") {
+      query = query.eq("business_id", filters.businessId);
+    }
+    if (filters.search) {
+      // Search inside message or stack
+      query = query.or(`message.ilike.%${filters.search}%,stack.ilike.%${filters.search}%`);
+    }
+  }
+
+  const { data: logs, error } = await query.limit(150);
+  if (error) throw error;
+  return logs || [];
+}
+
+
 
