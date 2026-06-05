@@ -8,6 +8,7 @@ type Message = {
   id: string;
   role: "assistant" | "user";
   content: string;
+  metadata?: Record<string, any>;
 };
 
 type HostedChatClientProps = {
@@ -48,6 +49,7 @@ export function HostedChatClient({
   const scrollRef = useRef<HTMLDivElement>(null);
   const visitorIdRef = useRef("");
   const conversationIdRef = useRef<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
   const storageKey = useMemo(() => `agentify_hosted_chat_${businessId}`, [businessId]);
 
@@ -57,11 +59,65 @@ export function HostedChatClient({
     localStorage.setItem(`${storageKey}_visitor`, storedVisitorId);
     visitorIdRef.current = storedVisitorId;
     conversationIdRef.current = storedConversationId;
+    setConversationId(storedConversationId);
   }, [storageKey]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isSending]);
+
+  // Poll message history every 4 seconds to fetch manual takeover responses in real time
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const fetchHistory = async () => {
+      if (isSending) return;
+
+      try {
+        const res = await fetch(`/api/widget/chat/history?conversationId=${conversationId}&_=${Date.now()}`);
+        const data = await res.json();
+        if (data.messages && Array.isArray(data.messages)) {
+          const formatted = data.messages.map((m: any) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            metadata: m.metadata,
+          }));
+
+          setMessages((current) => {
+            const currentHistory = current.slice(1);
+            
+            // Check if lengths differ
+            if (currentHistory.length !== formatted.length) {
+              return [
+                current[0], // welcome message
+                ...formatted,
+              ];
+            }
+            
+            // Check if last message content changed (e.g. status updates)
+            if (currentHistory.length > 0 && formatted.length > 0) {
+              const lastCurrent = currentHistory[currentHistory.length - 1];
+              const lastFormatted = formatted[formatted.length - 1];
+              if (lastCurrent.content !== lastFormatted.content) {
+                return [
+                  current[0],
+                  ...formatted,
+                ];
+              }
+            }
+            return current;
+          });
+        }
+      } catch (err) {
+        console.error("Error polling chat history:", err);
+      }
+    };
+
+    fetchHistory();
+    const interval = setInterval(fetchHistory, 4000);
+    return () => clearInterval(interval);
+  }, [conversationId, isSending]);
 
   async function sendMessage(rawMessage: string) {
     const message = rawMessage.trim();
@@ -98,12 +154,15 @@ export function HostedChatClient({
       if (data.conversationId) {
         conversationIdRef.current = data.conversationId;
         localStorage.setItem(`${storageKey}_conversation`, data.conversationId);
+        setConversationId(data.conversationId);
       }
 
-      setMessages((current) => [
-        ...current,
-        { id: createId("assistant"), role: "assistant", content: data.reply },
-      ]);
+      if (data.reply !== null) {
+        setMessages((current) => [
+          ...current,
+          { id: createId("assistant"), role: "assistant", content: data.reply },
+        ]);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -155,22 +214,32 @@ export function HostedChatClient({
         <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-slate-50/50 p-4 sm:p-5">
           {messages.map((message) => {
             const isUser = message.role === "user";
+            const isManualMsg = message.metadata?.is_manual || false;
             return (
               <div key={message.id} className={`flex items-start gap-2.5 ${isUser ? "justify-end" : "justify-start"}`}>
                 {!isUser && (
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-slate-500 shadow-sm border border-slate-100">
-                    <Bot className="h-4 w-4" />
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm border ${
+                    isManualMsg ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-white text-slate-500 border-slate-100"
+                  }`}>
+                    {isManualMsg ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                   </div>
                 )}
                 <div
                   className={`max-w-[78%] min-w-0 rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
                     isUser
                       ? "rounded-tr-sm text-white"
-                      : "rounded-tl-sm border border-slate-200/60 bg-white text-slate-800"
+                      : isManualMsg
+                        ? "rounded-tl-sm border border-amber-200 bg-amber-50/30 text-slate-800"
+                        : "rounded-tl-sm border border-slate-200/60 bg-white text-slate-800"
                   }`}
                   style={isUser ? { backgroundColor: primaryColor } : undefined}
                 >
                   <div className="break-words">{formatMarkdownToReact(message.content)}</div>
+                  {isManualMsg && (
+                    <div className="mt-1 text-[9px] font-bold text-amber-700 tracking-wide uppercase select-none">
+                      Support Agent
+                    </div>
+                  )}
                 </div>
                 {isUser && (
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-slate-600 border border-slate-300/40">
@@ -180,7 +249,7 @@ export function HostedChatClient({
               </div>
             );
           })}
-          {messages[messages.length - 1]?.role === "assistant" && !isSending && (
+          {messages[messages.length - 1]?.role === "assistant" && !messages[messages.length - 1]?.metadata?.is_manual && !isSending && (
             <div className="flex justify-start pl-[42px] shrink-0">
               <button
                 type="button"
