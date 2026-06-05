@@ -51,10 +51,12 @@ export function ConversationManager({ initialConversations }: { initialConversat
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const filteredConversations = conversations.filter(c => 
-    c.visitor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.visitor_email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter(c => {
+    const name = c.visitor_name || "Anonymous";
+    const email = c.visitor_email || "";
+    return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           email.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const selectedConversation = conversations.find(c => c.id === selectedId);
 
@@ -72,7 +74,21 @@ export function ConversationManager({ initialConversations }: { initialConversat
     }
   }, [selectedId]);
 
-  // Poll for message and list updates every 4 seconds
+  // Poll for conversation list updates every 4 seconds (always active)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const convs = await getBusinessConversations();
+        setConversations(convs as any);
+      } catch (err) {
+        console.error("Dashboard conversations list polling error:", err);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Poll for active conversation message updates every 4 seconds
   useEffect(() => {
     if (!selectedId) return;
 
@@ -80,11 +96,8 @@ export function ConversationManager({ initialConversations }: { initialConversat
       try {
         const msgs = await getDashboardConversation(selectedId);
         setMessages(msgs as any);
-
-        const convs = await getBusinessConversations();
-        setConversations(convs as any);
       } catch (err) {
-        console.error("Dashboard conversations polling error:", err);
+        console.error("Messages polling error:", err);
       }
     }, 4000);
 

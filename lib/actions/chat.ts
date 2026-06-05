@@ -400,6 +400,11 @@ export async function runBusinessChat({
   // If manual takeover is active, save the user message but skip AI response generation
   const isManualTakeover = conversation?.is_manual_takeover || conversation?.metadata?.is_manual_takeover === true;
   if (isManualTakeover) {
+    await supabase
+      .from("conversations")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", currentConversationId);
+
     return {
       success: true,
       conversationId: currentConversationId,
@@ -809,11 +814,16 @@ export async function getBusinessConversations() {
 
   if (error) throw new Error(error.message);
   
-  // Transform to include last message
-  return data.map((conv: any) => ({
-    ...conv,
-    last_message: conv.messages?.[conv.messages.length - 1] || null
-  }));
+  // Sort messages in JS to guarantee last_message matches the absolute latest message
+  return data.map((conv: any) => {
+    const sortedMessages = [...(conv.messages || [])].sort(
+      (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    return {
+      ...conv,
+      last_message: sortedMessages[sortedMessages.length - 1] || null
+    };
+  });
 }
 
 export async function toggleManualTakeover({
