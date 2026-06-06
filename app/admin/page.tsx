@@ -75,6 +75,37 @@ export default async function AdminOverviewPage() {
         </p>
       </div>
 
+      {/* Early Access & Quota Safety Monitors */}
+      <div className="space-y-4">
+        <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+          <Activity className="w-4 h-4 text-indigo-400" />
+          Early Access & Quota Safety Monitors
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <StatCard
+            title="Free Early Access Slots"
+            value={`${stats.freeSlotsUsed} / 50`}
+            icon={<Sparkles className="w-4 h-4" />}
+            description="Active free trial businesses onboarded (50 slots hard limit)"
+            color="amber"
+          />
+          <StatCard
+            title="Free AI Requests Today"
+            value={`${stats.freeRequestsToday.toLocaleString()} / 1,000`}
+            icon={<Activity className="w-4 h-4" />}
+            description="Combined free usage today (1,000 requests hard cap)"
+            color="blue"
+          />
+          <StatCard
+            title="Gemini Safety Buffer"
+            value={`${stats.safetyBuffer.toLocaleString()} left`}
+            icon={<AlertOctagon className="w-4 h-4" />}
+            description="Remaining capacity under daily developer API limit (1,500)"
+            color="rose"
+          />
+        </div>
+      </div>
+
       {/* Grid of 8 Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <StatCard

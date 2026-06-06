@@ -5,6 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { createServiceClient } from "@/utils/supabase/service";
+import { getEffectivePlanConfig } from "@/lib/billing/platform";
 
 export type UsageType = "message" | "embedding" | "lead" | "knowledge_source" | "widget_chat";
 
@@ -181,4 +182,128 @@ export async function getUsagePercentage(
   if (result.limit === 0) return 100;
   if (result.limit >= 999999999) return 0;
   return Math.min(100, Math.round((result.used / result.limit) * 100));
+}
+
+/**
+ * Centrally verify if a business has usage capacity before firing AI requests.
+ * Enforces subscription status, monthly plan limits, daily cap, and global free requests.
+ */
+export async function verifyAIUsageLimits(businessId: string): Promise<{
+  allowed: boolean;
+  reason?: "monthly_limit" | "daily_limit" | "global_free_limit" | "inactive_subscription" | "no_subscription";
+  message?: string;
+  used?: number;
+  limit?: number;
+}> {
+  const supabase = createServiceClient();
+
+  // 1. Get subscription
+  const { data: sub, error: subError } = await supabase
+    .from("subscriptions")
+    .select("*")
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (subError || !sub) {
+    return {
+      allowed: false,
+      reason: "no_subscription",
+      message: "No subscription found. Please set up your account."
+    };
+  }
+
+  // 2. Check active subscription status
+  const activeStatuses = ["active", "trialing"];
+  if (!activeStatuses.includes(sub.status)) {
+    return {
+      allowed: false,
+      reason: "inactive_subscription",
+      message: `Your subscription is ${sub.status}. Please update your billing to continue.`
+    };
+  }
+
+  // 3. Check Monthly Message Quota
+  const monthlyLimit = sub.message_limit;
+  const periodStart = sub.current_period_start || sub.created_at;
+
+  const { data: monthlyLogs } = await supabase
+    .from("usage_logs")
+    .select("amount")
+    .eq("business_id", businessId)
+    .in("type", ["message", "widget_chat"])
+    .gte("created_at", periodStart);
+
+  const monthlyUsed = (monthlyLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+  if (monthlyUsed >= monthlyLimit) {
+    return {
+      allowed: false,
+      reason: "monthly_limit",
+      message: "You've reached your monthly AI message limit. Please upgrade your plan to continue.",
+      used: monthlyUsed,
+      limit: monthlyLimit
+    };
+  }
+
+  // 4. Check Daily Business Cap Limit
+  const plan = sub.plan;
+  const effectivePlan = await getEffectivePlanConfig(plan);
+  
+  // Daily cap limit: metadata override OR plan configuration default
+  const dailyLimit = sub.metadata?.daily_message_limit ?? effectivePlan.daily_messages ?? 999999999;
+  
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const { data: dailyLogs } = await supabase
+    .from("usage_logs")
+    .select("amount")
+    .eq("business_id", businessId)
+    .in("type", ["message", "widget_chat"])
+    .gte("created_at", startOfToday.toISOString());
+
+  const dailyUsed = (dailyLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+  if (dailyUsed >= dailyLimit) {
+    return {
+      allowed: false,
+      reason: "daily_limit",
+      message: "You've reached your daily AI message limit. Please try again tomorrow or upgrade your plan.",
+      used: dailyUsed,
+      limit: dailyLimit
+    };
+  }
+
+  // 5. If free plan, check Global Free Daily Quota
+  if (plan === "free_trial") {
+    // Get all free subscriptions
+    const { data: freeSubs } = await supabase
+      .from("subscriptions")
+      .select("business_id")
+      .eq("plan", "free_trial");
+
+    const freeBizIds = (freeSubs || []).map((s: any) => s.business_id);
+
+    if (freeBizIds.length > 0) {
+      const { data: globalLogs } = await supabase
+        .from("usage_logs")
+        .select("amount")
+        .in("business_id", freeBizIds)
+        .in("type", ["message", "widget_chat"])
+        .gte("created_at", startOfToday.toISOString());
+
+      const globalUsed = (globalLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+      const globalLimit = 1000;
+      
+      if (globalUsed >= globalLimit) {
+        return {
+          allowed: false,
+          reason: "global_free_limit",
+          message: "Free AI capacity has been reached for today. Please try again tomorrow or upgrade your plan.",
+          used: globalUsed,
+          limit: globalLimit
+        };
+      }
+    }
+  }
+
+  return { allowed: true };
 }

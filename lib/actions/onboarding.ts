@@ -160,6 +160,22 @@ Your goal is to help visitors and collect leads.`,
       if (widgetError) throw widgetError;
     }
 
+    // 4.5. Check Early Access slots limit for free accounts
+    const hasExistingSub = setup.subscription && setup.subscription.plan === "free_trial" && setup.subscription.status === "active";
+    if (!hasExistingSub) {
+      const { count: activeFreeCount, error: countErr } = await supabase
+        .from("subscriptions")
+        .select("id", { count: "exact", head: true })
+        .eq("plan", "free_trial")
+        .eq("status", "active");
+
+      if (countErr) throw countErr;
+
+      if ((activeFreeCount || 0) >= 50) {
+        return { error: "Early access free slots are full. Please join the waitlist or choose a paid plan." };
+      }
+    }
+
     // 5. Upsert Subscription with full billing infrastructure
     const now = new Date();
     const periodEnd = new Date();

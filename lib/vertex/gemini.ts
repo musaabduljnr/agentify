@@ -1,4 +1,5 @@
 import { generateChatResponse } from "@/lib/ai/engine/chat";
+import { type FeatureSource } from "@/lib/ai/logs/ai-logs";
 
 /**
  * Generates a response from the dynamically selected AI provider.
@@ -10,11 +11,15 @@ export async function generateGeminiResponse({
   userMessage,
   history = [],
   temperature = 0.4,
+  businessId,
+  featureSource,
 }: {
   systemInstruction: string;
   userMessage: string;
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
+  businessId?: string;
+  featureSource?: FeatureSource;
 }): Promise<string> {
   const mappedHistory = history.map(h => ({
     role: h.role,
@@ -26,6 +31,8 @@ export async function generateGeminiResponse({
     userMessage,
     history: mappedHistory,
     temperature,
+    businessId,
+    featureSource,
   });
 
   return response.text;

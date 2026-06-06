@@ -195,7 +195,9 @@ export async function createDemoBusiness(formData: {
       const crawlResult = await crawlWebsite({
         startUrl: websiteUrl,
         maxPages: 15,
-        depth: 2
+        depth: 2,
+        businessId: placeholderBiz.id,
+        featureSource: "website_summary_generation"
       });
 
       if (crawlResult && crawlResult.combinedText) {
@@ -277,6 +279,8 @@ JSON format:
             systemInstruction: systemPrompt,
             userMessage: `Website content:\n${scrapedText.slice(0, 12000)}`,
             temperature: 0.2,
+            businessId: placeholderBiz.id,
+            featureSource: "demo_generation",
           });
 
           const extracted = parseGeminiJson(extractionRaw);

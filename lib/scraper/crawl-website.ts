@@ -2,6 +2,7 @@ import { assertPublicHttpUrl, normalizeUrl } from "./url-safety";
 import { fetchRobotsRules, isUrlAllowedByRobots } from "./robots";
 import { getSitemapUrls } from "./sitemap";
 import { scrapePage } from "./scrape-url";
+import { type FeatureSource } from "../ai/logs/ai-logs";
 
 export interface CrawledPage {
   url: string;
@@ -33,11 +34,15 @@ export async function crawlWebsite({
   maxPages = 10,
   depth = 1,
   timeoutMs = 10000,
+  businessId,
+  featureSource,
 }: {
   startUrl: string;
   maxPages?: number;
   depth?: number;
   timeoutMs?: number;
+  businessId?: string;
+  featureSource?: FeatureSource;
 }): Promise<CrawlResult> {
   const startUrl = normalizeUrl(rawStartUrl);
   
@@ -95,7 +100,7 @@ export async function crawlWebsite({
 
         try {
           // Scrape individual page
-          const scraped = await scrapePage(item.url, startUrl);
+          const scraped = await scrapePage(item.url, startUrl, businessId, featureSource);
           
           // Skip low-value content (less than 80 words)
           if (scraped.wordCount < 80) {

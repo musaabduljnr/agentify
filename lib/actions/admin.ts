@@ -16,6 +16,7 @@ import { generateGeminiChat, generateGeminiEmbedding } from "@/lib/ai/providers/
 import { generateOpenRouterChat } from "@/lib/ai/providers/openrouter";
 import { generateGroqChat } from "@/lib/ai/providers/groq";
 import { generateVertexChat, generateVertexEmbedding } from "@/lib/ai/providers/vertex";
+import { writeAIEngineLog } from "@/lib/ai/logs/ai-logs";
 
 /**
  * 1. Admin Overview Statistics
@@ -56,6 +57,37 @@ export async function getAdminOverviewStats() {
   // Sum of AI messages used across all active subscriptions
   const totalAIMessagesUsed = (activeSubs || []).reduce((sum, s) => sum + (s.current_usage || 0), 0);
 
+  // Free Slots Used: Count of active subscriptions on the free trial plan
+  const freeSlotsUsed = (activeSubs || []).filter(s => s.plan === "free_trial").length;
+
+  // Free Requests Today & Gemini Safety Buffer
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const freeBizIds = (trialSubs || []).map((s: any) => s.business_id);
+  
+  let freeRequestsToday = 0;
+  if (freeBizIds.length > 0) {
+    const { data: globalLogs } = await supabase
+      .from("usage_logs")
+      .select("amount")
+      .in("business_id", freeBizIds)
+      .in("type", ["message", "widget_chat"])
+      .gte("created_at", startOfToday.toISOString());
+
+    freeRequestsToday = (globalLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+  }
+
+  // Calculate total requests today (all plans combined) to estimate Gemini's developer free limit usage
+  const { data: allLogsToday } = await supabase
+    .from("usage_logs")
+    .select("amount")
+    .in("type", ["message", "widget_chat"])
+    .gte("created_at", startOfToday.toISOString());
+
+  const totalRequestsToday = (allLogsToday || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+  const safetyBuffer = Math.max(0, 1500 - totalRequestsToday);
+
   return {
     totalUsers: usersCount || 0,
     totalBusinesses: businessesCount || 0,
@@ -71,6 +103,9 @@ export async function getAdminOverviewStats() {
     recentPayments: (paymentsData || []).slice(0, 5),
     recentLeads: recentLeads || [],
     highUsageBusinesses: highUsageSubs || [],
+    freeSlotsUsed,
+    freeRequestsToday,
+    safetyBuffer,
   };
 }
 
@@ -175,13 +210,47 @@ export async function getAllSubscriptions() {
   await requireAdmin();
   const supabase = createServiceClient();
 
-  const { data: subscriptions, error } = await supabase
-    .from("subscriptions")
-    .select("*, businesses(name, slug)")
-    .order("created_at", { ascending: false });
+  const [subsResult, paymentsResult] = await Promise.all([
+    supabase
+      .from("subscriptions")
+      .select("*, businesses(name, slug)")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("payment_transactions")
+      .select("business_id, amount")
+      .eq("status", "success")
+  ]);
 
-  if (error) throw error;
-  return subscriptions || [];
+  if (subsResult.error) throw subsResult.error;
+  if (paymentsResult.error) throw paymentsResult.error;
+
+  const subscriptions = subsResult.data || [];
+  const payments = paymentsResult.data || [];
+
+  // Group payments by business_id
+  const revenueMap: Record<string, number> = {};
+  for (const p of payments) {
+    revenueMap[p.business_id] = (revenueMap[p.business_id] || 0) + (p.amount || 0);
+  }
+
+  // Calculate profitability fields for each subscription
+  const enrichedSubscriptions = subscriptions.map((sub: any) => {
+    const revenue = revenueMap[sub.business_id] || 0;
+    const currentUsage = sub.current_usage || 0;
+    const estCost = currentUsage * 0.80; // ₦0.80 NGN per message
+    const profit = revenue - estCost;
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+    return {
+      ...sub,
+      revenue,
+      estCost,
+      profit,
+      margin,
+    };
+  });
+
+  return enrichedSubscriptions;
 }
 
 export async function updateSubscriptionPlan(subscriptionId: string, plan: PlanId) {
@@ -204,6 +273,52 @@ export async function updateSubscriptionPlan(subscriptionId: string, plan: PlanI
       ...planLimits,
       updated_at: now.toISOString(),
     })
+    .eq("id", subscriptionId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/subscriptions");
+  return { success: true };
+}
+
+export async function updateSubscriptionCustomLimits(
+  subscriptionId: string,
+  limits: {
+    message_limit?: number | null;
+    daily_message_limit?: number | null;
+  }
+) {
+  await requireAdmin();
+  const supabase = createServiceClient();
+
+  const { data: sub, error: fetchError } = await supabase
+    .from("subscriptions")
+    .select("metadata, message_limit")
+    .eq("id", subscriptionId)
+    .maybeSingle();
+
+  if (fetchError || !sub) {
+    return { error: fetchError?.message || "Subscription not found." };
+  }
+
+  const existingMetadata = sub.metadata || {};
+  const newMetadata = {
+    ...existingMetadata,
+    daily_message_limit: limits.daily_message_limit,
+  };
+
+  const updatePayload: Record<string, any> = {
+    metadata: newMetadata,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (limits.message_limit !== undefined) {
+    updatePayload.message_limit = limits.message_limit;
+  }
+
+  const { error } = await supabase
+    .from("subscriptions")
+    .update(updatePayload)
     .eq("id", subscriptionId);
 
   if (error) return { error: error.message };
@@ -273,6 +388,7 @@ export async function updateAdminBillingSettings(input: {
       name: plan.name.trim() || plan.id.replace("_", " "),
       price_ngn: normalizeLimit(plan.price_ngn),
       messages: normalizeLimit(plan.messages),
+      daily_messages: normalizeLimit(plan.daily_messages),
       knowledge_sources: normalizeLimit(plan.knowledge_sources),
       leads: normalizeLimit(plan.leads),
       widgets: normalizeLimit(plan.widgets),
@@ -457,6 +573,7 @@ export async function testAIProvider(provider: string, model: string) {
   await requireAdmin();
   const systemInstruction = "You are a friendly AI service test bot. Keep answers extremely short.";
   const userMessage = "Verify that our connection is working!";
+  const startTime = Date.now();
 
   try {
     let result = "";
@@ -477,9 +594,27 @@ export async function testAIProvider(provider: string, model: string) {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    const latencyMs = Date.now() - startTime;
+    await writeAIEngineLog({
+      provider,
+      model,
+      latencyMs,
+      status: "success",
+      featureSource: "admin_test",
+    });
+
     return { success: true, response: result };
   } catch (error: any) {
+    const latencyMs = Date.now() - startTime;
     console.error(`AI test failed for ${provider} (${model}):`, error);
+    await writeAIEngineLog({
+      provider,
+      model,
+      latencyMs,
+      status: "failed",
+      errorMessage: error.message || String(error),
+      featureSource: "admin_test",
+    });
     return { error: error.message || "AI Test verification call failed." };
   }
 }
@@ -487,6 +622,7 @@ export async function testAIProvider(provider: string, model: string) {
 export async function testEmbeddingProvider(provider: string, model: string) {
   await requireAdmin();
   const testText = "Agentify embedding test connectivity statement.";
+  const startTime = Date.now();
 
   try {
     let values: number[] = [];
@@ -501,9 +637,27 @@ export async function testEmbeddingProvider(provider: string, model: string) {
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    const latencyMs = Date.now() - startTime;
+    await writeAIEngineLog({
+      provider,
+      model,
+      latencyMs,
+      status: "success",
+      featureSource: "admin_test",
+    });
+
     return { success: true, dimensions: values.length };
   } catch (error: any) {
+    const latencyMs = Date.now() - startTime;
     console.error(`Embedding test failed for ${provider} (${model}):`, error);
+    await writeAIEngineLog({
+      provider,
+      model,
+      latencyMs,
+      status: "failed",
+      errorMessage: error.message || String(error),
+      featureSource: "admin_test",
+    });
     return { error: error.message || "Embedding Test verification call failed." };
   }
 }

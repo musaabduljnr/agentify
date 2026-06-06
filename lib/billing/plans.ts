@@ -10,6 +10,7 @@ export type PlanConfig = {
   name: string;
   price_ngn: number | null; // null = custom pricing (enterprise)
   messages: number | null; // null = unlimited
+  daily_messages: number | null; // null = unlimited
   knowledge_sources: number | null;
   leads: number | null;
   widgets: number | null;
@@ -22,9 +23,10 @@ export type PlanConfig = {
 
 export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
   free_trial: {
-    name: "Free Trial",
+    name: "Free Early Access",
     price_ngn: 0,
     messages: 100,
+    daily_messages: 20,
     knowledge_sources: 5,
     leads: 50,
     widgets: 1,
@@ -32,6 +34,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     features: [
       "1 AI Assistant",
       "100 messages/month",
+      "20 daily messages limit",
       "5 knowledge sources",
       "50 leads",
       "1 widget",
@@ -43,8 +46,9 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
 
   starter: {
     name: "Starter",
-    price_ngn: 5000,
+    price_ngn: 10000,
     messages: 5000,
+    daily_messages: 250,
     knowledge_sources: 25,
     leads: 1000,
     widgets: 1,
@@ -52,6 +56,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     features: [
       "1 AI Assistant",
       "5,000 messages/month",
+      "250 daily messages soft cap",
       "25 knowledge sources",
       "1,000 leads",
       "1 widget",
@@ -64,15 +69,17 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
 
   growth: {
     name: "Growth",
-    price_ngn: 15000,
-    messages: 25000,
+    price_ngn: 25000,
+    messages: 15000,
+    daily_messages: 750,
     knowledge_sources: 100,
     leads: 10000,
     widgets: 3,
     embeddings: 100000,
     features: [
       "3 AI Assistants",
-      "25,000 messages/month",
+      "15,000 messages/month",
+      "750 daily messages soft cap",
       "100 knowledge sources",
       "10,000 leads",
       "3 widgets",
@@ -88,6 +95,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     name: "Enterprise",
     price_ngn: null,
     messages: null, // unlimited
+    daily_messages: null,
     knowledge_sources: null,
     leads: null,
     widgets: null,
@@ -95,6 +103,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     features: [
       "Unlimited AI Assistants",
       "Unlimited messages",
+      "Custom daily soft caps",
       "Unlimited knowledge sources",
       "Unlimited leads",
       "Unlimited widgets",
@@ -133,6 +142,7 @@ export function getPlanLimits(planId: string) {
     lead_limit: plan.leads ?? 999999999,
     widget_limit: plan.widgets ?? 999999999,
     embedding_limit: plan.embeddings ?? 999999999,
+    daily_message_limit: plan.daily_messages ?? 999999999,
   };
 }
 

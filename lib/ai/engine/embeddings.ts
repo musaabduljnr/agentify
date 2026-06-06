@@ -4,7 +4,7 @@ import { generateGeminiEmbedding, generateGeminiEmbeddingsBatch } from "../provi
 import { generateVertexEmbedding } from "../providers/vertex";
 import { executeWithRetryAndTimeout } from "./fallback";
 import { estimateTokens } from "@/lib/embeddings/chunker";
-import { writeAIEngineLog } from "../logs/ai-logs";
+import { writeAIEngineLog, type FeatureSource } from "../logs/ai-logs";
 
 const MAX_CHAR_LIMIT = 10000;
 const REQUIRED_DIMENSIONS = 768;
@@ -34,7 +34,11 @@ function ensureCorrectDimensions(vector: number[]): number[] {
   return padded;
 }
 
-export async function generateEmbedding(text: string): Promise<number[]> {
+export async function generateEmbedding(
+  text: string,
+  businessId?: string,
+  featureSource?: FeatureSource
+): Promise<number[]> {
   const normalized = normalizeText(text);
   if (!normalized) {
     throw new Error("Cannot generate embedding for empty or blank text.");
@@ -68,18 +72,21 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     // Log embedding generation
     await writeAIEngineLog({
+      businessId,
       provider,
       model,
       latencyMs: latency,
       status: "success",
       promptTokensEstimate: tokenEstimate,
       metadata: { action: "generate_embedding", textLength: normalized.length },
+      featureSource,
     });
 
     return vector;
   } catch (error: any) {
     const latency = Date.now() - startTime;
     await writeAIEngineLog({
+      businessId,
       provider,
       model,
       latencyMs: latency,
@@ -87,12 +94,17 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       errorMessage: error.message || String(error),
       promptTokensEstimate: tokenEstimate,
       metadata: { action: "generate_embedding", failed: true },
+      featureSource,
     });
     throw error;
   }
 }
 
-export async function generateEmbeddingsBatch(texts: string[]): Promise<number[][]> {
+export async function generateEmbeddingsBatch(
+  texts: string[],
+  businessId?: string,
+  featureSource?: FeatureSource
+): Promise<number[][]> {
   const cleanedTexts = texts.map((t) => normalizeText(t)).filter((t) => t.length > 0);
   if (cleanedTexts.length === 0) return [];
 
@@ -141,18 +153,21 @@ export async function generateEmbeddingsBatch(texts: string[]): Promise<number[]
     const latency = Date.now() - startTime;
 
     await writeAIEngineLog({
+      businessId,
       provider,
       model,
       latencyMs: latency,
       status: "success",
       promptTokensEstimate: tokenEstimate,
       metadata: { action: "generate_embeddings_batch", batchSize: cleanedTexts.length },
+      featureSource,
     });
 
     return vectors;
   } catch (error: any) {
     const latency = Date.now() - startTime;
     await writeAIEngineLog({
+      businessId,
       provider,
       model,
       latencyMs: latency,
@@ -160,6 +175,7 @@ export async function generateEmbeddingsBatch(texts: string[]): Promise<number[]
       errorMessage: error.message || String(error),
       promptTokensEstimate: tokenEstimate,
       metadata: { action: "generate_embeddings_batch", failed: true },
+      featureSource,
     });
     throw error;
   }

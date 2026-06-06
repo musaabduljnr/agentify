@@ -48,6 +48,9 @@ function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | nul
     messages: Object.prototype.hasOwnProperty.call(override || {}, "messages")
       ? asFiniteNumber(override?.messages)
       : fallback.messages,
+    daily_messages: Object.prototype.hasOwnProperty.call(override || {}, "daily_messages")
+      ? asFiniteNumber(override?.daily_messages)
+      : fallback.daily_messages,
     knowledge_sources: Object.prototype.hasOwnProperty.call(override || {}, "knowledge_sources")
       ? asFiniteNumber(override?.knowledge_sources)
       : fallback.knowledge_sources,
@@ -143,6 +146,7 @@ export async function getEffectivePlanLimits(planId: string) {
     lead_limit: plan.leads ?? 999999999,
     widget_limit: plan.widgets ?? 999999999,
     embedding_limit: plan.embeddings ?? 999999999,
+    daily_message_limit: plan.daily_messages ?? 999999999,
   };
 }
 

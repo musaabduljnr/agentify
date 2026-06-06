@@ -314,7 +314,10 @@ export async function processWebsiteSource(sourceId: string) {
 
   try {
     // 3. Scrape the URL
-    const result = await scrapeUrl(source.source_url);
+    const result = await scrapeUrl(source.source_url, {
+      businessId: business.id,
+      featureSource: "website_summary_generation",
+    });
 
     // 4. Save extracted content
     const { error: updateError } = await supabase
@@ -422,6 +425,8 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
       startUrl: source.source_url,
       maxPages,
       depth,
+      businessId: business.id,
+      featureSource: "website_summary_generation",
     });
 
     // 4. Update the database fields
@@ -624,7 +629,7 @@ export async function generateEmbeddingsForSourceInternal(sourceId: string, busi
   // 3. Generate embeddings and insert
   for (let i = 0; i < chunks.length; i++) {
     const content = chunks[i];
-    const embedding = await generateEmbedding(content);
+    const embedding = await generateEmbedding(content, businessId, "embeddings_generation");
     
     const { error: insertError } = await supabase.from("knowledge_chunks").insert({
       business_id: businessId,
@@ -715,7 +720,7 @@ export async function generateEmbeddingsForSource(sourceId: string) {
 export async function searchKnowledge(query: string, businessId: string) {
   try {
     // Generate query embedding
-    const queryEmbedding = await generateEmbedding(query);
+    const queryEmbedding = await generateEmbedding(query, businessId, "playground");
 
     const supabase = await createClient();
     

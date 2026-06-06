@@ -1,4 +1,5 @@
 import "server-only";
+import { type FeatureSource } from "../logs/ai-logs";
 
 export type AIProvider = "gemini" | "openrouter" | "vertex" | "groq";
 
@@ -18,6 +19,7 @@ export interface ChatParams {
   timeoutMs?: number;
   businessId?: string;
   conversationId?: string;
+  featureSource?: FeatureSource;
 }
 
 export interface ChatResponse {
@@ -35,10 +37,14 @@ export interface EmbeddingParams {
   provider?: "gemini" | "vertex";
   model?: string;
   text: string;
+  businessId?: string;
+  featureSource?: FeatureSource;
 }
 
 export interface BatchEmbeddingParams {
   provider?: "gemini" | "vertex";
   model?: string;
   texts: string[];
+  businessId?: string;
+  featureSource?: FeatureSource;
 }

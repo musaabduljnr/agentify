@@ -1,5 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { getSecretWithEnvFallback } from "@/lib/config/platform-config";
+import { writeAIEngineLog, type FeatureSource } from "../logs/ai-logs";
+import { estimateTokens } from "@/lib/embeddings/chunker";
 
 const DEFAULT_GEMINI_CHAT_MODEL = "gemini-2.5-flash";
 const GEMINI_CHAT_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash"];
@@ -115,12 +117,16 @@ export async function generateGeminiContent({
   systemInstruction,
   temperature = 0.2,
   maxOutputTokens = 2048,
+  businessId,
+  featureSource,
 }: {
   model?: string;
   prompt: string;
   systemInstruction?: string;
   temperature?: number;
   maxOutputTokens?: number;
+  businessId?: string;
+  featureSource?: FeatureSource;
 }): Promise<string> {
   const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
@@ -148,18 +154,95 @@ export async function generateGeminiContent({
     return response.text;
   }
 
+  const startTime = Date.now();
+  const promptTokensEstimate = estimateTokens(prompt + " " + (systemInstruction || ""));
+
   try {
-    return await callGeminiContent(selectedModel);
-  } catch (error) {
-    if (!isGeminiQuotaError(error)) throw error;
+    const text = await callGeminiContent(selectedModel);
+    const latencyMs = Date.now() - startTime;
+    const responseTokensEstimate = estimateTokens(text);
+
+    await writeAIEngineLog({
+      businessId,
+      provider: "gemini",
+      model: selectedModel,
+      latencyMs,
+      status: "success",
+      promptTokensEstimate,
+      responseTokensEstimate,
+      featureSource,
+    });
+
+    return text;
+  } catch (error: any) {
+    if (!isGeminiQuotaError(error)) {
+      const latencyMs = Date.now() - startTime;
+      await writeAIEngineLog({
+        businessId,
+        provider: "gemini",
+        model: selectedModel,
+        latencyMs,
+        status: "failed",
+        errorMessage: error.message || String(error),
+        promptTokensEstimate,
+        featureSource,
+      });
+      throw error;
+    }
 
     const fallbackModel = "gemini-2.5-flash";
-    if (selectedModel === fallbackModel) throw error;
+    if (selectedModel === fallbackModel) {
+      const latencyMs = Date.now() - startTime;
+      await writeAIEngineLog({
+        businessId,
+        provider: "gemini",
+        model: selectedModel,
+        latencyMs,
+        status: "failed",
+        errorMessage: error.message || String(error),
+        promptTokensEstimate,
+        featureSource,
+      });
+      throw error;
+    }
 
     console.warn(
       `[Gemini Content Warning] ${selectedModel} quota/rate limit hit. Retrying content generation with ${fallbackModel}.`
     );
-    return callGeminiContent(fallbackModel);
+
+    try {
+      const text = await callGeminiContent(fallbackModel);
+      const latencyMs = Date.now() - startTime;
+      const responseTokensEstimate = estimateTokens(text);
+
+      await writeAIEngineLog({
+        businessId,
+        provider: "gemini",
+        model: fallbackModel,
+        fallbackUsed: true,
+        latencyMs,
+        status: "fallback_success",
+        promptTokensEstimate,
+        responseTokensEstimate,
+        featureSource,
+      });
+
+      return text;
+    } catch (fallbackError: any) {
+      const latencyMs = Date.now() - startTime;
+      await writeAIEngineLog({
+        businessId,
+        provider: "gemini",
+        model: fallbackModel,
+        fallbackUsed: true,
+        latencyMs,
+        status: "failed",
+        errorMessage: `Primary: ${error.message}. Fallback: ${fallbackError.message}`,
+        promptTokensEstimate,
+        featureSource,
+      });
+      throw fallbackError;
+    }
   }
 }
 

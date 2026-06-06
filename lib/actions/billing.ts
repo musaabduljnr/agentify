@@ -91,7 +91,7 @@ export async function getBillingData() {
 
 /**
  * Get usage warning level for a business.
- * Returns warning data if usage is at 80% or 100%.
+ * Returns warning data if usage is at 70%, 90%, or 100%+.
  */
 export async function getUsageWarnings() {
   try {
@@ -102,7 +102,7 @@ export async function getUsageWarnings() {
     const warnings: {
       type: string;
       label: string;
-      level: "warning" | "critical";
+      level: "warning" | "critical" | "blocked";
       used: number;
       limit: number;
       percentage: number;
@@ -116,8 +116,10 @@ export async function getUsageWarnings() {
       if (data.limit >= 999999999) return; // unlimited
       const pct = Math.round((data.used / data.limit) * 100);
       if (pct >= 100) {
+        warnings.push({ type, label, level: "blocked", used: data.used, limit: data.limit, percentage: pct });
+      } else if (pct >= 90) {
         warnings.push({ type, label, level: "critical", used: data.used, limit: data.limit, percentage: pct });
-      } else if (pct >= 80) {
+      } else if (pct >= 70) {
         warnings.push({ type, label, level: "warning", used: data.used, limit: data.limit, percentage: pct });
       }
     };

@@ -15,6 +15,7 @@ create table if not exists public.ai_interaction_logs (
   status text not null default 'success'
     check (status in ('success', 'failed', 'fallback_success')),
   error_message text,
+  feature_source text check (feature_source in ('demo_generation', 'assistant_prompt_generation', 'welcome_message_generation', 'suggested_questions_generation', 'website_summary_generation', 'embeddings_generation', 'hosted_chat', 'playground', 'admin_test')),
   metadata jsonb default '{}'::jsonb,
   created_at timestamp with time zone default now()
 );

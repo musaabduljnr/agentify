@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/utils/supabase/service";
 import { generateGeminiContent } from "../providers/gemini";
+import { type FeatureSource } from "../logs/ai-logs";
 
 /**
  * Checks if a conversation has more than 10 messages and triggers summary extraction if so.
@@ -8,7 +9,8 @@ import { generateGeminiContent } from "../providers/gemini";
  */
 export async function summarizeConversationIfNeeded(
   conversationId: string,
-  businessId: string
+  businessId: string,
+  featureSource?: FeatureSource
 ): Promise<string | null> {
   try {
     const supabase = createServiceClient();
@@ -70,6 +72,8 @@ SUMMARY:
       model: "gemini-2.5-flash",
       prompt,
       systemInstruction: "You are a concise summarizer. Keep summaries under 60 words.",
+      businessId,
+      featureSource,
     });
 
     if (summary) {

@@ -32,6 +32,29 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
   let fallbackUsed = false;
   const startTime = Date.now();
 
+  // Simple FAQ detection helper for routing optimization
+  function isSimpleFAQ(query: string): boolean {
+    const clean = query.trim().toLowerCase();
+    if (clean.length < 35) return true;
+    
+    const faqPatterns = [
+      /\b(hello|hi|hey|greetings)\b/i,
+      /\b(price|pricing|cost|how much|fee|payment)\b/i,
+      /\b(location|address|where are you|map|office)\b/i,
+      /\b(hours|open|close|time|schedule|sunday|monday|saturday|weekday|weekend)\b/i,
+      /\b(phone|email|contact|whatsapp|number|reach|support|help|complaint)\b/i,
+      /\b(booking|appointment|schedule|reserve|book)\b/i,
+    ];
+
+    return faqPatterns.some(pattern => pattern.test(clean));
+  }
+
+  // Cost Optimization: Route simple FAQs to cheaper/faster gemini-2.5-flash-lite
+  if (primaryProvider === "gemini" && primaryModel === "gemini-2.5-flash" && isSimpleFAQ(userMessage)) {
+    activeModel = "gemini-2.5-flash-lite";
+    console.log(`[AI Engine] Optimized: Routing simple FAQ query to gemini-2.5-flash-lite. Query: "${userMessage}"`);
+  }
+
   async function callProvider(prov: AIProvider, mod: string): Promise<string> {
     switch (prov) {
       case "gemini":
@@ -75,7 +98,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
     // Try primary
     const text = await executeWithRetryAndTimeout(
       primaryProvider,
-      () => callProvider(primaryProvider, primaryModel),
+      () => callProvider(primaryProvider, activeModel),
       { maxRetries: 2, timeoutMs }
     );
 
@@ -85,7 +108,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
     const response: ChatResponse = {
       text,
       provider: primaryProvider,
-      model: primaryModel,
+      model: activeModel,
       latencyMs,
       fallbackUsed: false,
       promptTokensEstimate,
@@ -97,13 +120,14 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
       businessId: params.businessId,
       conversationId: params.conversationId,
       provider: primaryProvider,
-      model: primaryModel,
+      model: activeModel,
       fallbackUsed: false,
       promptTokensEstimate,
       responseTokensEstimate,
       latencyMs,
       status: "success",
       metadata: { temperature },
+      featureSource: params.featureSource,
     });
 
     return response;
@@ -127,6 +151,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
         status: "failed",
         errorMessage: primaryError.message || String(primaryError),
         metadata: { primaryFailed: true },
+        featureSource: params.featureSource,
       });
       throw primaryError;
     }
@@ -171,6 +196,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
         latencyMs: totalLatency,
         status: "fallback_success",
         metadata: { primaryError: primaryError.message || String(primaryError) },
+        featureSource: params.featureSource,
       });
 
       return response;
@@ -191,6 +217,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
         status: "failed",
         errorMessage: `Primary failed: ${primaryError.message}. Fallback failed: ${fallbackError.message}`,
         metadata: { primaryError: primaryError.message, fallbackError: fallbackError.message },
+        featureSource: params.featureSource,
       });
 
       throw new Error(

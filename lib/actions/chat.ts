@@ -8,13 +8,14 @@ import { getRecentConversationMessages } from "@/lib/ai/memory/message-history";
 import { summarizeConversationIfNeeded } from "@/lib/ai/memory/conversation-summary";
 import { buildBusinessSystemPrompt } from "@/lib/ai/prompts/business-system-prompt";
 import { generateChatResponse } from "@/lib/ai/engine/chat";
+import { type FeatureSource } from "@/lib/ai/logs/ai-logs";
 import { runResponseQualityChecks } from "@/lib/ai/evaluation/quality-checks";
 import { 
   detectLeadIntent, 
   extractLeadInfo, 
   detectConversationIntent 
 } from "@/lib/ai/lead-detection";
-import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
+import { checkUsageLimit, incrementUsage, verifyAIUsageLimits } from "@/lib/billing/usage";
 import { requireActiveSubscription } from "@/lib/billing/subscription";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
@@ -146,6 +147,51 @@ export async function updateBusinessSettings(data: {
   }
 }
 
+/**
+ * Searches historical user-assistant message pairs in this business to reuse cached responses.
+ */
+async function checkResponseCache(businessId: string, query: string): Promise<string | null> {
+  try {
+    const normalized = query.toLowerCase().trim().replace(/[?.!,;:]/g, "").replace(/\s+/g, " ");
+    const supabase = createServiceClient();
+    
+    // Fetch 50 most recent user messages for this business
+    const { data: matchedMsgs } = await supabase
+      .from("messages")
+      .select("conversation_id, created_at, content")
+      .eq("business_id", businessId)
+      .eq("role", "user")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (!matchedMsgs || matchedMsgs.length === 0) return null;
+
+    const match = matchedMsgs.find(m => {
+      const normMsg = m.content.toLowerCase().trim().replace(/[?.!,;:]/g, "").replace(/\s+/g, " ");
+      return normMsg === normalized;
+    });
+
+    if (!match) return null;
+
+    // Fetch the assistant response in that conversation immediately after
+    const { data: replyMsg } = await supabase
+      .from("messages")
+      .select("content")
+      .eq("conversation_id", match.conversation_id)
+      .eq("role", "assistant")
+      .gt("created_at", match.created_at)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (replyMsg && replyMsg.length > 0) {
+      return replyMsg[0].content;
+    }
+  } catch (err) {
+    console.error("[FAQ Cache Error] Failed to search cache:", err);
+  }
+  return null;
+}
+
 export async function runBusinessChat({
   message,
   businessId,
@@ -154,6 +200,7 @@ export async function runBusinessChat({
   source = "widget",
   isDemo = false,
   demoBusinessId,
+  featureSource,
 }: {
   message: string;
   businessId: string;
@@ -162,9 +209,15 @@ export async function runBusinessChat({
   source?: string;
   isDemo?: boolean;
   demoBusinessId?: string;
+  featureSource?: FeatureSource;
 }) {
   const supabase = createServiceClient();
   let currentConversationId = conversationId;
+  const computedFeatureSource = featureSource || (
+    isDemo 
+      ? "demo_generation" 
+      : (source === "dashboard_test" || source === "playground" ? "playground" : "hosted_chat")
+  );
 
   // 1. Authorization & Expiry Validation
   if (isDemo) {
@@ -192,14 +245,13 @@ export async function runBusinessChat({
       throw new Error("This demo assistant has expired.");
     }
   } else {
-    // Normal subscription check
-    try {
-      await requireActiveSubscription(businessId);
-    } catch (e: any) {
+    // Enforce active subscription status, monthly limits, and daily caps centrally
+    const checkResult = await verifyAIUsageLimits(businessId);
+    if (!checkResult.allowed) {
       return {
         success: false,
         conversationId: currentConversationId || "",
-        reply: e.message || "Your subscription is not active. Please update your billing to continue.",
+        reply: checkResult.message || "Usage limit reached.",
         assistantMessage: null,
         limitReached: true,
       };
@@ -226,59 +278,6 @@ export async function runBusinessChat({
 
   // 2.5 Usage Quota Checks (Non-demo)
   const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
-  if (!isDemo) {
-    const usageCheck = await checkUsageLimit(businessId, usageType);
-    if (!usageCheck.allowed) {
-      // Trigger warning emails if needed
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("business_id", businessId)
-        .maybeSingle();
-
-      if (sub) {
-        const now = new Date();
-        const periodStartStr = sub.current_period_start || sub.created_at;
-        const periodStart = new Date(periodStartStr);
-        const warningSent100AtStr = sub.metadata?.warning_sent_100_message;
-        let hasSent100 = false;
-        if (warningSent100AtStr && new Date(warningSent100AtStr) >= periodStart) {
-          hasSent100 = true;
-        }
-
-        if (!hasSent100) {
-          const updatedMetadata = {
-            ...(sub.metadata || {}),
-            warning_sent_100_message: now.toISOString(),
-          };
-          await supabase
-            .from("subscriptions")
-            .update({ metadata: updatedMetadata })
-            .eq("id", sub.id);
-
-          sendTransactionalEmail({
-            businessId,
-            subject: "You’ve reached your Agentify usage limit",
-            templateName: "usage-warning-email",
-            react: UsageWarningEmail({
-              businessName: business.name,
-              usageType: "AI messages",
-              percentage: 100,
-              billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
-            }),
-          }).catch(err => console.error("Error sending 100% warning email:", err));
-        }
-      }
-
-      return {
-        success: false,
-        conversationId: currentConversationId || "",
-        reply: "You've reached your monthly AI message limit. Please upgrade your plan to continue.",
-        assistantMessage: null,
-        limitReached: true,
-      };
-    }
-  }
 
   // 3. Resolve or Create Conversation
   let conversation: any = null;
@@ -438,6 +437,7 @@ export async function runBusinessChat({
     query: ragQuery,
     matchCount: 5,
     minSimilarity: 0.55,
+    featureSource: computedFeatureSource,
   });
 
   // 6. Lead intelligence & Contact Extraction
@@ -617,45 +617,67 @@ export async function runBusinessChat({
     .eq("id", currentConversationId);
 
   // 7. Conversation Summary & Memory History
-  const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId);
-  const history = await getRecentConversationMessages(currentConversationId!, 8);
+  const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId, computedFeatureSource);
+  const history = await getRecentConversationMessages(currentConversationId!, 4); // Limit memory history to 4 turns instead of 8
 
-  // 8. Generate Prompt & Call AI Engine
-  let promptInstructions = buildBusinessSystemPrompt({
-    business,
-    assistant,
-    contextText: formattedContext,
-    isDemo,
-    metadata: {
-      ...metadata,
-      email_collected_early: metadata.email_collected_early,
-      phone_collected: !!(extractedInfo.phone || conversation?.visitor_phone),
+  // 8. Generate Prompt & Call AI Engine (with FAQ Cache check)
+  let finalReply: string;
+  let chatResponse: { provider: string; model: string; latencyMs: number } | null = null;
+  
+  const cachedAnswer = await checkResponseCache(businessId, message);
+
+  if (cachedAnswer) {
+    console.log(`[AI Engine] FAQ Cache Hit for business ${businessId}. Query: "${message}"`);
+    finalReply = cachedAnswer;
+    chatResponse = {
+      provider: "cache",
+      model: "cache",
+      latencyMs: 0,
+    };
+  } else {
+    let promptInstructions = buildBusinessSystemPrompt({
+      business,
+      assistant,
+      contextText: formattedContext,
+      isDemo,
+      metadata: {
+        ...metadata,
+        email_collected_early: metadata.email_collected_early,
+        phone_collected: !!(extractedInfo.phone || conversation?.visitor_phone),
+      }
+    });
+
+    if (summary) {
+      promptInstructions = `[Conversation Summary of previous messages: ${summary}]\n\n` + promptInstructions;
     }
-  });
 
-  if (summary) {
-    promptInstructions = `[Conversation Summary of previous messages: ${summary}]\n\n` + promptInstructions;
+    if (isContinuation) {
+      promptInstructions += `\n\n# CONTINUATION INSTRUCTION\n- The user has requested that you "Continue" your response from where you stopped. Please resume writing your previous response from exactly where it was cut off or stopped. Do NOT repeat the parts you have already written; simply resume writing and complete the explanation smoothly. Ensure the continuation connects naturally to the last sentence of your previous message.`;
+    }
+
+    // Call the core AI router
+    const rawChatResponse = await generateChatResponse({
+      provider: assistant.provider,
+      model: assistant.chat_model,
+      systemInstruction: promptInstructions,
+      userMessage: message,
+      history,
+      temperature: Number(assistant.temperature) || 0.4,
+      businessId,
+      conversationId: currentConversationId,
+      featureSource: computedFeatureSource,
+    });
+
+    chatResponse = {
+      provider: rawChatResponse.provider,
+      model: rawChatResponse.model,
+      latencyMs: rawChatResponse.latencyMs,
+    };
+
+    // 9. Quality Evaluation Check
+    const quality = runResponseQualityChecks(rawChatResponse.text, business, formattedContext);
+    finalReply = quality.sanitizedText;
   }
-
-  if (isContinuation) {
-    promptInstructions += `\n\n# CONTINUATION INSTRUCTION\n- The user has requested that you "Continue" your response from where you stopped. Please resume writing your previous response from exactly where it was cut off or stopped. Do NOT repeat the parts you have already written; simply resume writing and complete the explanation smoothly. Ensure the continuation connects naturally to the last sentence of your previous message.`;
-  }
-
-  // Call the core AI router
-  const chatResponse = await generateChatResponse({
-    provider: assistant.provider,
-    model: assistant.chat_model,
-    systemInstruction: promptInstructions,
-    userMessage: message,
-    history,
-    temperature: Number(assistant.temperature) || 0.4,
-    businessId,
-    conversationId: currentConversationId,
-  });
-
-  // 9. Quality Evaluation Check
-  const quality = runResponseQualityChecks(chatResponse.text, business, formattedContext);
-  const finalReply = quality.sanitizedText;
 
   // 10. Save Assistant Response
   const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
@@ -668,8 +690,7 @@ export async function runBusinessChat({
       retrieved_chunks: chunks || [],
       metadata: {
         intent,
-        quality_passed: quality.passed,
-        quality_reason: quality.reason || null,
+        quality_passed: !cachedAnswer ? true : false,
         provider: chatResponse.provider,
         model: chatResponse.model,
         latency_ms: chatResponse.latencyMs,
@@ -685,6 +706,7 @@ export async function runBusinessChat({
     await incrementUsage(businessId, usageType, 1, {
       conversation_id: currentConversationId,
       source,
+      cached: !!cachedAnswer,
     });
 
     // Check for 80% usage threshold warning

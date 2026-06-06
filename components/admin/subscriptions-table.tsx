@@ -5,6 +5,7 @@ import {
   updateSubscriptionPlan,
   updateSubscriptionStatus,
   resetBusinessUsage,
+  updateSubscriptionCustomLimits,
 } from "@/lib/actions/admin";
 import {
   Search,
@@ -16,6 +17,7 @@ import {
   Calendar,
   Layers,
   Loader2,
+  Sliders,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -31,6 +33,12 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Custom limits editor modal state
+  const [editingSub, setEditingSub] = useState<any | null>(null);
+  const [customMsgLimit, setCustomMsgLimit] = useState<number | string>("");
+  const [customDailyLimit, setCustomDailyLimit] = useState<number | string>("");
+  const [updatingLimits, setUpdatingLimits] = useState(false);
+
   // Search & Filter Logic
   const filtered = subscriptions.filter((sub) => {
     const matchesSearch = (sub.businesses?.name || "")
@@ -43,7 +51,10 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
     return matchesSearch && matchesPlan && matchesStatus;
   });
 
-  const handlePlanChange = async (subId: string, plan: "free_trial" | "starter" | "growth") => {
+  const handlePlanChange = async (
+    subId: string,
+    plan: "free_trial" | "starter" | "growth" | "enterprise"
+  ) => {
     setLoadingId(subId);
     setErrorMsg(null);
     try {
@@ -99,6 +110,44 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
     }
   };
 
+  const handleSaveCustomLimits = async () => {
+    if (!editingSub) return;
+    setUpdatingLimits(true);
+    setErrorMsg(null);
+    try {
+      const msgLimitVal = customMsgLimit === "" ? null : Number(customMsgLimit);
+      const dailyLimitVal = customDailyLimit === "" ? null : Number(customDailyLimit);
+
+      const result = await updateSubscriptionCustomLimits(editingSub.id, {
+        message_limit: msgLimitVal,
+        daily_message_limit: dailyLimitVal,
+      });
+
+      if (result.error) throw new Error(result.error);
+
+      // Local state update
+      setSubscriptions((prev) =>
+        prev.map((s) =>
+          s.id === editingSub.id
+            ? {
+                ...s,
+                message_limit: msgLimitVal ?? s.message_limit,
+                metadata: {
+                  ...s.metadata,
+                  daily_message_limit: dailyLimitVal,
+                },
+              }
+            : s
+        )
+      );
+      setEditingSub(null);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to update custom limits.");
+    } finally {
+      setUpdatingLimits(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Dynamic Search & Double Filter controls */}
@@ -125,6 +174,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
             <option value="free_trial">Free Trial</option>
             <option value="starter">Starter</option>
             <option value="growth">Growth</option>
+            <option value="enterprise">Enterprise</option>
           </select>
 
           {/* Status Selector */}
@@ -159,6 +209,9 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                   <th className="py-4 px-6 whitespace-nowrap">Status State</th>
                   <th className="py-4 px-6 whitespace-nowrap">Gateway Provider</th>
                   <th className="py-4 px-6 whitespace-nowrap">Message Quota Usage</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Revenue</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Est. AI Cost</th>
+                  <th className="py-4 px-6 whitespace-nowrap">Gross Margin</th>
                   <th className="py-4 px-6 whitespace-nowrap">Period Renew Date</th>
                   <th className="py-4 px-6 text-right whitespace-nowrap">Actions Panel</th>
                 </tr>
@@ -207,6 +260,30 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                       </td>
                       <td className="py-4 px-6 font-bold text-white whitespace-nowrap">
                         <span className="text-indigo-400">{sub.current_usage}</span> / {sub.message_limit}
+                        {sub.metadata?.daily_message_limit && (
+                          <span className="text-slate-500 font-normal text-[10px] block mt-0.5">
+                            Daily: {sub.metadata.daily_message_limit} cap
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 font-bold text-white whitespace-nowrap">
+                        ₦{(sub.revenue || 0).toLocaleString()}
+                      </td>
+                      <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
+                        ₦{(sub.estCost || 0).toFixed(2)}
+                      </td>
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${
+                            sub.margin >= 50
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                              : sub.margin > 0
+                              ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                              : "bg-red-500/10 border-red-500/20 text-red-400"
+                          }`}
+                        >
+                          {(sub.margin || 0).toFixed(0)}%
+                        </span>
                       </td>
                       <td className="py-4 px-6 font-medium text-slate-400 whitespace-nowrap">
                         <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -214,7 +291,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                           {endPeriod}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-right space-x-2">
+                      <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
                         {/* Reset Count Button */}
                         <Button
                           onClick={() => handleResetUsage(sub.id)}
@@ -224,6 +301,21 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                           className="rounded-xl h-9 text-[10px] font-bold border border-slate-850 hover:bg-slate-900"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
+                        </Button>
+
+                        {/* Edit Custom Limits Button */}
+                        <Button
+                          onClick={() => {
+                            setEditingSub(sub);
+                            setCustomMsgLimit(sub.message_limit ?? "");
+                            setCustomDailyLimit(sub.metadata?.daily_message_limit ?? "");
+                          }}
+                          disabled={loadingId === sub.id}
+                          variant="ghost"
+                          title="Edit Custom Limits"
+                          className="rounded-xl h-9 text-[10px] font-bold border border-slate-850 hover:bg-slate-900 text-indigo-400 hover:text-indigo-300"
+                        >
+                          <Sliders className="w-3.5 h-3.5" />
                         </Button>
 
                         {/* Upgrade drop menu */}
@@ -236,6 +328,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                           <option value="free_trial">Trial</option>
                           <option value="starter">Starter</option>
                           <option value="growth">Growth</option>
+                          <option value="enterprise">Enterprise</option>
                         </select>
 
                         {/* Suspension Toggle */}
@@ -270,6 +363,69 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
           </div>
         )}
       </div>
+
+      {/* Manual Limits Override Modal */}
+      {editingSub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 w-full max-w-md space-y-6 shadow-2xl relative">
+            <div>
+              <h3 className="text-lg font-black text-white tracking-tight">
+                Adjust Limits Manually
+              </h3>
+              <p className="text-slate-400 text-xs mt-1">
+                Setting custom overrides for {editingSub.businesses?.name || "this business"}.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Monthly Message Limit Field */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Monthly Message Limit
+                </label>
+                <input
+                  type="number"
+                  value={customMsgLimit}
+                  onChange={(e) => setCustomMsgLimit(e.target.value)}
+                  placeholder="e.g. 5000"
+                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+
+              {/* Daily Message Limit Field */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+                  Daily Message Limit Cap
+                </label>
+                <input
+                  type="number"
+                  value={customDailyLimit}
+                  onChange={(e) => setCustomDailyLimit(e.target.value)}
+                  placeholder="e.g. 250"
+                  className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                onClick={() => setEditingSub(null)}
+                variant="ghost"
+                className="rounded-xl border border-slate-850 hover:bg-slate-900 text-xs font-bold text-slate-400"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveCustomLimits}
+                disabled={updatingLimits}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-xs font-bold text-white px-4"
+              >
+                {updatingLimits ? "Saving..." : "Save Limits"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

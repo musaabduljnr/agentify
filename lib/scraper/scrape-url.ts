@@ -7,6 +7,7 @@ import {
 } from "./url-safety";
 import { cleanExtractedText, countWords } from "./text-cleaner";
 import { generateGeminiContent } from "../ai/providers/gemini";
+import { type FeatureSource } from "../ai/logs/ai-logs";
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
 const FETCH_TIMEOUT = 10_000; // 10 seconds per page
@@ -455,7 +456,12 @@ function extractLinks($: cheerio.CheerioAPI, pageUrl: string, rootUrl: string): 
   });
 }
 
-export async function scrapePage(rawUrl: string, rootUrl: string): Promise<PageScrapeResult> {
+export async function scrapePage(
+  rawUrl: string,
+  rootUrl: string,
+  businessId?: string,
+  featureSource?: FeatureSource
+): Promise<PageScrapeResult> {
   const { url, html } = await fetchHtml(rawUrl);
   const $ = cheerio.load(html);
 
@@ -499,6 +505,8 @@ CRITICAL INSTRUCTIONS:
         systemInstruction,
         temperature: 0.1,
         maxOutputTokens: 3000,
+        businessId,
+        featureSource,
       });
 
       if (geminiText && geminiText.trim().length > 50) {
@@ -621,7 +629,11 @@ function combinePages(pages: PageScrapeResult[]): Pick<ScrapeResult, "text" | "w
 
 export async function scrapeUrl(
   rawUrl: string,
-  options?: { maxPages?: number }
+  options?: {
+    maxPages?: number;
+    businessId?: string;
+    featureSource?: FeatureSource;
+  }
 ): Promise<ScrapeResult> {
   const startUrl = normalizeUrl(rawUrl);
   await assertPublicHttpUrl(startUrl);
@@ -644,7 +656,7 @@ export async function scrapeUrl(
         try {
           return {
             item,
-            page: await scrapePage(item.url, startUrl),
+            page: await scrapePage(item.url, startUrl, options?.businessId, options?.featureSource),
             error: null,
           };
         } catch (err: unknown) {

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { classifyQueryIntent, type QueryIntent } from "../intent/classify-query";
 import { scoreChunkRelevance } from "./chunk-scoring";
 import { formatContext } from "./build-context";
+import { type FeatureSource } from "../logs/ai-logs";
 
 export interface RetrievedChunk {
   id: string;
@@ -26,6 +27,7 @@ interface RetrieveContextParams {
   query: string;
   matchCount?: number;
   minSimilarity?: number;
+  featureSource?: FeatureSource;
 }
 
 export async function retrieveBusinessContext(params: RetrieveContextParams): Promise<{
@@ -33,12 +35,12 @@ export async function retrieveBusinessContext(params: RetrieveContextParams): Pr
   formattedContext: string;
   intent: QueryIntent;
 }> {
-  const { businessId, query, matchCount = 8, minSimilarity = 0.55 } = params;
+  const { businessId, query, matchCount = 8, minSimilarity = 0.55, featureSource } = params;
   const intent = classifyQueryIntent(query);
 
   try {
     // 1. Generate query embedding
-    const queryEmbedding = await generateEmbedding(query);
+    const queryEmbedding = await generateEmbedding(query, businessId, featureSource);
 
     // 2. Query Supabase vector match
     const supabase = createServiceClient();
@@ -82,8 +84,14 @@ export async function retrieveBusinessContext(params: RetrieveContextParams): Pr
     // Sort by boosted score
     scored.sort((a, b) => b.rerankScore - a.rerankScore);
 
-    // Take top matchCount
-    const finalChunks = scored.slice(0, matchCount).map(({ rerankScore, ...rest }) => rest);
+    // Dynamic RAG slicing for token optimization:
+    // If the top match has a similarity >= 0.70 (high confidence), retrieve only 2 chunks.
+    // Otherwise (low confidence), retrieve up to 5 chunks to gather broader context.
+    const topSimilarity = scored.length > 0 ? scored[0].similarity : 0;
+    const isHighConfidence = topSimilarity >= 0.70;
+    const dynamicLimit = isHighConfidence ? 2 : 5;
+
+    const finalChunks = scored.slice(0, dynamicLimit).map(({ rerankScore, ...rest }) => rest);
 
     // 6. Format structured context
     const formattedContext = formatContext(finalChunks);
