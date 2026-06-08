@@ -88,6 +88,7 @@
         max-width: calc(100vw - 24px);
       }
       .agentify-bubble {
+        position: relative;
         width: 60px;
         height: 60px;
         border-radius: 50%;
@@ -106,6 +107,20 @@
         width: 30px;
         height: 30px;
         fill: white;
+      }
+      .agentify-badge-dot {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #ef4444;
+        border: 2px solid white;
+        display: none;
+      }
+      .agentify-badge-dot.visible {
+        display: block;
       }
       .agentify-panel {
         position: absolute;
@@ -347,7 +362,10 @@
     
     const bubble = document.createElement("div");
     bubble.className = "agentify-bubble";
-    bubble.innerHTML = `<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>`;
+    bubble.innerHTML = `
+      <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+      <div class="agentify-badge-dot" id="agentify-badge"></div>
+    `;
     
     const panel = document.createElement("div");
     panel.className = "agentify-panel";
@@ -391,7 +409,24 @@
     const suggestedList = panel.querySelector("#agentify-suggested-list");
     const closeBtn = panel.querySelector("#agentify-close");
 
-    bubble.onclick = () => panel.classList.toggle("active");
+    const badge = bubble.querySelector("#agentify-badge");
+
+    function showBadge() {
+      if (!panel.classList.contains("active")) {
+        badge.classList.add("visible");
+      }
+    }
+
+    function hideBadge() {
+      badge.classList.remove("visible");
+    }
+
+    bubble.onclick = () => {
+      panel.classList.toggle("active");
+      if (panel.classList.contains("active")) {
+        hideBadge();
+      }
+    };
     closeBtn.onclick = () => panel.classList.remove("active");
 
     // Render suggested questions
@@ -416,19 +451,28 @@
       if (!conversationId) return;
 
       pollingInterval = setInterval(async () => {
-        if (!panel.classList.contains("active")) return;
-
         try {
           const res = await fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}&_=${Date.now()}`);
           const data = await res.json();
 
           if (data.messages && data.messages.length > renderedMessageCount) {
+            let hasNewAssistantMessage = false;
+            for (let i = renderedMessageCount; i < data.messages.length; i++) {
+              if (data.messages[i].role === "assistant") {
+                hasNewAssistantMessage = true;
+              }
+            }
+
             msgList.innerHTML = `<div class="agentify-message assistant">${formatMarkdown(config.welcomeText)}</div>`;
             renderedMessageCount = 0;
 
             data.messages.forEach((msg) => {
               addMessage(msg.content, msg.role === "assistant" ? "assistant" : "user", msg.metadata);
             });
+
+            if (hasNewAssistantMessage && !panel.classList.contains("active")) {
+              showBadge();
+            }
           }
         } catch (err) {
           console.error("Widget polling error:", err);
