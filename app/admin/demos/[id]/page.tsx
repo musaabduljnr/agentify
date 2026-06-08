@@ -7,7 +7,9 @@ import {
   extendDemoBusiness, 
   pauseDemoBusiness, 
   archiveDemoBusiness, 
-  deleteDemoBusiness 
+  deleteDemoBusiness,
+  getDemoConversationMessages,
+  generateDemoSalesPitch
 } from "@/lib/actions/demo-generator";
 import { 
   Sparkles, Globe, User, Mail, Phone, Calendar, ArrowLeft, 
@@ -18,7 +20,6 @@ import {
 import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createServiceClient } from "@/utils/supabase/service";
 
 export default function DemoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function DemoDetailPage({ params }: { params: Promise<{ id: strin
 
   // Pitch generation state
   const [pitchText, setPitchText] = useState("");
+  const [pitchGenerating, setPitchGenerating] = useState(false);
 
   useEffect(() => {
     fetchDetail();
@@ -74,17 +76,7 @@ export default function DemoDetailPage({ params }: { params: Promise<{ id: strin
   const fetchMessages = async (convId: string, placeholderBusinessId: string) => {
     setMessagesLoading(true);
     try {
-      // Fetch via supabase browser or standard server side query
-      // For simplicity and admin security, we can run a fetch from supabase client
-      const supabase = createServiceClient();
-      const { data: msgs, error } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", convId)
-        .eq("business_id", placeholderBusinessId)
-        .order("created_at", { ascending: true });
-
-      if (error) throw error;
+      const msgs = await getDemoConversationMessages(convId, placeholderBusinessId);
       setMessages(msgs || []);
     } catch (err) {
       console.error("Failed to load messages:", err);
@@ -172,20 +164,19 @@ export default function DemoDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const generateSalesPitch = () => {
-    const demoUrl = `${window.location.origin}${data.demo.demo_url}`;
-    const nameStr = data.demo.contact_name ? ` ${data.demo.contact_name}` : "";
-    const descriptionStr = data.demo.industry ? ` designed for the ${data.demo.industry} industry` : "";
-    
-    let suggestedQ = "";
-    if (data.assistant?.welcome_message) {
-      suggestedQ = "\nTry asking it something like: \n- \"How do your bookings work?\"\n- \"What are your pricing packages?\"";
+  const generateSalesPitch = async () => {
+    setPitchGenerating(true);
+    const toastId = toast.loading("Generating tailored sales pitch with AI...");
+    try {
+      const pitch = await generateDemoSalesPitch(id, window.location.origin);
+      setPitchText(pitch);
+      toast.success("AI Sales Pitch generated! Copy it below.", { id: toastId });
+    } catch (e) {
+      console.error("Failed to generate AI pitch:", e);
+      toast.error("Failed to generate custom AI sales pitch.", { id: toastId });
+    } finally {
+      setPitchGenerating(false);
     }
-
-    const pitch = `Hi${nameStr},\n\nI visited your website recently and built a custom AI-powered assistant for your business${descriptionStr}.\n\nIt is fully trained on your actual website content and can answer customer queries about your products, pricing, delivery, bookings, and contact details 24/7.\n\nYou can test it live right now at this link: ${demoUrl}\n${suggestedQ}\n\nLet me know if you would like to claim this assistant for your site! It only takes 2 minutes to embed.\n\nBest regards,\n[Your Name]\nAgentify Team`;
-    
-    setPitchText(pitch);
-    toast.success("Pitch generated! Copy it below.");
   };
 
   const copyPitch = () => {
@@ -447,9 +438,11 @@ export default function DemoDetailPage({ params }: { params: Promise<{ id: strin
               </h3>
               <button
                 onClick={generateSalesPitch}
-                className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                disabled={pitchGenerating}
+                className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                Generate Pitch
+                {pitchGenerating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {pitchGenerating ? "Generating..." : "Generate Pitch"}
               </button>
             </div>
 

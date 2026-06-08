@@ -841,3 +841,136 @@ export async function getAdminDemoAnalytics() {
     };
   }
 }
+
+/**
+ * Retrieves messages for a specific conversation of a demo business.
+ */
+export async function getDemoConversationMessages(convId: string, placeholderBusinessId: string) {
+  try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
+    await requireAdmin();
+    const serviceClient = createServiceClient();
+
+    const { data: msgs, error } = await serviceClient
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", convId)
+      .eq("business_id", placeholderBusinessId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return msgs || [];
+  } catch (error: any) {
+    console.error("Error in getDemoConversationMessages:", error);
+    throw error;
+  }
+}
+
+/**
+ * Generates a tailored AI sales pitch using Gemini.
+ */
+export async function generateDemoSalesPitch(demoId: string, origin: string) {
+  try {
+    const demoCrmEnabled = await getConfig("feature_flags", "enable_admin_demo_crm");
+    if (demoCrmEnabled === "false") {
+      throw new Error("Admin Demo CRM is globally disabled.");
+    }
+    await requireAdmin();
+    const serviceClient = createServiceClient();
+
+    // 1. Fetch demo business details
+    const { data: demo, error: demoErr } = await serviceClient
+      .from("demo_businesses")
+      .select("*")
+      .eq("id", demoId)
+      .single();
+
+    if (demoErr || !demo) throw new Error("Demo business not found");
+
+    // 2. Fetch placeholder business
+    let placeholderBiz = null;
+    if (demo.placeholder_business_id) {
+      const { data } = await serviceClient
+        .from("businesses")
+        .select("*")
+        .eq("id", demo.placeholder_business_id)
+        .single();
+      placeholderBiz = data;
+    }
+
+    // 3. Fetch assistant details
+    let assistant = null;
+    let widgetConfig = null;
+    if (demo.placeholder_business_id) {
+      const [{ data: asst }, { data: widget }] = await Promise.all([
+        serviceClient
+          .from("assistants")
+          .select("*")
+          .eq("business_id", demo.placeholder_business_id)
+          .eq("is_active", true)
+          .maybeSingle(),
+        serviceClient
+          .from("widget_configs")
+          .select("*")
+          .eq("business_id", demo.placeholder_business_id)
+          .maybeSingle()
+      ]);
+      assistant = asst;
+      widgetConfig = widget;
+    }
+
+    const suggestedQuestions = widgetConfig && Array.isArray(widgetConfig.suggested_questions)
+      ? widgetConfig.suggested_questions.slice(0, 4)
+      : [];
+
+    const demoUrl = `${origin}${demo.demo_url}`;
+
+    const systemInstruction = `You are an expert sales copywriter and prospecting assistant for Agentify.
+Your job is to write a highly personalized, compelling, and uniquely tailored prospecting email/pitch to a business owner or contact.
+
+You will be given the following details:
+- Business Name: ${demo.business_name}
+- Website URL: ${demo.website_url}
+- Decision Maker / Contact Name: ${demo.contact_name || "None provided"}
+- Business Description: ${placeholderBiz?.description || "Not provided"}
+- Industry: ${demo.industry || "Not provided"}
+- AI Assistant Demo URL: ${demoUrl}
+- Assistant Welcome Message: ${assistant?.welcome_message || "Not provided"}
+- Suggested Questions: ${JSON.stringify(suggestedQuestions)}
+
+RULES:
+1. Address the recipient by name if a contact name is provided. If not, use a friendly professional greeting like "Hi there" or "Hi ${demo.business_name} team".
+2. Tailor the email specifically to their business description and industry. Reference their industry-specific pain points or needs (e.g., if they are a dental clinic, mention booking appointments; if they are an e-commerce store, mention product queries or shipping; if they are a restaurant, mention reservations and menus). Do NOT write a generic, one-size-fits-all pitch.
+3. Keep the tone warm, consultative, professional, and enthusiastic, but not overly pushy or spammy. Avoid generic sales jargon.
+4. Highlight that we visited their website and built a custom AI assistant trained on their actual website content in under 2 minutes. Explain that it can handle inquiries 24/7.
+5. Provide the unique Demo URL clearly and suggest 2-3 specific, highly tailored questions they can try asking the assistant. Make these questions extremely relevant to their actual business offerings.
+6. Instruct them on how easy it is to claim the assistant for their website (takes only 2 minutes).
+7. Keep the email concise and scannable (around 150-250 words) with clear paragraphs.
+8. End with a professional sign-off:
+Best regards,
+[Your Name]
+Agentify Team
+
+Output ONLY the text of the email. Do not include subject lines, markdown code fences like \`\`\` or any other metadata, just the pure email content.`;
+
+    const userMessage = `Generate the tailored sales pitch email now.`;
+
+    const pitch = await generateGeminiResponse({
+      systemInstruction,
+      userMessage,
+      temperature: 0.5,
+      businessId: demo.placeholder_business_id || undefined,
+      featureSource: "demo_generation",
+    });
+
+    return pitch.trim();
+  } catch (error: any) {
+    console.error("Error in generateDemoSalesPitch:", error);
+    throw error;
+  }
+}
+
+

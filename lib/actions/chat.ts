@@ -964,3 +964,183 @@ export async function sendManualMessage({
     return { error: err.message || "Failed to send manual message" };
   }
 }
+
+/**
+ * Retrieves all assistants for the current business.
+ */
+export async function getAssistants() {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+    const { data: assistants, error } = await supabase
+      .from("assistants")
+      .select("*")
+      .eq("business_id", business.id)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return assistants || [];
+  } catch (err: any) {
+    console.error("Error in getAssistants:", err);
+    throw err;
+  }
+}
+
+/**
+ * Creates a new assistant for the current business.
+ */
+export async function createAssistant(data: {
+  name: string;
+  tone: string;
+  welcome_message: string;
+}) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    // 1. Fetch current subscription to verify widget_limit
+    const { data: sub } = await supabase
+      .from("subscriptions")
+      .select("widget_limit")
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    const limit = sub?.widget_limit || 1;
+
+    // 2. Count existing assistants
+    const { count, error: countErr } = await supabase
+      .from("assistants")
+      .select("*", { count: "exact", head: true })
+      .eq("business_id", business.id);
+
+    if (countErr) throw countErr;
+
+    if ((count || 0) >= limit) {
+      return { error: `You've reached the maximum number of assistants (${limit}) allowed under your current plan. Please upgrade to create more.` };
+    }
+
+    // 3. Create the new assistant (default is_active to false since they can toggle it later)
+    const { data: newAsst, error } = await supabase
+      .from("assistants")
+      .insert({
+        business_id: business.id,
+        name: data.name,
+        tone: data.tone,
+        welcome_message: data.welcome_message,
+        is_active: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/assistant");
+    return { success: true, assistant: newAsst };
+  } catch (err: any) {
+    console.error("Error in createAssistant:", err);
+    return { error: err.message || "Failed to create assistant" };
+  }
+}
+
+/**
+ * Deletes an assistant. If it was active, sets another remaining assistant as active.
+ */
+export async function deleteAssistant(assistantId: string) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    // 1. Fetch assistant details
+    const { data: assistant, error: fetchErr } = await supabase
+      .from("assistants")
+      .select("*")
+      .eq("id", assistantId)
+      .eq("business_id", business.id)
+      .single();
+
+    if (fetchErr || !assistant) {
+      return { error: "Assistant not found" };
+    }
+
+    // Count remaining assistants
+    const { data: remaining } = await supabase
+      .from("assistants")
+      .select("id, is_active")
+      .eq("business_id", business.id)
+      .neq("id", assistantId)
+      .order("created_at", { ascending: true });
+
+    if (!remaining || remaining.length === 0) {
+      return { error: "You must keep at least one assistant configuration." };
+    }
+
+    // 2. Delete the assistant
+    const { error: deleteErr } = await supabase
+      .from("assistants")
+      .delete()
+      .eq("id", assistantId);
+
+    if (deleteErr) throw deleteErr;
+
+    // 3. If the deleted assistant was active, mark the first remaining one as active
+    if (assistant.is_active) {
+      const { error: activateErr } = await supabase
+        .from("assistants")
+        .update({ is_active: true })
+        .eq("id", remaining[0].id);
+      
+      if (activateErr) throw activateErr;
+    }
+
+    revalidatePath("/dashboard/assistant");
+    revalidatePath("/dashboard/playground");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in deleteAssistant:", err);
+    return { error: err.message || "Failed to delete assistant" };
+  }
+}
+
+/**
+ * Sets an assistant as the active one and deactivates others.
+ */
+export async function setActiveAssistant(assistantId: string) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    // Set all other assistants to is_active = false
+    const { error: deactivateError } = await supabase
+      .from("assistants")
+      .update({ is_active: false })
+      .eq("business_id", business.id)
+      .neq("id", assistantId);
+
+    if (deactivateError) throw deactivateError;
+
+    // Set target assistant to is_active = true
+    const { error: activateError } = await supabase
+      .from("assistants")
+      .update({ is_active: true })
+      .eq("id", assistantId)
+      .eq("business_id", business.id);
+
+    if (activateError) throw activateError;
+
+    revalidatePath("/dashboard/assistant");
+    revalidatePath("/dashboard/playground");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in setActiveAssistant:", err);
+    return { error: err.message || "Failed to activate assistant" };
+  }
+}
+

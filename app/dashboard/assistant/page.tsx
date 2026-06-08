@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { AssistantEditor } from "@/components/dashboard/assistant/assistant-editor";
-import { getCurrentBusiness, getAssistant } from "@/lib/actions/chat";
+import { getCurrentBusiness, getAssistants } from "@/lib/actions/chat";
+import { getBusinessSubscription } from "@/lib/billing/subscription";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -10,12 +11,20 @@ export const metadata: Metadata = {
 
 export default async function AssistantPage() {
   const business = await getCurrentBusiness();
-  const assistant = business ? await getAssistant(business.id) : null;
+  if (!business) {
+    redirect("/login");
+  }
+
+  const [assistants, subscription] = await Promise.all([
+    getAssistants(),
+    getBusinessSubscription(business.id),
+  ]);
 
   return (
     <AssistantEditor 
       initialBusiness={business}
-      initialAssistant={assistant}
+      initialAssistants={assistants || []}
+      subscription={subscription}
     />
   );
 }
