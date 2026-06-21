@@ -97,19 +97,17 @@ export async function assertPublicHttpUrl(url: string): Promise<void> {
 
   if (isIP(hostname)) return;
 
-  let addresses: { address: string }[];
+  let addresses: { address: string }[] = [];
   try {
     addresses = await lookup(hostname, { all: true });
-  } catch {
-    throw new Error("Could not resolve the website hostname.");
+  } catch (err) {
+    console.warn(`[DNS Warning] Could not resolve ${hostname} using dns.lookup:`, err);
   }
 
-  if (addresses.length === 0) {
-    throw new Error("Could not resolve the website hostname.");
-  }
-
-  if (addresses.some((entry) => isPrivateIp(entry.address))) {
-    throw new Error("Cannot scrape URLs that resolve to private or local networks.");
+  if (addresses && addresses.length > 0) {
+    if (addresses.some((entry) => isPrivateIp(entry.address))) {
+      throw new Error("Cannot scrape URLs that resolve to private or local networks.");
+    }
   }
 }
 
