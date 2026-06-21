@@ -102,8 +102,8 @@ export async function crawlWebsite({
           // Scrape individual page
           const scraped = await scrapePage(item.url, startUrl, businessId, featureSource);
           
-          // Skip low-value content (less than 80 words)
-          if (scraped.wordCount < 80) {
+          // Skip low-value content (less than 10 words)
+          if (scraped.wordCount < 10) {
             pages.push({
               url: scraped.url,
               title: scraped.title,
