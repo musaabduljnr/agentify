@@ -8,8 +8,20 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./tests/setup.ts",
+    exclude: ["**/e2e/**", "node_modules/**"],
     alias: {
       "@": path.resolve(__dirname, "./"),
+    },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      exclude: [
+        "node_modules/**",
+        ".next/**",
+        "tests/**",
+        "vitest.config.ts",
+        "next.config.ts",
+      ],
     },
   },
 });

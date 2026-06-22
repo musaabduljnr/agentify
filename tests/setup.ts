@@ -21,3 +21,6 @@ vi.mock("next/navigation", () => ({
     prefetch: vi.fn(),
   }),
 }));
+
+vi.mock("server-only", () => ({}));
+

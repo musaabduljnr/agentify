@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
+import Link from "next/link";
+
 export default function ContactPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -135,11 +137,11 @@ export default function ContactPage() {
                 <p className="text-slate-400 text-xs leading-relaxed mb-6 font-medium">
                   Try viewing our interactive demo to test how Agentify responds to questions in real time. We built it using our own website scrapers!
                 </p>
-                <a href="/demo">
+                <Link href="/demo" passHref legacyBehavior>
                   <Button className="w-full bg-white text-slate-900 hover:bg-slate-100 font-bold rounded-2xl h-11 text-xs">
                     View Live Demo
                   </Button>
-                </a>
+                </Link>
               </div>
             </div>
 

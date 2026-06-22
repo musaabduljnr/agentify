@@ -29,8 +29,14 @@ jobs:
     - name: Run Typecheck
       run: npx tsc --noEmit
 
-    - name: Run Tests
-      run: npx vitest run
+    - name: Run Vitest Tests with Coverage
+      run: npm run test:coverage
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Run Playwright E2E Tests
+      run: npm run test:e2e
 
     - name: Build Project
       run: npm run build

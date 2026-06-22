@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /about
+Allow: /careers
+Allow: /contact
+Allow: /integrations
+Allow: /demo/
+Allow: /chat/
+Disallow: /dashboard/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /login
+Disallow: /signup
+Disallow: /onboarding
+
+Sitemap: https://agentify.ai/sitemap.xml

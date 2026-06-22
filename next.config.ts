@@ -41,7 +41,9 @@ const nextConfig: NextConfig = {
             // This CSP covers the main app pages only.
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.paystack.co",
+              process.env.NODE_ENV === "production"
+                ? "script-src 'self' 'unsafe-inline' https://js.paystack.co"
+                : "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.paystack.co",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",

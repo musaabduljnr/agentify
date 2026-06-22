@@ -5,7 +5,7 @@ We use Supabase CLI to manage database migrations. This ensures versioning, repe
 ## Directory Structure
 
 - `supabase/migrations/`: Contains versioned, idempotent `.sql` migration files.
-- `supabase/*.sql`: Legacy raw schema files (archived for reference; do not run directly on new setups).
+- `supabase/legacy_sql/`: Legacy raw schema files (archived for reference; do not run directly on new setups).
 
 ## Managing Migrations locally
 

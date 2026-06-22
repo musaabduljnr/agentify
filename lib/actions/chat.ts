@@ -6,25 +6,17 @@ import { revalidatePath } from "next/cache";
 import { retrieveBusinessContext } from "@/lib/ai/rag/retrieve-context";
 import { getRecentConversationMessages } from "@/lib/ai/memory/message-history";
 import { summarizeConversationIfNeeded } from "@/lib/ai/memory/conversation-summary";
-import { buildBusinessSystemPrompt } from "@/lib/ai/prompts/business-system-prompt";
-import { generateChatResponse } from "@/lib/ai/engine/chat";
 import { type FeatureSource } from "@/lib/ai/logs/ai-logs";
-import { runResponseQualityChecks } from "@/lib/ai/evaluation/quality-checks";
-import { 
-  detectLeadIntent, 
-  extractLeadInfo, 
-  detectConversationIntent 
-} from "@/lib/ai/lead-detection";
-import { checkUsageLimit, incrementUsage, verifyAIUsageLimits } from "@/lib/billing/usage";
-import { requireActiveSubscription } from "@/lib/billing/subscription";
 import { rateLimit } from "@/lib/security/rate-limit";
-import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
-import { sendTransactionalEmail } from "@/lib/email/send-email";
-import { NewLeadEmail } from "@/lib/email/templates/new-lead-email";
-import { BookingRequestEmail } from "@/lib/email/templates/booking-request-email";
-import { SupportRequestEmail } from "@/lib/email/templates/support-request-email";
-import { UsageWarningEmail } from "@/lib/email/templates/usage-warning-email";
 import { requireCompleteBusinessSetup } from "@/lib/queries/business";
+import { verifyAIUsageLimits } from "@/lib/billing/usage";
+
+// Import modular sub-handlers
+import { resolveOrCreateConversation } from "./chat/conversation-management";
+import { saveUserMessage, saveAssistantMessage } from "./chat/message-persistence";
+import { processLeadHandling } from "./chat/lead-handling";
+import { getAiResponse } from "./chat/ai-response";
+import { processUsageTracking } from "./chat/usage-tracking";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -68,7 +60,6 @@ export async function updateAssistant(data: {
 
     const supabase = await createClient();
 
-    // Also update business description if provided
     if (data.business_description) {
       await supabase
         .from("businesses")
@@ -77,7 +68,6 @@ export async function updateAssistant(data: {
     }
 
     if (data.id) {
-      // Update existing
       const { error } = await supabase
         .from("assistants")
         .update({
@@ -90,7 +80,6 @@ export async function updateAssistant(data: {
 
       if (error) throw new Error(error.message);
     } else {
-      // Create new
       const { error } = await supabase.from("assistants").insert({
         business_id: business.id,
         name: data.name,
@@ -147,51 +136,6 @@ export async function updateBusinessSettings(data: {
   }
 }
 
-/**
- * Searches historical user-assistant message pairs in this business to reuse cached responses.
- */
-async function checkResponseCache(businessId: string, query: string): Promise<string | null> {
-  try {
-    const normalized = query.toLowerCase().trim().replace(/[?.!,;:]/g, "").replace(/\s+/g, " ");
-    const supabase = createServiceClient();
-    
-    // Fetch 50 most recent user messages for this business
-    const { data: matchedMsgs } = await supabase
-      .from("messages")
-      .select("conversation_id, created_at, content")
-      .eq("business_id", businessId)
-      .eq("role", "user")
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    if (!matchedMsgs || matchedMsgs.length === 0) return null;
-
-    const match = matchedMsgs.find(m => {
-      const normMsg = m.content.toLowerCase().trim().replace(/[?.!,;:]/g, "").replace(/\s+/g, " ");
-      return normMsg === normalized;
-    });
-
-    if (!match) return null;
-
-    // Fetch the assistant response in that conversation immediately after
-    const { data: replyMsg } = await supabase
-      .from("messages")
-      .select("content")
-      .eq("conversation_id", match.conversation_id)
-      .eq("role", "assistant")
-      .gt("created_at", match.created_at)
-      .order("created_at", { ascending: true })
-      .limit(1);
-
-    if (replyMsg && replyMsg.length > 0) {
-      return replyMsg[0].content;
-    }
-  } catch (err) {
-    console.error("[FAQ Cache Error] Failed to search cache:", err);
-  }
-  return null;
-}
-
 export async function runBusinessChat({
   message,
   businessId,
@@ -212,7 +156,6 @@ export async function runBusinessChat({
   featureSource?: FeatureSource;
 }) {
   const supabase = createServiceClient();
-  let currentConversationId = conversationId;
   const computedFeatureSource = featureSource || (
     isDemo 
       ? "demo_generation" 
@@ -245,12 +188,11 @@ export async function runBusinessChat({
       throw new Error("This demo assistant has expired.");
     }
   } else {
-    // Enforce active subscription status, monthly limits, and daily caps centrally
     const checkResult = await verifyAIUsageLimits(businessId);
     if (!checkResult.allowed) {
       return {
         success: false,
-        conversationId: currentConversationId || "",
+        conversationId: conversationId || "",
         reply: checkResult.message || "Usage limit reached.",
         assistantMessage: null,
         limitReached: true,
@@ -276,114 +218,44 @@ export async function runBusinessChat({
 
   if (aErr || !assistant) throw new Error("Assistant not found");
 
-  // 2.5 Usage Quota Checks (Non-demo)
   const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
 
-  // 3. Resolve or Create Conversation
-  let conversation: any = null;
-  if (!currentConversationId) {
-    // Create standard conversation
-    const { data: conv, error: convError } = await supabase
-      .from("conversations")
-      .insert({
-        business_id: businessId,
-        source: source,
-        status: "open",
-        visitor_id: visitorId,
-      })
-      .select()
-      .single();
-
-    if (convError || !conv) throw new Error(`Failed to create conversation: ${convError?.message}`);
-    currentConversationId = conv.id;
-    conversation = conv;
-
-    if (isDemo && demoBusinessId) {
-      // Create demo conversation
-      await supabase.from("demo_conversations").insert({
-        id: currentConversationId,
-        demo_business_id: demoBusinessId,
-        visitor_id: visitorId,
-        source: source,
-        first_message: message,
-        last_message: message,
-        message_count: 1,
-      });
-
-      // Update demo counts atomically via RPC
-      await supabase.rpc("increment_demo_conversation_count", {
-        p_demo_id: demoBusinessId,
-      });
-
-      // Log event
-      await supabase.from("demo_events").insert({
-        demo_business_id: demoBusinessId,
-        visitor_id: visitorId,
-        event_type: "conversation_started",
-        metadata: { conversation_id: currentConversationId },
-      });
-    }
-  } else {
-    const { data: existingConversation } = await supabase
-      .from("conversations")
-      .select("*")
-      .eq("id", currentConversationId)
-      .eq("business_id", businessId)
-      .maybeSingle();
-
-    if (!existingConversation) throw new Error("Conversation not found.");
-    conversation = existingConversation;
-
-    if (isDemo && demoBusinessId) {
-      // Update demo conversation counts atomically via RPC
-      await supabase.rpc("increment_demo_conversation_msg_count", {
-        p_conv_id: currentConversationId,
-        p_last_message: message,
-      });
-
-      // Update demo messages total atomically via RPC
-      await supabase.rpc("increment_demo_message_count", {
-        p_demo_id: demoBusinessId,
-      });
-
-      // Log event
-      await supabase.from("demo_events").insert({
-        demo_business_id: demoBusinessId,
-        visitor_id: visitorId,
-        event_type: "message_sent",
-        metadata: { conversation_id: currentConversationId, length: message.length },
-      });
-    }
-  }
-
-  // 4. Save User Message
-  const { error: userMsgError } = await supabase.from("messages").insert({
-    conversation_id: currentConversationId,
-    business_id: businessId,
-    role: "user",
-    content: message,
+  // 3. Resolve or Create Conversation (extracted)
+  const { conversationId: currentConversationId, conversation } = await resolveOrCreateConversation({
+    currentConversationId: conversationId,
+    businessId,
+    visitorId,
+    source,
+    isDemo,
+    demoBusinessId,
+    message,
   });
 
-  if (userMsgError) throw new Error(`Failed to save user message: ${userMsgError.message}`);
+  // 4. Save User Message (extracted)
+  await saveUserMessage({
+    conversationId: currentConversationId!,
+    businessId,
+    message,
+  });
 
-  // If manual takeover is active, save the user message but skip AI response generation
+  // Check manual takeover
   const isManualTakeover = conversation?.is_manual_takeover || conversation?.metadata?.is_manual_takeover === true;
   if (isManualTakeover) {
     await supabase
       .from("conversations")
       .update({ updated_at: new Date().toISOString() })
-      .eq("id", currentConversationId);
+      .eq("id", currentConversationId!);
 
     return {
       success: true,
-      conversationId: currentConversationId,
+      conversationId: currentConversationId!,
       reply: null,
       assistantMessage: null,
       isManualTakeover: true,
     };
   }
 
-  // 5. RAG Retrieval & Intent Classification
+  // 5. RAG Context Retrieval
   const isContinuation = message.toLowerCase().trim() === "continue";
   let ragQuery = message;
 
@@ -410,325 +282,68 @@ export async function runBusinessChat({
     featureSource: computedFeatureSource,
   });
 
-  // 6. Lead intelligence & Contact Extraction
-  const metadata = (conversation?.metadata as any) || {};
-  const hasBuyingIntent = detectLeadIntent(message);
-  const { intentType, requestedAction } = detectConversationIntent(message);
-  const extractedInfo = extractLeadInfo(message);
-
-  let contactRequested = metadata.contact_requested || false;
-  let contactCaptured = metadata.contact_captured || false;
-
-  if (intentType !== "general_inquiry") {
-    metadata.intent_type = intentType;
-    metadata.requested_action = requestedAction;
-  }
-
-  const conversationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/conversations?id=${currentConversationId}`;
-
-  // Alerts triggering (email alerts for high intent, non-demo only)
-  if (!isDemo) {
-    if (intentType === "booking" && !metadata.booking_email_sent) {
-      metadata.booking_email_sent = true;
-      sendTransactionalEmail({
-        businessId,
-        subject: "New booking request from your AI assistant",
-        templateName: "booking-request-email",
-        react: BookingRequestEmail({
-          businessName: business.name,
-          leadName: extractedInfo.name || conversation?.visitor_name,
-          leadEmail: extractedInfo.email || conversation?.visitor_email,
-          leadPhone: extractedInfo.phone || conversation?.visitor_phone,
-          requestedAction,
-          conversationUrl,
-        }),
-      }).catch(err => console.error("Error triggering booking email:", err));
-    }
-
-    if (intentType === "support_ticket" && !metadata.support_email_sent) {
-      metadata.support_email_sent = true;
-      sendTransactionalEmail({
-        businessId,
-        subject: "New support request from your AI assistant",
-        templateName: "support-request-email",
-        react: SupportRequestEmail({
-          businessName: business.name,
-          leadName: extractedInfo.name || conversation?.visitor_name,
-          leadEmail: extractedInfo.email || conversation?.visitor_email,
-          issueSummary: message,
-          conversationUrl,
-        }),
-      }).catch(err => console.error("Error triggering support email:", err));
-    }
-  }
-
-  // Lead record updates
-  if (extractedInfo.email || extractedInfo.phone || extractedInfo.name) {
-    if (isDemo && demoBusinessId) {
-      // Upsert lead in demo_leads
-      const { data: existingLead } = await supabase
-        .from("demo_leads")
-        .select("id")
-        .eq("conversation_id", currentConversationId)
-        .maybeSingle();
-
-      const leadData: Record<string, any> = {
-        demo_business_id: demoBusinessId,
-        conversation_id: currentConversationId,
-        interest: requestedAction || "Demo Interaction",
-      };
-      if (extractedInfo.name) leadData.name = extractedInfo.name;
-      if (extractedInfo.email) leadData.email = extractedInfo.email;
-      if (extractedInfo.phone) leadData.phone = extractedInfo.phone;
-
-      if (existingLead) {
-        await supabase.from("demo_leads").update(leadData).eq("id", existingLead.id);
-      } else {
-        await supabase.from("demo_leads").insert(leadData);
-
-        // Update demo lead count atomically via RPC
-        await supabase.rpc("increment_demo_lead_count", {
-          p_demo_id: demoBusinessId,
-        });
-
-        await supabase.from("demo_events").insert({
-          demo_business_id: demoBusinessId,
-          visitor_id: visitorId,
-          event_type: "lead_captured",
-          metadata: { conversation_id: currentConversationId, lead_info: extractedInfo },
-        });
-
-        await supabase
-          .from("demo_conversations")
-          .update({ lead_captured: true })
-          .eq("id", currentConversationId);
-      }
-    } else {
-      // Standard lead pipeline
-      const leadUpdate: any = {
-        business_id: businessId,
-        conversation_id: currentConversationId,
-        source: source,
-      };
-      if (extractedInfo.email) leadUpdate.email = extractedInfo.email;
-      if (extractedInfo.phone) leadUpdate.phone = extractedInfo.phone;
-      if (extractedInfo.name) leadUpdate.name = extractedInfo.name;
-      if (intentType !== "general_inquiry") leadUpdate.interest = requestedAction;
-
-      const { data: existingLead } = await supabase
-        .from("leads")
-        .select("id")
-        .eq("conversation_id", currentConversationId)
-        .eq("business_id", businessId)
-        .maybeSingle();
-
-      if (existingLead) {
-        await supabase.from("leads").update(leadUpdate).eq("id", existingLead.id);
-      } else {
-        const leadCheck = await checkUsageLimit(businessId, "lead");
-        if (!leadCheck.allowed) {
-          metadata.lead_limit_reached = true;
-        } else {
-          const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
-          if (!leadInsertError) {
-            await sendTransactionalEmail({
-              businessId,
-              subject: "New lead captured by Agentify",
-              templateName: "new-lead-email",
-              react: NewLeadEmail({
-                businessName: business.name,
-                leadName: extractedInfo.name,
-                leadEmail: extractedInfo.email,
-                leadPhone: extractedInfo.phone,
-                interest: intentType !== "general_inquiry" ? requestedAction : null,
-                intentType,
-                conversationUrl,
-              }),
-            });
-            await incrementUsage(businessId, "lead", 1, { conversation_id: currentConversationId });
-          }
-        }
-      }
-    }
-
-    if (extractedInfo.email || extractedInfo.phone) {
-      contactCaptured = true;
-      metadata.contact_captured = true;
-      metadata.email_collected_early = true;
-      
-      const convUpdate: any = { lead_captured: true };
-      if (extractedInfo.email) convUpdate.visitor_email = extractedInfo.email;
-      if (extractedInfo.name) convUpdate.visitor_name = extractedInfo.name;
-      if (extractedInfo.phone) convUpdate.visitor_phone = extractedInfo.phone;
-      
-      await supabase
-        .from("conversations")
-        .update(convUpdate)
-        .eq("id", currentConversationId);
-    }
-  }
-
-  if (!contactRequested && !contactCaptured) {
-    metadata.contact_requested = true;
-  }
-
-  await supabase
-    .from("conversations")
-    .update({ 
-      metadata,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", currentConversationId);
+  // 6. Lead intelligence & Contact Extraction (extracted)
+  const leadResult = await processLeadHandling({
+    message,
+    businessId,
+    conversationId: currentConversationId!,
+    visitorId,
+    source,
+    isDemo,
+    demoBusinessId,
+    businessName: business.name,
+    conversation,
+  });
 
   // 7. Conversation Summary & Memory History
   const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId, computedFeatureSource);
-  const history = await getRecentConversationMessages(currentConversationId!, 4); // Limit memory history to 4 turns instead of 8
+  const history = await getRecentConversationMessages(currentConversationId!, 4);
 
-  // 8. Generate Prompt & Call AI Engine (with FAQ Cache check)
-  let finalReply: string;
-  let chatResponse: { provider: string; model: string; latencyMs: number } | null = null;
-  
-  const cachedAnswer = await checkResponseCache(businessId, message);
+  // 8. Generate Prompt & Call AI Engine (extracted)
+  const { finalReply, chatResponse, cachedAnswer } = await getAiResponse({
+    message,
+    businessId,
+    conversationId: currentConversationId!,
+    isDemo,
+    business,
+    assistant,
+    formattedContext,
+    metadata: leadResult.metadata,
+    summary,
+    history,
+    computedFeatureSource,
+  });
 
-  if (cachedAnswer) {
-    console.log(`[AI Engine] FAQ Cache Hit for business ${businessId}. Query: "${message}"`);
-    finalReply = cachedAnswer;
-    chatResponse = {
-      provider: "cache",
-      model: "cache",
-      latencyMs: 0,
-    };
-  } else {
-    let promptInstructions = buildBusinessSystemPrompt({
-      business,
-      assistant,
-      contextText: formattedContext,
-      isDemo,
-      metadata: {
-        ...metadata,
-        email_collected_early: metadata.email_collected_early,
-        phone_collected: !!(extractedInfo.phone || conversation?.visitor_phone),
-      }
-    });
+  // 9. Save Assistant Response (extracted)
+  const savedAssistantMsg = await saveAssistantMessage({
+    conversationId: currentConversationId!,
+    businessId,
+    content: finalReply,
+    chunks,
+    intent,
+    cachedAnswer,
+    chatResponse,
+  });
 
-    if (summary) {
-      promptInstructions = `[Conversation Summary of previous messages: ${summary}]\n\n` + promptInstructions;
-    }
-
-    if (isContinuation) {
-      promptInstructions += `\n\n# CONTINUATION INSTRUCTION\n- The user has requested that you "Continue" your response from where you stopped. Please resume writing your previous response from exactly where it was cut off or stopped. Do NOT repeat the parts you have already written; simply resume writing and complete the explanation smoothly. Ensure the continuation connects naturally to the last sentence of your previous message.`;
-    }
-
-    // Call the core AI router
-    const rawChatResponse = await generateChatResponse({
-      provider: assistant.provider,
-      model: assistant.chat_model,
-      systemInstruction: promptInstructions,
-      userMessage: message,
-      history,
-      temperature: Number(assistant.temperature) || 0.4,
-      businessId,
-      conversationId: currentConversationId,
-      featureSource: computedFeatureSource,
-    });
-
-    chatResponse = {
-      provider: rawChatResponse.provider,
-      model: rawChatResponse.model,
-      latencyMs: rawChatResponse.latencyMs,
-    };
-
-    // 9. Quality Evaluation Check
-    const quality = runResponseQualityChecks(rawChatResponse.text, business, formattedContext);
-    finalReply = quality.sanitizedText;
-  }
-
-  // 10. Save Assistant Response
-  const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
-    .from("messages")
-    .insert({
-      conversation_id: currentConversationId,
-      business_id: businessId,
-      role: "assistant",
-      content: finalReply,
-      retrieved_chunks: chunks || [],
-      metadata: {
-        intent,
-        quality_passed: !cachedAnswer ? true : false,
-        provider: chatResponse.provider,
-        model: chatResponse.model,
-        latency_ms: chatResponse.latencyMs,
-      }
-    })
-    .select()
-    .single();
-
-  if (assistantMsgError) throw new Error(`Failed to save assistant response: ${assistantMsgError.message}`);
-
-  // 11. Usage Increments (Non-demo)
+  // 10. Usage Increments (extracted)
   if (!isDemo) {
-    await incrementUsage(businessId, usageType, 1, {
-      conversation_id: currentConversationId,
+    await processUsageTracking({
+      businessId,
+      conversationId: currentConversationId!,
       source,
-      cached: !!cachedAnswer,
+      usageType,
+      cachedAnswer,
+      businessName: business.name,
     });
-
-    // Check for 80% usage threshold warning
-    const finalCheck = await checkUsageLimit(businessId, usageType);
-    const limit = finalCheck.limit;
-    const used = finalCheck.used;
-    const percentage = limit > 0 ? (used / limit) * 100 : 0;
-
-    if (percentage >= 80) {
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("business_id", businessId)
-        .maybeSingle();
-
-      if (sub) {
-        const now = new Date();
-        const periodStartStr = sub.current_period_start || sub.created_at;
-        const periodStart = new Date(periodStartStr);
-        const warningSent80AtStr = sub.metadata?.warning_sent_80_message;
-        let hasSent80 = false;
-        if (warningSent80AtStr && new Date(warningSent80AtStr) >= periodStart) {
-          hasSent80 = true;
-        }
-
-        if (!hasSent80) {
-          const updatedMetadata = {
-            ...(sub.metadata || {}),
-            warning_sent_80_message: now.toISOString(),
-          };
-          await supabase
-            .from("subscriptions")
-            .update({ metadata: updatedMetadata })
-            .eq("id", sub.id);
-
-          sendTransactionalEmail({
-            businessId,
-            subject: "You’re nearing your Agentify usage limit",
-            templateName: "usage-warning-email",
-            react: UsageWarningEmail({
-              businessName: business.name,
-              usageType: "AI messages",
-              percentage: Math.round(percentage),
-              billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
-            }),
-          }).catch(err => console.error("Error sending 80% warning email:", err));
-        }
-      }
-    }
   }
 
   return {
     success: true,
-    conversationId: currentConversationId,
+    conversationId: currentConversationId!,
     reply: finalReply,
     assistantMessage: savedAssistantMsg,
     intent,
-    latencyMs: chatResponse.latencyMs,
+    latencyMs: chatResponse?.latencyMs || 0,
   };
 }
 
@@ -763,8 +378,66 @@ export async function sendDashboardTestMessage({
       retrievedChunks: result.assistantMessage?.retrieved_chunks || [],
     };
   } catch (err: any) {
-    logErrorSync(err, "ai-provider");
-    return { error: getUserFriendlyError("ai-provider") };
+    console.error("Error in sendDashboardTestMessage:", err);
+    return { error: err.message || "Failed to send test message." };
+  }
+}
+
+export async function deleteAssistant(id: string) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    const { data: assistant } = await supabase
+      .from("assistants")
+      .select("is_active")
+      .eq("id", id)
+      .eq("business_id", business.id)
+      .single();
+
+    if (assistant?.is_active) {
+      throw new Error("You cannot delete your active assistant. Set another assistant as active first.");
+    }
+
+    const { error } = await supabase
+      .from("assistants")
+      .delete()
+      .eq("id", id)
+      .eq("business_id", business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/assistant");
+    revalidatePath("/dashboard/playground");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in deleteAssistant:", err);
+    return { error: err.message || "Failed to delete assistant" };
+  }
+}
+
+export async function setActiveAssistant(assistantId: string) {
+  try {
+    const business = await getCurrentBusiness();
+    if (!business) throw new Error("No business found");
+
+    const supabase = await createClient();
+
+    const { error: rpcError } = await supabase.rpc("set_active_assistant", {
+      p_business_id: business.id,
+      p_assistant_id: assistantId,
+    });
+
+    if (rpcError) throw rpcError;
+
+    revalidatePath("/dashboard/assistant");
+    revalidatePath("/dashboard/playground");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error in setActiveAssistant:", err);
+    return { error: err.message || "Failed to activate assistant" };
   }
 }
 
@@ -800,7 +473,6 @@ export async function getBusinessConversations() {
 
   if (error) throw new Error(error.message);
   
-  // Sort messages in JS to guarantee last_message matches the absolute latest message
   return data.map((conv: any) => {
     const sortedMessages = [...(conv.messages || [])].sort(
       (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -824,7 +496,6 @@ export async function toggleManualTakeover({
     if (!business) throw new Error("No business found");
     const supabase = await createClient();
 
-    // 1. Fetch current metadata
     const { data: conv, error: fetchErr } = await supabase
       .from("conversations")
       .select("metadata")
@@ -840,7 +511,6 @@ export async function toggleManualTakeover({
       is_manual_takeover: isManual,
     };
 
-    // 2. Try to update both is_manual_takeover and metadata (for migration resilience)
     try {
       const { error: primaryError } = await supabase
         .from("conversations")
@@ -893,7 +563,6 @@ export async function sendManualMessage({
     if (!business) throw new Error("No business found");
     const supabase = await createClient();
 
-    // 1. Verify conversation belongs to this business
     const { data: conv, error: convErr } = await supabase
       .from("conversations")
       .select("id")
@@ -903,7 +572,6 @@ export async function sendManualMessage({
 
     if (convErr || !conv) throw new Error("Conversation not found");
 
-    // 2. Insert manual message with metadata is_manual: true
     const { error: msgErr } = await supabase
       .from("messages")
       .insert({
@@ -916,7 +584,6 @@ export async function sendManualMessage({
 
     if (msgErr) throw msgErr;
 
-    // 3. Update conversation's updated_at timestamp to bubble it to the top
     await supabase
       .from("conversations")
       .update({ updated_at: new Date().toISOString() })
@@ -929,9 +596,6 @@ export async function sendManualMessage({
   }
 }
 
-/**
- * Retrieves all assistants for the current business.
- */
 export async function getAssistants() {
   try {
     const business = await getCurrentBusiness();
@@ -952,9 +616,6 @@ export async function getAssistants() {
   }
 }
 
-/**
- * Creates a new assistant for the current business.
- */
 export async function createAssistant(data: {
   name: string;
   tone: string;
@@ -966,7 +627,6 @@ export async function createAssistant(data: {
 
     const supabase = await createClient();
 
-    // 1. Fetch current subscription to verify widget_limit
     const { data: sub } = await supabase
       .from("subscriptions")
       .select("widget_limit")
@@ -975,7 +635,6 @@ export async function createAssistant(data: {
 
     const limit = sub?.widget_limit || 1;
 
-    // 2. Count existing assistants
     const { count, error: countErr } = await supabase
       .from("assistants")
       .select("*", { count: "exact", head: true })
@@ -987,7 +646,6 @@ export async function createAssistant(data: {
       return { error: `You've reached the maximum number of assistants (${limit}) allowed under your current plan. Please upgrade to create more.` };
     }
 
-    // 3. Create the new assistant (default is_active to false since they can toggle it later)
     const { data: newAsst, error } = await supabase
       .from("assistants")
       .insert({
@@ -1009,92 +667,3 @@ export async function createAssistant(data: {
     return { error: err.message || "Failed to create assistant" };
   }
 }
-
-/**
- * Deletes an assistant. If it was active, sets another remaining assistant as active.
- */
-export async function deleteAssistant(assistantId: string) {
-  try {
-    const business = await getCurrentBusiness();
-    if (!business) throw new Error("No business found");
-
-    const supabase = await createClient();
-
-    // 1. Fetch assistant details
-    const { data: assistant, error: fetchErr } = await supabase
-      .from("assistants")
-      .select("*")
-      .eq("id", assistantId)
-      .eq("business_id", business.id)
-      .single();
-
-    if (fetchErr || !assistant) {
-      return { error: "Assistant not found" };
-    }
-
-    // Count remaining assistants
-    const { data: remaining } = await supabase
-      .from("assistants")
-      .select("id, is_active")
-      .eq("business_id", business.id)
-      .neq("id", assistantId)
-      .order("created_at", { ascending: true });
-
-    if (!remaining || remaining.length === 0) {
-      return { error: "You must keep at least one assistant configuration." };
-    }
-
-    // 2. Delete the assistant
-    const { error: deleteErr } = await supabase
-      .from("assistants")
-      .delete()
-      .eq("id", assistantId);
-
-    if (deleteErr) throw deleteErr;
-
-    // 3. If the deleted assistant was active, mark the first remaining one as active
-    if (assistant.is_active) {
-      const { error: activateErr } = await supabase
-        .from("assistants")
-        .update({ is_active: true })
-        .eq("id", remaining[0].id);
-      
-      if (activateErr) throw activateErr;
-    }
-
-    revalidatePath("/dashboard/assistant");
-    revalidatePath("/dashboard/playground");
-    return { success: true };
-  } catch (err: any) {
-    console.error("Error in deleteAssistant:", err);
-    return { error: err.message || "Failed to delete assistant" };
-  }
-}
-
-/**
- * Sets an assistant as the active one and deactivates others.
- */
-export async function setActiveAssistant(assistantId: string) {
-  try {
-    const business = await getCurrentBusiness();
-    if (!business) throw new Error("No business found");
-
-    const supabase = await createClient();
-
-    // Call transactional RPC to set active assistant
-    const { error: rpcError } = await supabase.rpc("set_active_assistant", {
-      p_business_id: business.id,
-      p_assistant_id: assistantId,
-    });
-
-    if (rpcError) throw rpcError;
-
-    revalidatePath("/dashboard/assistant");
-    revalidatePath("/dashboard/playground");
-    return { success: true };
-  } catch (err: any) {
-    console.error("Error in setActiveAssistant:", err);
-    return { error: err.message || "Failed to activate assistant" };
-  }
-}
-
