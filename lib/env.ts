@@ -119,6 +119,16 @@ export function validateEnv(): void {
     }
   }
 
+  // Check for required production rate limiter variables
+  if (process.env.NODE_ENV === "production") {
+    if (!process.env.UPSTASH_REDIS_REST_URL) {
+      missing.push("  - UPSTASH_REDIS_REST_URL\n    Required for production rate limiting via Upstash Redis");
+    }
+    if (!process.env.UPSTASH_REDIS_REST_TOKEN) {
+      missing.push("  - UPSTASH_REDIS_REST_TOKEN\n    Required for production rate limiting via Upstash Redis");
+    }
+  }
+
   const publicEnvKeys = Object.keys(process.env).filter((key) =>
     key.startsWith("NEXT_PUBLIC_")
   );

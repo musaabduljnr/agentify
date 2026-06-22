@@ -74,7 +74,7 @@ export function HostedChatClient({
       if (isSending) return;
 
       try {
-        const res = await fetch(`/api/widget/chat/history?conversationId=${conversationId}&_=${Date.now()}`);
+        const res = await fetch(`/api/widget/chat/history?conversationId=${conversationId}&visitorId=${visitorIdRef.current}&_=${Date.now()}`);
         const data = await res.json();
         if (data.messages && Array.isArray(data.messages)) {
           const formatted = data.messages.map((m: any) => ({

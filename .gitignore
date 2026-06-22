@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch and debug files
+scratch_*
+test_*
+*.log
+/coverage/
+.vitest/
+/tests-results/
+.env.local
+.env.*.local
+nul
+/nul
+
+

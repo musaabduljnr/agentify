@@ -1,5 +1,0 @@
-Agentify is a premium 24/7 AI sales assistant builder for modern websites.
-It empowers SaaS platforms and business owners to deploy customized AI agents that capture leads, answer product questions, and provide conversation intelligence.
-Agentify supports integrating manual text, FAQs, scraped websites, and uploaded business documents (PDF, DOCX, TXT) to build a robust retrieval-augmented generation (RAG) knowledge engine.
-The platform features tier-based resource constraints, automated usage limit enforcement, and beautiful real-time analytics dashboards showing lead conversion rates, popular inquiries, and unanswered questions.
-Agentify was developed using Next.js 16, Supabase, TailwindCSS, and Vertex AI models.

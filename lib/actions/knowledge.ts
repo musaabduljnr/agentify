@@ -185,6 +185,40 @@ export async function createManualSource(formData: { title: string; content: str
   return { success: true };
 }
 
+export async function getSignedUploadUrlAction(formData: {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+}) {
+  try {
+    const business = await getCurrentBusiness();
+    
+    const fileValidation = validateFileUpload(formData.fileName, formData.fileType, formData.fileSize);
+    if (!fileValidation.valid) {
+      return { error: fileValidation.error || "Invalid file upload." };
+    }
+
+    const { buildStoragePath } = await import("@/lib/security/file-upload");
+    const filePath = buildStoragePath(business.id, formData.fileName);
+
+    const serviceClient = createServiceClient();
+    const { data, error } = await serviceClient.storage
+      .from("business-documents")
+      .createSignedUploadUrl(filePath);
+
+    if (error || !data) {
+      throw new Error(`Failed to generate signed upload URL: ${error?.message}`);
+    }
+
+    return {
+      signedUrl: data.signedUrl,
+      filePath: filePath,
+    };
+  } catch (err: any) {
+    return { error: err.message || "Failed to generate signed upload URL." };
+  }
+}
+
 export async function createDocumentSource(formData: {
   title: string;
   file_name: string;

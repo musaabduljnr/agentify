@@ -310,20 +310,10 @@ export async function runBusinessChat({
         message_count: 1,
       });
 
-      // Update demo counts
-      const { data: demo } = await supabase
-        .from("demo_businesses")
-        .select("conversation_count")
-        .eq("id", demoBusinessId)
-        .single();
-
-      await supabase
-        .from("demo_businesses")
-        .update({
-          conversation_count: (demo?.conversation_count || 0) + 1,
-          last_activity_at: new Date().toISOString(),
-        })
-        .eq("id", demoBusinessId);
+      // Update demo counts atomically via RPC
+      await supabase.rpc("increment_demo_conversation_count", {
+        p_demo_id: demoBusinessId,
+      });
 
       // Log event
       await supabase.from("demo_events").insert({
@@ -345,36 +335,16 @@ export async function runBusinessChat({
     conversation = existingConversation;
 
     if (isDemo && demoBusinessId) {
-      // Update demo conversation counts
-      const { data: demoConv } = await supabase
-        .from("demo_conversations")
-        .select("message_count")
-        .eq("id", currentConversationId)
-        .single();
+      // Update demo conversation counts atomically via RPC
+      await supabase.rpc("increment_demo_conversation_msg_count", {
+        p_conv_id: currentConversationId,
+        p_last_message: message,
+      });
 
-      await supabase
-        .from("demo_conversations")
-        .update({
-          last_message: message,
-          message_count: (demoConv?.message_count || 0) + 1,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", currentConversationId);
-
-      // Update demo messages total
-      const { data: demo } = await supabase
-        .from("demo_businesses")
-        .select("total_message_count")
-        .eq("id", demoBusinessId)
-        .single();
-
-      await supabase
-        .from("demo_businesses")
-        .update({
-          total_message_count: (demo?.total_message_count || 0) + 1,
-          last_activity_at: new Date().toISOString(),
-        })
-        .eq("id", demoBusinessId);
+      // Update demo messages total atomically via RPC
+      await supabase.rpc("increment_demo_message_count", {
+        p_demo_id: demoBusinessId,
+      });
 
       // Log event
       await supabase.from("demo_events").insert({
@@ -516,16 +486,10 @@ export async function runBusinessChat({
       } else {
         await supabase.from("demo_leads").insert(leadData);
 
-        const { data: demo } = await supabase
-          .from("demo_businesses")
-          .select("lead_count")
-          .eq("id", demoBusinessId)
-          .single();
-
-        await supabase
-          .from("demo_businesses")
-          .update({ lead_count: (demo?.lead_count || 0) + 1 })
-          .eq("id", demoBusinessId);
+        // Update demo lead count atomically via RPC
+        await supabase.rpc("increment_demo_lead_count", {
+          p_demo_id: demoBusinessId,
+        });
 
         await supabase.from("demo_events").insert({
           demo_business_id: demoBusinessId,
@@ -1117,23 +1081,13 @@ export async function setActiveAssistant(assistantId: string) {
 
     const supabase = await createClient();
 
-    // Set all other assistants to is_active = false
-    const { error: deactivateError } = await supabase
-      .from("assistants")
-      .update({ is_active: false })
-      .eq("business_id", business.id)
-      .neq("id", assistantId);
+    // Call transactional RPC to set active assistant
+    const { error: rpcError } = await supabase.rpc("set_active_assistant", {
+      p_business_id: business.id,
+      p_assistant_id: assistantId,
+    });
 
-    if (deactivateError) throw deactivateError;
-
-    // Set target assistant to is_active = true
-    const { error: activateError } = await supabase
-      .from("assistants")
-      .update({ is_active: true })
-      .eq("id", assistantId)
-      .eq("business_id", business.id);
-
-    if (activateError) throw activateError;
+    if (rpcError) throw rpcError;
 
     revalidatePath("/dashboard/assistant");
     revalidatePath("/dashboard/playground");

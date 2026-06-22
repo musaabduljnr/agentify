@@ -4,9 +4,8 @@ import { useState } from "react";
 import { Upload, FileText, File, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { createDocumentSource, getBusinessIdForUpload } from "@/lib/actions/knowledge";
-import { createClient } from "@/utils/supabase/client";
-import { buildStoragePath, validateFileUpload } from "@/lib/security/file-upload";
+import { createDocumentSource, getSignedUploadUrlAction } from "@/lib/actions/knowledge";
+import { validateFileUpload } from "@/lib/security/file-upload";
 
 const MAX_SIZE_MB = 10;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
@@ -57,22 +56,30 @@ export function DocumentSourceForm() {
     setSuccess(false);
 
     try {
-      // 1. Get business ID for storage path
-      const businessId = await getBusinessIdForUpload();
-      
-      // 2. Upload file to Supabase Storage
-      const supabase = createClient();
-      const filePath = buildStoragePath(businessId, file.name);
-      
-      const { error: uploadError } = await supabase.storage
-        .from("business-documents")
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-        
-      if (uploadError) {
-        throw new Error(`Failed to upload file: ${uploadError.message}`);
+      // 1. Get signed upload URL and filePath from the server
+      const signedData = await getSignedUploadUrlAction({
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+      });
+
+      if (signedData.error || !signedData.signedUrl || !signedData.filePath) {
+        throw new Error(signedData.error || "Failed to generate signed upload URL.");
+      }
+
+      const { signedUrl, filePath } = signedData;
+
+      // 2. Upload file to Supabase Storage via signed URL
+      const response = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type,
+        },
+        body: file,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to upload file to storage: ${response.statusText}`);
       }
       
       // 3. Create knowledge source record

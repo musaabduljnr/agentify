@@ -452,7 +452,7 @@
 
       pollingInterval = setInterval(async () => {
         try {
-          const res = await fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}&_=${Date.now()}`);
+          const res = await fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}&visitorId=${visitorId}&_=${Date.now()}`);
           const data = await res.json();
 
           if (data.messages && data.messages.length > renderedMessageCount) {
@@ -584,7 +584,7 @@
 
     // Start history polling if already have a conversationId
     if (conversationId) {
-      fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}&_=${Date.now()}`)
+      fetch(`${baseUrl}/api/widget/chat/history?conversationId=${conversationId}&visitorId=${visitorId}&_=${Date.now()}`)
         .then(res => res.json())
         .then(data => {
           if (data.messages && data.messages.length > 0) {

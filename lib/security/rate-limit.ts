@@ -152,6 +152,20 @@ export async function rateLimit(
   const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
   const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
+  if (process.env.NODE_ENV === "production") {
+    if (!upstashUrl || !upstashToken) {
+      console.error("[RateLimit] CRITICAL: Upstash Redis credentials are missing in production!");
+      // Fail safely (open): allow the request but do not fall back to in-memory store in production
+      return {
+        success: true,
+        remaining: 1,
+        reset: Math.floor(Date.now() / 1000) + config.window,
+        limit: config.requests,
+      };
+    }
+    return upstashRateLimit(key, config, upstashUrl, upstashToken);
+  }
+
   if (upstashUrl && upstashToken) {
     return upstashRateLimit(key, config, upstashUrl, upstashToken);
   }

@@ -36,20 +36,22 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: "Demo not found" }, { status: 404 });
     }
 
-    // Process counters
-    const updatePayload: Record<string, any> = {};
+    // Process counters atomically via RPC
+    let visitorInc = 0;
+    let pageViewInc = 0;
     if (eventType === "unique_visitor") {
-      updatePayload.unique_visitor_count = (demo.unique_visitor_count || 0) + 1;
-      updatePayload.page_view_count = (demo.page_view_count || 0) + 1;
+      visitorInc = 1;
+      pageViewInc = 1;
     } else if (eventType === "page_viewed") {
-      updatePayload.page_view_count = (demo.page_view_count || 0) + 1;
+      pageViewInc = 1;
     }
 
-    if (Object.keys(updatePayload).length > 0) {
-      await supabase
-        .from("demo_businesses")
-        .update(updatePayload)
-        .eq("id", demoBusinessId);
+    if (visitorInc > 0 || pageViewInc > 0) {
+      await supabase.rpc("increment_demo_visitor_stats", {
+        p_demo_id: demoBusinessId,
+        p_visitor_inc: visitorInc,
+        p_page_view_inc: pageViewInc,
+      });
     }
 
     // Insert event

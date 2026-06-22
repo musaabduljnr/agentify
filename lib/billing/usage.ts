@@ -29,10 +29,10 @@ export async function incrementUsage(
 ): Promise<void> {
   const supabase = createServiceClient();
 
-  // Get the subscription ID
+  // Get the subscription ID and current_usage
   const { data: sub } = await supabase
     .from("subscriptions")
-    .select("id")
+    .select("id, current_usage")
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -53,12 +53,12 @@ export async function incrementUsage(
     }).then(({ error }) => {
       // Fallback: update directly if RPC doesn't exist
       if (error) {
+        console.warn("[Usage] increment_subscription_usage RPC failed or missing, falling back", error);
+        const currentVal = sub?.current_usage ?? 0;
         supabase
           .from("subscriptions")
           .update({
-            current_usage: (sub as any)?.current_usage 
-              ? (sub as any).current_usage + amount 
-              : amount,
+            current_usage: Math.max(0, currentVal + amount),
           })
           .eq("business_id", businessId)
           .then(() => {});
