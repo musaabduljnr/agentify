@@ -5,6 +5,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/service";
 import { getBusinessSubscription, getCurrentPlan, getRemainingUsage } from "@/lib/billing/subscription";
 import { getUsageSummary } from "@/lib/billing/usage";
 import { PLAN_ORDER } from "@/lib/billing/plans";
@@ -13,6 +14,7 @@ import {
   getBillingPlatformSettings,
   getEffectivePlanConfigs,
 } from "@/lib/billing/platform";
+import { revalidatePath } from "next/cache";
 
 async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -133,5 +135,110 @@ export async function getUsageWarnings() {
   } catch (err: any) {
     console.error("getUsageWarnings error:", err);
     return [];
+  }
+}
+
+/**
+ * Mark the current subscription to cancel at the end of the billing period.
+ * The subscription remains active until the period ends.
+ */
+export async function cancelSubscriptionAtPeriodEnd() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const business = await getCurrentBusiness();
+    if (!business) return { error: "No business found." };
+
+    const serviceClient = createServiceClient();
+    const { error } = await serviceClient
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("business_id", business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/billing");
+    return { success: true };
+  } catch (err: any) {
+    console.error("cancelSubscriptionAtPeriodEnd error:", err);
+    return { error: "Failed to cancel subscription. Please try again." };
+  }
+}
+
+/**
+ * Reactivate a subscription that was marked to cancel at period end.
+ */
+export async function reactivateSubscription() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const business = await getCurrentBusiness();
+    if (!business) return { error: "No business found." };
+
+    const serviceClient = createServiceClient();
+    const { error } = await serviceClient
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("business_id", business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/billing");
+    return { success: true };
+  } catch (err: any) {
+    console.error("reactivateSubscription error:", err);
+    return { error: "Failed to reactivate subscription. Please try again." };
+  }
+}
+
+/**
+ * Record a downgrade intent — no immediate charge change.
+ * The actual downgrade takes effect at the next billing period.
+ */
+export async function requestDowngrade(targetPlan: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const business = await getCurrentBusiness();
+    if (!business) return { error: "No business found." };
+
+    const allowedDowngrades = ["free_trial", "starter"];
+    if (!allowedDowngrades.includes(targetPlan)) {
+      return { error: "Invalid target plan for downgrade." };
+    }
+
+    const serviceClient = createServiceClient();
+    // Record intent in subscription metadata
+    const { error } = await serviceClient
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: true,
+        metadata: {
+          downgrade_to: targetPlan,
+          downgrade_requested_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("business_id", business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/billing");
+    return { success: true, message: `Your plan will be downgraded to ${targetPlan} at the end of your billing period.` };
+  } catch (err: any) {
+    console.error("requestDowngrade error:", err);
+    return { error: "Failed to request downgrade. Please try again." };
   }
 }

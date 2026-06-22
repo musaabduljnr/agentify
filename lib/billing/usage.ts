@@ -6,6 +6,7 @@
 
 import { createServiceClient } from "@/utils/supabase/service";
 import { getEffectivePlanConfig } from "@/lib/billing/platform";
+import { getCachedUsage, setCachedUsage, invalidateUsageCache } from "@/lib/billing/usage-cache";
 
 export type UsageType = "message" | "embedding" | "lead" | "knowledge_source" | "widget_chat";
 
@@ -29,10 +30,10 @@ export async function incrementUsage(
 ): Promise<void> {
   const supabase = createServiceClient();
 
-  // Get the subscription ID and current_usage
+  // Get the subscription ID
   const { data: sub } = await supabase
     .from("subscriptions")
-    .select("id, current_usage")
+    .select("id")
     .eq("business_id", businessId)
     .maybeSingle();
 
@@ -51,20 +52,14 @@ export async function incrementUsage(
       p_business_id: businessId,
       p_amount: amount,
     }).then(({ error }) => {
-      // Fallback: update directly if RPC doesn't exist
       if (error) {
-        console.warn("[Usage] increment_subscription_usage RPC failed or missing, falling back", error);
-        const currentVal = sub?.current_usage ?? 0;
-        supabase
-          .from("subscriptions")
-          .update({
-            current_usage: Math.max(0, currentVal + amount),
-          })
-          .eq("business_id", businessId)
-          .then(() => {});
+        console.warn("[Usage] increment_subscription_usage RPC failed", error);
       }
     });
   }
+
+  // Invalidate cache on every write so next check is fresh
+  invalidateUsageCache(businessId);
 }
 
 /**
@@ -143,8 +138,20 @@ export async function checkUsageLimit(
 
 /**
  * Get a complete usage summary for a business.
+ * Uses cache when available; falls back to DB on miss.
  */
 export async function getUsageSummary(businessId: string) {
+  // Check cache first
+  const cached = getCachedUsage(businessId);
+  if (cached) {
+    return {
+      messages: cached.messages,
+      embeddings: cached.embeddings,
+      leads: cached.leads,
+      knowledge_sources: cached.knowledge_sources,
+    };
+  }
+
   const [messages, embeddings, leads, knowledge] = await Promise.all([
     checkUsageLimit(businessId, "message"),
     checkUsageLimit(businessId, "embedding"),
@@ -152,12 +159,12 @@ export async function getUsageSummary(businessId: string) {
     checkUsageLimit(businessId, "knowledge_source"),
   ]);
 
-  return {
-    messages,
-    embeddings,
-    leads,
-    knowledge_sources: knowledge,
-  };
+  const snapshot = { messages, embeddings, leads, knowledge_sources: knowledge };
+
+  // Populate cache
+  setCachedUsage(businessId, snapshot);
+
+  return snapshot;
 }
 
 /**

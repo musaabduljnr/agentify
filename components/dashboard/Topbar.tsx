@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Bell, Menu, User, Bot, Building2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { DashboardNotification } from "@/lib/queries/notifications";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -78,6 +79,11 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
       </div>
 
       <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+        {/* Language Switcher */}
+        <div className="hidden sm:block">
+          <LanguageSwitcher />
+        </div>
+
         <div className="relative" ref={containerRef}>
           <button
             onClick={() => setOpen((value) => !value)}

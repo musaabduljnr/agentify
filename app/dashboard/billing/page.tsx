@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { getPaymentHistory } from "@/lib/actions/payments";
 import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
+import { CancelPlanDialog } from "@/components/billing/cancel-plan-dialog";
 import { Button } from "@/components/ui/button";
 import {
   CreditCard,
@@ -254,6 +255,22 @@ export default async function BillingPage({
               </div>
             </div>
           </div>
+
+          {/* Cancel / Reactivate */}
+          {subscription.plan !== "free_trial" && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+              <h4 className="text-base font-bold text-slate-900 mb-1">Manage Subscription</h4>
+              <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                {subscription.cancel_at_period_end
+                  ? "Your subscription is scheduled for cancellation. You can reactivate it before the period ends."
+                  : "You can cancel your subscription at any time. It will remain active until the end of your billing period."}
+              </p>
+              <CancelPlanDialog
+                cancelAtPeriodEnd={!!subscription.cancel_at_period_end}
+                periodEndDate={resetDate}
+              />
+            </div>
+          )}
 
           {/* Secure Payment Infrastructure Header */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">

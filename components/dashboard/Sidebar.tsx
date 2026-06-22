@@ -15,7 +15,10 @@ import {
   X,
   LogOut,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Archive,
+  UserCheck,
+  Webhook
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -26,11 +29,14 @@ const menuItems = [
   { icon: Sparkles, label: "AI Playground", href: "/dashboard/playground" },
   { icon: MessageSquare, label: "Knowledge Base", href: "/dashboard/knowledge" },
   { icon: Users, label: "Conversations", href: "/dashboard/conversations" },
+  { icon: Archive, label: "Archived", href: "/dashboard/conversations/archived" },
   { icon: Users, label: "Leads", href: "/dashboard/leads" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
   { icon: Paintbrush, label: "Widget", href: "/dashboard/widget" },
   { icon: Code2, label: "Embed Code", href: "/dashboard/embed" },
   { icon: CreditCard, label: "Billing", href: "/dashboard/billing" },
+  { icon: UserCheck, label: "Team", href: "/dashboard/settings/team" },
+  { icon: Webhook, label: "Webhooks", href: "/dashboard/settings/webhooks" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
