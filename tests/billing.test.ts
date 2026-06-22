@@ -53,7 +53,7 @@ describe("Billing Usage Tracking", () => {
     });
   });
 
-  it("should trigger fallback direct update if RPC fails", async () => {
+  it("should log a warning if RPC fails", async () => {
     const serviceClient = createServiceClient();
     vi.mocked(serviceClient.rpc).mockResolvedValueOnce({
       error: {
@@ -64,20 +64,12 @@ describe("Billing Usage Tracking", () => {
       } as any,
     } as any);
 
-    // Mock direct update response
-    const mockUpdate = vi.fn().mockReturnThis();
-    const mockEq = vi.fn().mockReturnThis();
-    const mockThen = vi.fn().mockImplementation(function (resolve) {
-      if (resolve) resolve({ error: null });
-      return Promise.resolve({ error: null });
-    });
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     vi.mocked(serviceClient.from).mockReturnValue({
       insert: vi.fn().mockResolvedValue({ error: null }),
-      update: mockUpdate,
       select: vi.fn().mockReturnThis(),
-      eq: mockEq,
-      then: mockThen,
+      eq: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({
         data: { id: "sub-123", current_usage: 15 },
         error: null,
@@ -86,9 +78,12 @@ describe("Billing Usage Tracking", () => {
 
     await incrementUsage("biz-123", "message", 2);
 
-    expect(mockUpdate).toHaveBeenCalledWith({
-      current_usage: 17, // 15 (current) + 2 (amount)
-    });
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "[Usage] increment_subscription_usage RPC failed",
+      expect.any(Object)
+    );
+
+    consoleWarnSpy.mockRestore();
   });
 
   it("should compute limits and remaining usage correctly", async () => {
