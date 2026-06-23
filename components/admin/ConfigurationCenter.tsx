@@ -111,19 +111,33 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
       if (res.success) {
         toast.success(`Configuration '${key}' updated successfully.`);
         // Refresh local state by simulating the update
-        setConfigs((prev) =>
-          prev.map((c) => {
-            if (c.category === category && c.key === key) {
-              return {
-                ...c,
-                hasValue: true,
+        setConfigs((prev) => {
+          const exists = prev.some((c) => c.category === category && c.key === key);
+          if (exists) {
+            return prev.map((c) => {
+              if (c.category === category && c.key === key) {
+                return {
+                  ...c,
+                  hasValue: true,
+                  value: isSecret ? null : value,
+                  preview: isSecret ? `${value.substring(0, 8)}••••••${value.slice(-4)}` : value,
+                };
+              }
+              return c;
+            });
+          } else {
+            return [
+              ...prev,
+              {
+                category,
+                key,
                 value: isSecret ? null : value,
                 preview: isSecret ? `${value.substring(0, 8)}••••••${value.slice(-4)}` : value,
-              };
-            }
-            return c;
-          })
-        );
+                hasValue: true,
+              },
+            ];
+          }
+        });
         cancelEdit(category, key);
       }
     } catch (err: any) {
@@ -179,19 +193,33 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
       const res = await updatePlatformConfig(category, key, newValue);
       if (res.success) {
         toast.success(`Feature '${key}' ${newValue === "true" ? "enabled" : "disabled"}.`);
-        setConfigs((prev) =>
-          prev.map((c) => {
-            if (c.category === category && c.key === key) {
-              return {
-                ...c,
-                hasValue: true,
+        setConfigs((prev) => {
+          const exists = prev.some((c) => c.category === category && c.key === key);
+          if (exists) {
+            return prev.map((c) => {
+              if (c.category === category && c.key === key) {
+                return {
+                  ...c,
+                  hasValue: true,
+                  value: newValue,
+                  preview: newValue,
+                };
+              }
+              return c;
+            });
+          } else {
+            return [
+              ...prev,
+              {
+                category,
+                key,
                 value: newValue,
                 preview: newValue,
-              };
-            }
-            return c;
-          })
-        );
+                hasValue: true,
+              },
+            ];
+          }
+        });
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to toggle configuration.");
