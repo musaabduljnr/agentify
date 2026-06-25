@@ -29,7 +29,13 @@ export function StepBusinessInfo({ register, errors }: any) {
       <div className="space-y-2">
         <label className="text-sm font-bold text-slate-700 ml-1">Website URL</label>
         <Input 
-          {...register("websiteUrl", { required: "Website is required" })}
+          {...register("websiteUrl", { 
+            required: "Website is required",
+            pattern: {
+              value: /^https?:\/\/.+/,
+              message: "Please enter a valid URL starting with http:// or https://"
+            }
+          })}
           placeholder="https://acme.com"
           className={errors.websiteUrl ? "border-red-500 focus-visible:ring-red-500/20" : ""}
         />

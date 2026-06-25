@@ -15,6 +15,7 @@ import { completeOnboarding, OnboardingData } from "@/lib/actions/onboarding";
 export function OnboardingForm({ initialData }: { initialData: Partial<OnboardingData> }) {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { register, handleSubmit, watch, setValue, trigger, formState: { errors } } = useForm<OnboardingData>({
@@ -45,8 +46,15 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
   };
 
   const nextStep = async () => {
+    if (isTransitioning) return;
+    setIsTransitioning(true);
     const isValid = await trigger(stepFields[step]);
-    if (isValid) setStep((s) => s + 1);
+    if (isValid) {
+      setStep((s) => s + 1);
+      setTimeout(() => setIsTransitioning(false), 500); // 500ms delay prevents double-click bleed
+    } else {
+      setIsTransitioning(false);
+    }
   };
   const prevStep = () => setStep((s) => s - 1);
 
@@ -139,6 +147,7 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
                   <Button 
                     type="button" 
                     onClick={nextStep}
+                    disabled={isTransitioning}
                     className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold shadow-lg shadow-indigo-100"
                   >
                     Continue
@@ -148,7 +157,7 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
                   <Button 
                     type="button" 
                     onClick={handleSubmit(onSubmit)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isTransitioning}
                     className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold shadow-lg shadow-indigo-100"
                   >
                     {isSubmitting ? (
