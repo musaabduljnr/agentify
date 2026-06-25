@@ -10,8 +10,8 @@ export function WebsiteSourceForm() {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [crawlMode, setCrawlMode] = useState<"single" | "crawl">("single");
-  const [maxPages, setMaxPages] = useState<number>(10);
-  const [crawlDepth, setCrawlDepth] = useState<number>(1);
+  const [maxPages, setMaxPages] = useState<number>(50);
+  const [crawlDepth, setCrawlDepth] = useState<number>(3);
   const [autoEmbed, setAutoEmbed] = useState<boolean>(false);
 
   const [loading, setLoading] = useState(false);
@@ -166,13 +166,13 @@ export function WebsiteSourceForm() {
               <Input
                 type="number"
                 min={1}
-                max={50}
+                max={1000}
                 value={maxPages}
                 onChange={(e) => setMaxPages(Math.max(1, parseInt(e.target.value) || 1))}
                 className="bg-white"
                 disabled={loading}
               />
-              <p className="text-[10px] text-slate-400">Limits execution size (maximum 50 pages).</p>
+              <p className="text-[10px] text-slate-400">Limits execution size (maximum 1000 pages).</p>
             </div>
 
             <div className="space-y-2">
@@ -185,6 +185,9 @@ export function WebsiteSourceForm() {
               >
                 <option value={1}>1 (Same domain subpages only)</option>
                 <option value={2}>2 (Follow link connections)</option>
+                <option value={3}>3 (Deep crawl - 3 levels)</option>
+                <option value={5}>5 (Very deep crawl)</option>
+                <option value={10}>10 (Maximum depth)</option>
               </select>
               <p className="text-[10px] text-slate-400">Determines link path traversal limits.</p>
             </div>

@@ -117,8 +117,6 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
             e.preventDefault();
             if (step < 4) {
               nextStep();
-            } else {
-              handleSubmit(onSubmit)(e);
             }
           }}>
             {renderStep()}
@@ -148,7 +146,8 @@ export function OnboardingForm({ initialData }: { initialData: Partial<Onboardin
                   </Button>
                 ) : (
                   <Button 
-                    type="submit" 
+                    type="button" 
+                    onClick={handleSubmit(onSubmit)}
                     disabled={isSubmitting}
                     className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold shadow-lg shadow-indigo-100"
                   >

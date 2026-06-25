@@ -81,8 +81,8 @@ export async function crawlWebsite({
     }
   }
 
-  // Concurrency limit of 2
-  const CONCURRENCY = 2;
+  // Concurrency limit of 5
+  const CONCURRENCY = 5;
 
   while (queue.length > 0 && (pages.length + failedPages.length) < maxPages) {
     const batch = queue.splice(0, CONCURRENCY);

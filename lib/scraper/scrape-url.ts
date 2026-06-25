@@ -440,10 +440,6 @@ function extractLinks($: cheerio.CheerioAPI, pageUrl: string, rootUrl: string): 
     const href = $el.attr("href");
     if (!href) return;
 
-    // Skip links inside navigation, footer, or header containers to keep crawling focused on main content pages
-    const parentContainer = $el.parents("nav, footer, header, .footer, #footer, .nav, #nav, .header, #header, [role='navigation'], [role='banner'], [role='contentinfo']");
-    if (parentContainer.length > 0) return;
-
     const normalized = normalizeCrawlUrl(href, pageUrl);
     if (!normalized || !isSameOrigin(normalized, rootUrl)) return;
 
