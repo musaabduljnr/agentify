@@ -88,7 +88,6 @@ export async function getBusinessAnalytics(days: number = 30): Promise<Analytics
         .from("conversations")
         .select("id, source, created_at, visitor_name, visitor_email, visitor_phone, metadata")
         .eq("business_id", business.id)
-        .is("archived_at", null)
         .gte("created_at", thresholdDate.toISOString()),
 
       supabase
