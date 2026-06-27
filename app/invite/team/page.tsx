@@ -1,4 +1,5 @@
 import { acceptTeamInvitation } from "@/lib/actions/team";
+import { AcceptInviteClient } from "@/components/invite/AcceptInviteClient";
 import { createHash } from "crypto";
 import { createServiceClient } from "@/utils/supabase/service";
 import { createClient } from "@/utils/supabase/server";
@@ -105,17 +106,6 @@ export default async function InviteTeamPage({ searchParams }: InvitePageProps) 
     );
   }
 
-  // User is logged in, show Accept screen
-  async function acceptAction() {
-    "use server";
-    const res = await acceptTeamInvitation(token!);
-    if (res.success) {
-      redirect("/dashboard");
-    } else {
-      redirect(`/invite/team?token=${token}&error=${res.error}`);
-    }
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
@@ -142,11 +132,12 @@ export default async function InviteTeamPage({ searchParams }: InvitePageProps) 
             Click accept below to join <span className="font-semibold text-slate-800">{businessName}</span> as a <span className="font-semibold text-indigo-600 capitalize">{role}</span>.
           </p>
 
-          <form action={acceptAction}>
-            <Button type="submit" className="w-full rounded-2xl h-12 font-bold bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all">
-              Accept and Join Workspace
-            </Button>
-          </form>
+          <AcceptInviteClient
+            token={token}
+            email={user.email || ""}
+            businessName={businessName}
+            role={role}
+          />
 
           <p className="text-xs text-slate-400 mt-5">
             By accepting, you will gain access to this business workspace resources in accordance with your role.
