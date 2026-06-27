@@ -46,7 +46,9 @@ export default function SignupPage() {
       setLoading(false);
     } else {
       await supabase.auth.signOut();
-      router.replace(`/login?verification=sent&email=${encodeURIComponent(email)}`);
+      const params = new URLSearchParams(window.location.search);
+      const nextParam = params.get("next") ? `&next=${encodeURIComponent(params.get("next")!)}` : "";
+      router.replace(`/login?verification=sent&email=${encodeURIComponent(email)}${nextParam}`);
       router.refresh();
     }
   };

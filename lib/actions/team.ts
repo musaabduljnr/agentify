@@ -3,66 +3,75 @@
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { revalidatePath } from "next/cache";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
+import { z } from "zod";
+import { getCurrentBusiness } from "@/lib/queries/business";
+import { getUserBusinessRole, BusinessRole } from "@/lib/team/permissions";
+import { sendTeamInvitationEmail } from "@/lib/email/send-email";
 
+// Helper to normalize error messages
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+// Helper to check user context and permissions
 async function getCurrentBusinessWithRole() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, name, owner_id")
-    .eq("owner_id", user.id)
+  const business = await getCurrentBusiness();
+  if (!business) return null;
+
+  const role = await getUserBusinessRole(user.id, business.id);
+  if (!role) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
     .maybeSingle();
 
-  // Owner check: business owner_id matches user.id
-  if (business) return { business, user, role: "owner" as const };
-
-  // Check if user is a team member of any business
-  const { data: membership } = await supabase
-    .from("team_members")
-    .select("business_id, role, businesses(id, name, owner_id)")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (membership) {
-    const biz = membership.businesses as any;
-    return { business: biz, user, role: membership.role as "admin" | "member" };
-  }
-
-  return null;
+  return { business, user, role, profile };
 }
 
-export interface TeamMember {
-  id: string;
-  email: string;
-  role: "owner" | "admin" | "member";
-  status: "pending" | "active" | "removed";
-  joined_at: string | null;
-  invited_at: string;
-  user_id: string | null;
-}
+// Zod Input Validations
+const inviteSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(["admin", "support", "sales", "viewer"]),
+});
+
+const memberActionSchema = z.object({
+  memberId: z.string().uuid(),
+});
+
+const roleUpdateSchema = z.object({
+  memberId: z.string().uuid(),
+  role: z.enum(["admin", "support", "sales", "viewer"]),
+});
+
+const invitationActionSchema = z.object({
+  invitationId: z.string().uuid(),
+});
 
 /**
- * Fetch all active/pending team members for the current business.
+ * Fetch all team members for the active business.
  */
-export async function getTeamMembers(): Promise<TeamMember[]> {
+export async function getTeamMembers() {
   try {
     const ctx = await getCurrentBusinessWithRole();
     if (!ctx) return [];
 
-    const supabase = await createClient();
+    const supabase = createServiceClient();
     const { data, error } = await supabase
-      .from("team_members")
-      .select("id, email, role, status, joined_at, invited_at, user_id")
+      .from("business_members")
+      .select("*, profile:profiles(email, full_name)")
       .eq("business_id", ctx.business.id)
-      .neq("status", "removed")
-      .order("invited_at", { ascending: false });
+      .order("created_at", { ascending: true });
 
     if (error) throw error;
-    return (data || []) as TeamMember[];
+    return data || [];
   } catch (err) {
     console.error("getTeamMembers error:", err);
     return [];
@@ -70,147 +79,525 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
 }
 
 /**
- * Invite a new team member by email.
- * Only owners and admins can invite.
+ * Fetch all invitations for the active business.
  */
-export async function inviteTeamMember(email: string, role: "admin" | "member") {
+export async function getTeamInvitations() {
   try {
     const ctx = await getCurrentBusinessWithRole();
-    if (!ctx) return { error: "Unauthorized" };
-    if (!["owner", "admin"].includes(ctx.role)) return { error: "Only owners and admins can invite members." };
+    if (!ctx) return [];
 
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail || !normalizedEmail.includes("@")) {
-      return { error: "Please enter a valid email address." };
-    }
-
-    const serviceClient = createServiceClient();
-
-    // Check if member already exists
-    const { data: existing } = await serviceClient
-      .from("team_members")
-      .select("id, status")
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from("team_invitations")
+      .select("*, inviter:profiles!team_invitations_invited_by_fkey(email, full_name)")
       .eq("business_id", ctx.business.id)
-      .eq("email", normalizedEmail)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
 
-    if (existing && existing.status !== "removed") {
-      return { error: "This email has already been invited or is already a member." };
-    }
-
-    const inviteToken = randomBytes(32).toString("hex");
-
-    const { error: insertError } = await serviceClient
-      .from("team_members")
-      .upsert({
-        business_id: ctx.business.id,
-        email: normalizedEmail,
-        role,
-        status: "pending",
-        invited_by: ctx.user.id,
-        invited_at: new Date().toISOString(),
-        invite_token: inviteToken,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "business_id,email" });
-
-    if (insertError) throw insertError;
-
-    revalidatePath("/dashboard/settings/team");
-    return { success: true, inviteToken };
-  } catch (err: any) {
-    console.error("inviteTeamMember error:", err);
-    return { error: "Failed to send invitation. Please try again." };
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error("getTeamInvitations error:", err);
+    return [];
   }
 }
 
 /**
- * Remove a team member (set status to 'removed').
- * Owners can remove anyone; admins can only remove members.
+ * Invite a member.
+ */
+export async function inviteTeamMember(email: string, role: string) {
+  try {
+    const ctx = await getCurrentBusinessWithRole();
+    if (!ctx) return { error: "Unauthorized" };
+    if (!["owner", "admin"].includes(ctx.role)) {
+      return { error: "Only owners and admins can invite team members." };
+    }
+
+    const input = inviteSchema.parse({ email, role });
+    const normalizedEmail = input.email.trim().toLowerCase();
+
+    const serviceClient = createServiceClient();
+
+    // 1. Check duplicate active members
+    const { data: existingMember } = await serviceClient
+      .from("business_members")
+      .select("id, status")
+      .eq("business_id", ctx.business.id)
+      .eq("user_id", (
+        await serviceClient
+          .from("profiles")
+          .select("id")
+          .eq("email", normalizedEmail)
+          .maybeSingle()
+      ).data?.id || "00000000-0000-0000-0000-000000000000")
+      .maybeSingle();
+
+    if (existingMember && existingMember.status === "active") {
+      return { error: "This user is already an active member of this business." };
+    }
+
+    // 2. Check team member limits on active subscriptions
+    const { data: subscription } = await serviceClient
+      .from("subscriptions")
+      .select("team_member_limit")
+      .eq("business_id", ctx.business.id)
+      .maybeSingle();
+
+    const limit = subscription?.team_member_limit ?? 1;
+
+    // Count currently active members
+    const { count: activeCount } = await serviceClient
+      .from("business_members")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", ctx.business.id)
+      .eq("status", "active");
+
+    // Count pending invitations
+    const { count: pendingCount } = await serviceClient
+      .from("team_invitations")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", ctx.business.id)
+      .eq("status", "pending");
+
+    const totalAllocated = (activeCount || 0) + (pendingCount || 0);
+    if (totalAllocated >= limit) {
+      return { 
+        error: "limit_reached",
+        message: `Your subscription plan limit has been reached (${limit} team members). Please upgrade your plan to invite more team members.`
+      };
+    }
+
+    // 3. Remove/revoke any duplicate pending invitations for this email to avoid index crash
+    await serviceClient
+      .from("team_invitations")
+      .update({ status: "revoked", revoked_at: new Date().toISOString() })
+      .eq("business_id", ctx.business.id)
+      .eq("email", normalizedEmail)
+      .eq("status", "pending");
+
+    // 4. Generate secure token
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+    // 5. Insert invitation
+    const { error: inviteError } = await serviceClient
+      .from("team_invitations")
+      .insert({
+        business_id: ctx.business.id,
+        email: normalizedEmail,
+        role: input.role,
+        token_hash: tokenHash,
+        status: "pending",
+        invited_by: ctx.user.id,
+        expires_at: expiresAt.toISOString(),
+        last_sent_at: new Date().toISOString(),
+      });
+
+    if (inviteError) throw inviteError;
+
+    // 6. Generate Link
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
+    const inviteLink = `${appUrl}/invite/team?token=${token}`;
+
+    // 7. Send Invitation Email
+    let emailFailed = false;
+    try {
+      const emailRes = await sendTeamInvitationEmail({
+        to: normalizedEmail,
+        businessName: ctx.business.name,
+        inviterName: ctx.profile?.full_name || ctx.user?.email || "Team Owner",
+        role: input.role,
+        inviteUrl: inviteLink,
+        expiresAt: expiresAt.toISOString(),
+        businessId: ctx.business.id,
+      });
+
+      if (!emailRes.success) {
+        emailFailed = true;
+        console.warn("[TEAM ACTIONS] Invitation email dispatch failed:", emailRes.error);
+      }
+    } catch (emailErr) {
+      emailFailed = true;
+      console.error("[TEAM ACTIONS] Exception during invite email send:", emailErr);
+    }
+
+    revalidatePath("/dashboard/settings/team");
+    return { success: true, inviteLink, emailFailed };
+  } catch (err) {
+    console.error("inviteTeamMember error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Resend invitation.
+ */
+export async function resendTeamInvitation(invitationId: string) {
+  try {
+    const ctx = await getCurrentBusinessWithRole();
+    if (!ctx) return { error: "Unauthorized" };
+    if (!["owner", "admin"].includes(ctx.role)) {
+      return { error: "Only owners and admins can manage invitations." };
+    }
+
+    const input = invitationActionSchema.parse({ invitationId });
+    const serviceClient = createServiceClient();
+
+    // 1. Fetch invitation
+    const { data: invite, error: fetchErr } = await serviceClient
+      .from("team_invitations")
+      .select("*")
+      .eq("id", input.invitationId)
+      .eq("business_id", ctx.business.id)
+      .maybeSingle();
+
+    if (fetchErr || !invite) return { error: "Invitation not found." };
+
+    // 2. Generate new token
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    // 3. Update invite
+    const { error: updateErr } = await serviceClient
+      .from("team_invitations")
+      .update({
+        token_hash: tokenHash,
+        status: "pending",
+        expires_at: expiresAt.toISOString(),
+        last_sent_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", invite.id);
+
+    if (updateErr) throw updateErr;
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
+    const inviteLink = `${appUrl}/invite/team?token=${token}`;
+
+    // 4. Send email
+    let emailFailed = false;
+    try {
+      const emailRes = await sendTeamInvitationEmail({
+        to: invite.email,
+        businessName: ctx.business.name,
+        inviterName: ctx.profile?.full_name || ctx.user?.email || "Team Owner",
+        role: invite.role,
+        inviteUrl: inviteLink,
+        expiresAt: expiresAt.toISOString(),
+        businessId: ctx.business.id,
+      });
+
+      if (!emailRes.success) emailFailed = true;
+    } catch {
+      emailFailed = true;
+    }
+
+    revalidatePath("/dashboard/settings/team");
+    return { success: true, inviteLink, emailFailed };
+  } catch (err) {
+    console.error("resendTeamInvitation error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Revoke invitation.
+ */
+export async function revokeTeamInvitation(invitationId: string) {
+  try {
+    const ctx = await getCurrentBusinessWithRole();
+    if (!ctx) return { error: "Unauthorized" };
+    if (!["owner", "admin"].includes(ctx.role)) {
+      return { error: "Insufficient permissions." };
+    }
+
+    const input = invitationActionSchema.parse({ invitationId });
+    const serviceClient = createServiceClient();
+
+    const { error } = await serviceClient
+      .from("team_invitations")
+      .update({
+        status: "revoked",
+        revoked_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.invitationId)
+      .eq("business_id", ctx.business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/settings/team");
+    return { success: true };
+  } catch (err) {
+    console.error("revokeTeamInvitation error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Accept invitation.
+ */
+export async function acceptTeamInvitation(token: string) {
+  try {
+    if (!token) return { error: "Invalid token" };
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const serviceClient = createServiceClient();
+
+    // 1. Resolve invitation
+    const { data: invite, error: fetchErr } = await serviceClient
+      .from("team_invitations")
+      .select("*, businesses(name)")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+
+    if (fetchErr || !invite) return { error: "invalid" };
+    if (invite.status === "revoked") return { error: "revoked" };
+    if (invite.status === "accepted") return { error: "accepted_already" };
+
+    // Check expiry
+    const now = new Date();
+    if (new Date(invite.expires_at) < now || invite.status === "expired") {
+      await serviceClient
+        .from("team_invitations")
+        .update({ status: "expired" })
+        .eq("id", invite.id);
+      return { error: "expired" };
+    }
+
+    // 2. Fetch authenticated session
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      // Prompt sign up/login
+      return { error: "logged_out", invitation: invite };
+    }
+
+    // Ensure email matches or user accepts manually
+    // 3. Prevent duplicate active membership
+    const { data: existingMember } = await serviceClient
+      .from("business_members")
+      .select("id")
+      .eq("business_id", invite.business_id)
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (existingMember) {
+      // Mark accepted since they are already members
+      await serviceClient
+        .from("team_invitations")
+        .update({
+          status: "accepted",
+          accepted_at: new Date().toISOString(),
+          invited_user_id: user.id,
+        })
+        .eq("id", invite.id);
+
+      return { success: true, businessId: invite.business_id };
+    }
+
+    // 4. Create membership via service client
+    const { error: memberError } = await serviceClient
+      .from("business_members")
+      .insert({
+        business_id: invite.business_id,
+        user_id: user.id,
+        role: invite.role,
+        status: "active",
+        invited_by: invite.invited_by,
+      });
+
+    if (memberError) throw memberError;
+
+    // 5. Update invitation to accepted
+    await serviceClient
+      .from("team_invitations")
+      .update({
+        status: "accepted",
+        accepted_at: new Date().toISOString(),
+        invited_user_id: user.id,
+      })
+      .eq("id", invite.id);
+
+    revalidatePath("/dashboard");
+    return { success: true, businessId: invite.business_id };
+  } catch (err) {
+    console.error("acceptTeamInvitation error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Update member role.
+ */
+export async function updateTeamMemberRole(memberId: string, role: string) {
+  try {
+    const ctx = await getCurrentBusinessWithRole();
+    if (!ctx) return { error: "Unauthorized" };
+    if (ctx.role !== "owner") {
+      return { error: "Only owners can change member roles." };
+    }
+
+    const input = roleUpdateSchema.parse({ memberId, role });
+    const serviceClient = createServiceClient();
+
+    // Verify target member
+    const { data: target } = await serviceClient
+      .from("business_members")
+      .select("role")
+      .eq("id", input.memberId)
+      .eq("business_id", ctx.business.id)
+      .maybeSingle();
+
+    if (!target) return { error: "Member not found." };
+    if (target.role === "owner") return { error: "Cannot change the owner's role." };
+
+    const { error } = await serviceClient
+      .from("business_members")
+      .update({
+        role: input.role,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.memberId)
+      .eq("business_id", ctx.business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/settings/team");
+    return { success: true };
+  } catch (err) {
+    console.error("updateTeamMemberRole error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Suspend team member access.
+ */
+export async function suspendTeamMember(memberId: string) {
+  try {
+    const ctx = await getCurrentBusinessWithRole();
+    if (!ctx) return { error: "Unauthorized" };
+    if (!["owner", "admin"].includes(ctx.role)) {
+      return { error: "Insufficient permissions." };
+    }
+
+    const input = memberActionSchema.parse({ memberId });
+    const serviceClient = createServiceClient();
+
+    const { data: target } = await serviceClient
+      .from("business_members")
+      .select("role, user_id")
+      .eq("id", input.memberId)
+      .eq("business_id", ctx.business.id)
+      .maybeSingle();
+
+    if (!target) return { error: "Member not found." };
+    if (target.role === "owner") return { error: "Cannot suspend the owner." };
+    if (ctx.role === "admin" && target.role === "admin") {
+      return { error: "Admins cannot suspend other admins." };
+    }
+
+    const { error } = await serviceClient
+      .from("business_members")
+      .update({
+        status: "suspended",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.memberId)
+      .eq("business_id", ctx.business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/settings/team");
+    return { success: true };
+  } catch (err) {
+    console.error("suspendTeamMember error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Reactivate suspended team member.
+ */
+export async function reactivateTeamMember(memberId: string) {
+  try {
+    const ctx = await getCurrentBusinessWithRole();
+    if (!ctx) return { error: "Unauthorized" };
+    if (!["owner", "admin"].includes(ctx.role)) {
+      return { error: "Insufficient permissions." };
+    }
+
+    const input = memberActionSchema.parse({ memberId });
+    const serviceClient = createServiceClient();
+
+    const { error } = await serviceClient
+      .from("business_members")
+      .update({
+        status: "active",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", input.memberId)
+      .eq("business_id", ctx.business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/settings/team");
+    return { success: true };
+  } catch (err) {
+    console.error("reactivateTeamMember error:", err);
+    return { error: getErrorMessage(err) };
+  }
+}
+
+/**
+ * Remove a member completely.
  */
 export async function removeTeamMember(memberId: string) {
   try {
     const ctx = await getCurrentBusinessWithRole();
     if (!ctx) return { error: "Unauthorized" };
-    if (!["owner", "admin"].includes(ctx.role)) return { error: "Insufficient permissions." };
+    if (!["owner", "admin"].includes(ctx.role)) {
+      return { error: "Insufficient permissions." };
+    }
 
+    const input = memberActionSchema.parse({ memberId });
     const serviceClient = createServiceClient();
 
-    // Fetch the member to check their role
-    const { data: member } = await serviceClient
-      .from("team_members")
-      .select("role, email")
-      .eq("id", memberId)
+    const { data: target } = await serviceClient
+      .from("business_members")
+      .select("role, user_id")
+      .eq("id", input.memberId)
       .eq("business_id", ctx.business.id)
       .maybeSingle();
 
-    if (!member) return { error: "Member not found." };
-    if (member.role === "owner") return { error: "Cannot remove the owner." };
-    if (ctx.role === "admin" && member.role === "admin") {
+    if (!target) return { error: "Member not found." };
+    if (target.role === "owner") return { error: "Cannot remove the owner." };
+    if (ctx.role === "admin" && target.role === "admin") {
       return { error: "Admins cannot remove other admins." };
     }
 
+    // Prevent sole owner from removing themselves
+    if (target.user_id === ctx.user.id) {
+      return { error: "You cannot remove yourself. Transfer ownership first." };
+    }
+
     const { error } = await serviceClient
-      .from("team_members")
-      .update({ status: "removed", updated_at: new Date().toISOString() })
-      .eq("id", memberId)
+      .from("business_members")
+      .delete()
+      .eq("id", input.memberId)
       .eq("business_id", ctx.business.id);
 
     if (error) throw error;
 
     revalidatePath("/dashboard/settings/team");
     return { success: true };
-  } catch (err: any) {
+  } catch (err) {
     console.error("removeTeamMember error:", err);
-    return { error: "Failed to remove member. Please try again." };
-  }
-}
-
-/**
- * Update a team member's role.
- * Only owners can change roles.
- */
-export async function updateMemberRole(memberId: string, newRole: "admin" | "member") {
-  try {
-    const ctx = await getCurrentBusinessWithRole();
-    if (!ctx) return { error: "Unauthorized" };
-    if (ctx.role !== "owner") return { error: "Only owners can change member roles." };
-
-    const serviceClient = createServiceClient();
-    const { error } = await serviceClient
-      .from("team_members")
-      .update({ role: newRole, updated_at: new Date().toISOString() })
-      .eq("id", memberId)
-      .eq("business_id", ctx.business.id);
-
-    if (error) throw error;
-
-    revalidatePath("/dashboard/settings/team");
-    return { success: true };
-  } catch (err: any) {
-    console.error("updateMemberRole error:", err);
-    return { error: "Failed to update role. Please try again." };
-  }
-}
-
-/**
- * Accept a team invite via token.
- */
-export async function acceptTeamInvite(token: string) {
-  try {
-    const supabase = await createClient();
-    const { data: result, error } = await supabase.rpc("accept_team_invite", {
-      p_token: token,
-    });
-
-    if (error) throw error;
-
-    const parsed = result as any;
-    if (parsed?.error) return { error: parsed.error };
-
-    revalidatePath("/dashboard");
-    return { success: true, businessId: parsed?.business_id, role: parsed?.role };
-  } catch (err: any) {
-    console.error("acceptTeamInvite error:", err);
-    return { error: "Failed to accept invite. The link may be expired." };
+    return { error: getErrorMessage(err) };
   }
 }

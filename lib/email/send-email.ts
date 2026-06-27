@@ -1,4 +1,6 @@
 import { render } from "@react-email/render";
+import { TeamInvitationEmail } from "@/lib/email/templates/team-invitation-email";
+import * as React from "react";
 import { getResendClient } from "@/lib/email/resend";
 import { getNodemailerTransporter } from "@/lib/email/nodemailer";
 import { getBusinessNotificationEmail, validateEmail } from "@/lib/email/recipients";
@@ -297,3 +299,38 @@ export async function sendTransactionalEmail(
     return { success: false, error: errMsg };
   }
 }
+
+interface SendTeamInvitationEmailInput {
+  to: string;
+  businessName: string;
+  inviterName: string;
+  role: string;
+  inviteUrl: string;
+  expiresAt: string;
+  businessId: string;
+}
+
+export async function sendTeamInvitationEmail({
+  to,
+  businessName,
+  inviterName,
+  role,
+  inviteUrl,
+  expiresAt,
+  businessId,
+}: SendTeamInvitationEmailInput) {
+  return sendTransactionalEmail({
+    businessId,
+    to,
+    subject: `You've been invited to join ${businessName} on Agentify`,
+    templateName: "team-invitation-email",
+    react: React.createElement(TeamInvitationEmail, {
+      businessName,
+      inviterName,
+      role,
+      inviteUrl,
+      expiresAt,
+    }),
+  });
+}
+

@@ -63,6 +63,9 @@ function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | nul
     embeddings: Object.prototype.hasOwnProperty.call(override || {}, "embeddings")
       ? asFiniteNumber(override?.embeddings)
       : fallback.embeddings,
+    team_members: Object.prototype.hasOwnProperty.call(override || {}, "team_members")
+      ? asFiniteNumber(override?.team_members)
+      : fallback.team_members,
     features: asStringArray(override?.features, fallback.features),
     paystack_plan_code:
       typeof override?.paystack_plan_code === "string" && override.paystack_plan_code.trim()
@@ -147,6 +150,7 @@ export async function getEffectivePlanLimits(planId: string) {
     widget_limit: plan.widgets ?? 999999999,
     embedding_limit: plan.embeddings ?? 999999999,
     daily_message_limit: plan.daily_messages ?? 999999999,
+    team_member_limit: plan.team_members ?? 999999999,
   };
 }
 

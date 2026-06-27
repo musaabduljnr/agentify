@@ -10,6 +10,7 @@ interface DashboardLayoutProps {
   user: any;
   profile: any;
   business: any;
+  businesses?: any[];
   assistant: any;
   subscription?: {
     plan: string;
@@ -25,6 +26,7 @@ export default function DashboardLayout({
   user,
   profile,
   business,
+  businesses = [],
   assistant,
   subscription,
   notifications = [],
@@ -45,6 +47,7 @@ export default function DashboardLayout({
           user={user} 
           profile={profile}
           business={business}
+          businesses={businesses}
           assistant={assistant}
           notifications={notifications}
         />

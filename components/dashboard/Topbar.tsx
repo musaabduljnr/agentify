@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Bell, Menu, User, Bot, Building2, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { Bell, Menu, User, Bot, Building2, AlertTriangle, CheckCircle2, Info, ChevronDown } from "lucide-react";
 import type { DashboardNotification } from "@/lib/queries/notifications";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
@@ -11,6 +11,7 @@ interface TopbarProps {
   user: any;
   profile: any;
   business: any;
+  businesses?: any[];
   assistant: any;
   notifications?: DashboardNotification[];
 }
@@ -28,10 +29,15 @@ function NotificationIcon({ level }: { level: DashboardNotification["level"] }) 
   return <AlertTriangle className="h-4 w-4" />;
 }
 
-export function Topbar({ onMenuClick, user, profile, business, assistant, notifications = [] }: TopbarProps) {
+export function Topbar({ onMenuClick, user, profile, business, businesses = [], assistant, notifications = [] }: TopbarProps) {
   const displayName = profile?.full_name || user?.email || "User";
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleSwitchBusiness = (businessId: string) => {
+    document.cookie = `active_business_id=${businessId}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
+    window.location.reload();
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
@@ -62,12 +68,30 @@ export function Topbar({ onMenuClick, user, profile, business, assistant, notifi
         </button>
         
         <div className="hidden md:flex min-w-0 items-center gap-4 xl:gap-6">
-          <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
-            <Building2 className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-bold text-slate-700 truncate max-w-[150px]">
-              {business?.name || "No Business"}
-            </span>
-          </div>
+          {businesses.length > 1 ? (
+            <div className="relative flex items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 py-2 shrink-0">
+              <Building2 className="w-4 h-4 text-slate-400 mr-2" />
+              <select
+                value={business?.id || ""}
+                onChange={(e) => handleSwitchBusiness(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none appearance-none pr-6 cursor-pointer"
+              >
+                {businesses.map((b: any) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100">
+              <Building2 className="w-4 h-4 text-slate-400" />
+              <span className="text-xs font-bold text-slate-700 truncate max-w-[150px]">
+                {business?.name || "No Business"}
+              </span>
+            </div>
+          )}
           
           <div className="flex items-center gap-3 px-4 py-2 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
             <Bot className="w-4 h-4 text-indigo-500" />

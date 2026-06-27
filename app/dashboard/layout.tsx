@@ -46,6 +46,7 @@ export default async function DashboardLayout({
       user={setup.user} 
       profile={setup.profile}
       business={setup.business}
+      businesses={setup.businesses}
       assistant={setup.assistant}
       subscription={subscriptionData}
       notifications={notifications}

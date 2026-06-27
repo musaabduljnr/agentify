@@ -15,6 +15,7 @@ export type PlanConfig = {
   leads: number | null;
   widgets: number | null;
   embeddings: number | null;
+  team_members: number | null; // null = unlimited
   features: string[];
   paystack_plan_code: string | null; // placeholder — set via env later
   flutterwave_plan_id: string | null; // placeholder — set via env later
@@ -31,6 +32,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     leads: 50,
     widgets: 1,
     embeddings: 1000,
+    team_members: 0,
     features: [
       "1 AI Assistant",
       "100 messages/month",
@@ -53,6 +55,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     leads: 1000,
     widgets: 1,
     embeddings: 20000,
+    team_members: 2,
     features: [
       "1 AI Assistant",
       "5,000 messages/month",
@@ -76,6 +79,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     leads: 10000,
     widgets: 3,
     embeddings: 100000,
+    team_members: 5,
     features: [
       "3 AI Assistants",
       "15,000 messages/month",
@@ -100,6 +104,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     leads: null,
     widgets: null,
     embeddings: null,
+    team_members: null,
     features: [
       "Unlimited AI Assistants",
       "Unlimited messages",
@@ -125,6 +130,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     leads: 25000,
     widgets: 5,
     embeddings: 250000,
+    team_members: 10,
     features: [
       "5 AI Assistants",
       "50,000 messages/month",
@@ -167,6 +173,7 @@ export function getPlanLimits(planId: string) {
     widget_limit: plan.widgets ?? 999999999,
     embedding_limit: plan.embeddings ?? 999999999,
     daily_message_limit: plan.daily_messages ?? 999999999,
+    team_member_limit: plan.team_members ?? 999999999,
   };
 }
 
