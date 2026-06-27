@@ -8,6 +8,7 @@ import { z } from "zod";
 import { getCurrentBusiness } from "@/lib/queries/business";
 import { getUserBusinessRole, BusinessRole } from "@/lib/team/permissions";
 import { sendTeamInvitationEmail } from "@/lib/email/send-email";
+import { getEffectivePlanLimits } from "@/lib/billing/platform";
 
 // Helper to normalize error messages
 function getErrorMessage(err: unknown): string {
@@ -138,11 +139,15 @@ export async function inviteTeamMember(email: string, role: string) {
     // 2. Check team member limits on active subscriptions
     const { data: subscription } = await serviceClient
       .from("subscriptions")
-      .select("team_member_limit")
+      .select("plan, team_member_limit")
       .eq("business_id", ctx.business.id)
       .maybeSingle();
 
-    const limit = subscription?.team_member_limit ?? 1;
+    let limit = subscription?.team_member_limit;
+    if (limit === null || limit === undefined) {
+      const planLimits = await getEffectivePlanLimits(subscription?.plan || "free_trial");
+      limit = planLimits.team_member_limit;
+    }
 
     // Count currently active members
     const { count: activeCount } = await serviceClient
