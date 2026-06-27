@@ -38,6 +38,8 @@ jobs:
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co' }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-anon' }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'mock-service' }}
+        UPSTASH_REDIS_REST_URL: 'https://mock-redis.example.com'
+        UPSTASH_REDIS_REST_TOKEN: 'mock-token'
 
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
@@ -48,3 +50,5 @@ jobs:
         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co' }}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'mock-anon' }}
         SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'mock-service' }}
+        UPSTASH_REDIS_REST_URL: 'https://mock-redis.example.com'
+        UPSTASH_REDIS_REST_TOKEN: 'mock-token'
