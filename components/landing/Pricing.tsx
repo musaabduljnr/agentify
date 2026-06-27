@@ -33,6 +33,12 @@ const planMeta = {
     href: "mailto:support@agentify.app",
     popular: false,
   },
+  business: {
+    description: "For larger scale operations",
+    buttonText: "Get Business",
+    href: "/signup",
+    popular: false,
+  },
 };
 
 export async function Pricing() {

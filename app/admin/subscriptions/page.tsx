@@ -1,4 +1,4 @@
-import { getAllSubscriptions } from "@/lib/actions/admin";
+import { getAllSubscriptions } from "@/lib/actions/admin-subscriptions";
 import { SubscriptionsTable } from "@/components/admin/subscriptions-table";
 import { KeyRound } from "lucide-react";
 

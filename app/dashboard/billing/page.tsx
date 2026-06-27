@@ -257,7 +257,7 @@ export default async function BillingPage({
           </div>
 
           {/* Cancel / Reactivate */}
-          {subscription.plan !== "free_trial" && (
+          {subscription.plan !== "free_trial" && subscription.payment_provider !== "manual" && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
               <h4 className="text-base font-bold text-slate-900 mb-1">Manage Subscription</h4>
               <p className="text-xs text-slate-500 mb-5 leading-relaxed">
@@ -273,25 +273,42 @@ export default async function BillingPage({
           )}
 
           {/* Secure Payment Infrastructure Header */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
-                <Shield className="w-5 h-5 text-indigo-600" />
+          {subscription.payment_provider === "manual" ? (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
+                  <Crown className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Manual Billing Account</h4>
+                  <p className="text-xs text-slate-500">Your subscription is managed manually by our team.</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Secure Payments</h4>
-                <p className="text-xs text-slate-500">Transactions are secured and processed using industry-standard gateways.</p>
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-xs text-indigo-800 font-semibold text-center uppercase tracking-wider">
+                Managed manually by Agentify
               </div>
             </div>
-            <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
-              <Info className="w-5 h-5 text-indigo-500 shrink-0" />
-              <p className="text-xs text-slate-600 leading-relaxed">
-                We accept local card, bank transfer, USSD, and mobile money options. Payments are handled securely via 
-                <strong> Paystack</strong> (our primary provider) and <strong>Flutterwave</strong> (secondary option). Your 
-                card information is never saved on our servers.
-              </p>
+          ) : (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center border border-indigo-100">
+                  <Shield className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Secure Payments</h4>
+                  <p className="text-xs text-slate-500">Transactions are secured and processed using industry-standard gateways.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                <Info className="w-5 h-5 text-indigo-500 shrink-0" />
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  We accept local card, bank transfer, USSD, and mobile money options. Payments are handled securely via 
+                  <strong> Paystack</strong> (our primary provider) and <strong>Flutterwave</strong> (secondary option). Your 
+                  card information is never saved on our servers.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Upgrade Sidebar */}
@@ -456,21 +473,31 @@ export default async function BillingPage({
                     Current Plan
                   </Button>
                 ) : plan.isUpgrade ? (
-                  <div className="space-y-2">
-                    <UpgradeButton
-                      planId={plan.id as "starter" | "growth"}
-                      provider="paystack"
-                      label="Pay with Paystack"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
-                    />
-                    <UpgradeButton
-                      planId={plan.id as "starter" | "growth"}
-                      provider="flutterwave"
-                      label="Pay with Flutterwave"
+                  subscription.payment_provider === "manual" ? (
+                    <Button
                       variant="outline"
-                      className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50"
-                    />
-                  </div>
+                      className="w-full rounded-2xl h-11 border-2 border-slate-200 text-slate-400 font-bold cursor-default hover:bg-white"
+                      disabled
+                    >
+                      Managed Manually
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <UpgradeButton
+                        planId={plan.id as "starter" | "growth"}
+                        provider="paystack"
+                        label="Pay with Paystack"
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold"
+                      />
+                      <UpgradeButton
+                        planId={plan.id as "starter" | "growth"}
+                        provider="flutterwave"
+                        label="Pay with Flutterwave"
+                        variant="outline"
+                        className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50"
+                      />
+                    </div>
+                  )
                 ) : (
                   <Button
                     variant="outline"

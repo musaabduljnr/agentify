@@ -4,7 +4,7 @@ import { getConfiguredOptionalEnv } from "@/lib/env";
 // Plan Configuration
 // ══════════════════════════════════════════════════════════════
 
-export type PlanId = "free_trial" | "starter" | "growth" | "enterprise";
+export type PlanId = "free_trial" | "starter" | "growth" | "business" | "enterprise";
 
 export type PlanConfig = {
   name: string;
@@ -115,6 +115,30 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     flutterwave_plan_id: null,
     contact_sales: true,
   },
+
+  business: {
+    name: "Business",
+    price_ngn: 50000,
+    messages: 50000,
+    daily_messages: 2500,
+    knowledge_sources: 250,
+    leads: 25000,
+    widgets: 5,
+    embeddings: 250000,
+    features: [
+      "5 AI Assistants",
+      "50,000 messages/month",
+      "2,500 daily messages soft cap",
+      "250 knowledge sources",
+      "25,000 leads",
+      "5 widgets",
+      "Dedicated account manager",
+      "Remove branding",
+      "Custom domain & webhooks",
+    ],
+    paystack_plan_code: null,
+    flutterwave_plan_id: null,
+  },
 };
 
 /**
@@ -158,4 +182,4 @@ export function formatPlanPrice(plan: PlanConfig): string {
 /**
  * All plan IDs in order.
  */
-export const PLAN_ORDER: PlanId[] = ["free_trial", "starter", "growth", "enterprise"];
+export const PLAN_ORDER: PlanId[] = ["free_trial", "starter", "growth", "business", "enterprise"];
