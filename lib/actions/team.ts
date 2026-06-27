@@ -88,6 +88,21 @@ export async function getTeamInvitations() {
     if (!ctx) return [];
 
     const supabase = createServiceClient();
+
+    // Prune old revoked or expired invitations older than 30 days
+    try {
+      const pruneDate = new Date();
+      pruneDate.setDate(pruneDate.getDate() - 30);
+      await supabase
+        .from("team_invitations")
+        .delete()
+        .eq("business_id", ctx.business.id)
+        .in("status", ["revoked", "expired"])
+        .lt("updated_at", pruneDate.toISOString());
+    } catch (pruneErr) {
+      console.warn("Failed to prune old team invitations:", pruneErr);
+    }
+
     const { data, error } = await supabase
       .from("team_invitations")
       .select("*, inviter:profiles!team_invitations_invited_by_fkey(email, full_name)")
@@ -381,6 +396,12 @@ export async function acceptTeamInvitation(token: string) {
       return { error: "logged_out", invitation: invite };
     }
 
+    if (user.email?.toLowerCase() !== invite.email.toLowerCase()) {
+      return {
+        error: `This invitation was sent to '${invite.email}'. You are currently logged in as '${user.email}'. Please log in with the correct account to accept.`
+      };
+    }
+
     // Ensure email matches or user accepts manually
     // 3. Prevent duplicate active membership
     const { data: existingMember } = await serviceClient
@@ -539,6 +560,40 @@ export async function reactivateTeamMember(memberId: string) {
 
     const input = memberActionSchema.parse({ memberId });
     const serviceClient = createServiceClient();
+
+    // Check plan limit before reactivating
+    const { data: subscription } = await serviceClient
+      .from("subscriptions")
+      .select("plan, team_member_limit")
+      .eq("business_id", ctx.business.id)
+      .maybeSingle();
+
+    let limit = subscription?.team_member_limit;
+    if (limit === null || limit === undefined) {
+      const planLimits = await getEffectivePlanLimits(subscription?.plan || "free_trial");
+      limit = planLimits.team_member_limit;
+    }
+
+    // Count currently active members
+    const { count: activeCount } = await serviceClient
+      .from("business_members")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", ctx.business.id)
+      .eq("status", "active");
+
+    // Count pending invitations
+    const { count: pendingCount } = await serviceClient
+      .from("team_invitations")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", ctx.business.id)
+      .eq("status", "pending");
+
+    const totalAllocated = (activeCount || 0) + (pendingCount || 0);
+    if (totalAllocated >= limit) {
+      return { 
+        error: `Your subscription plan limit has been reached (${limit} team members). Please upgrade your plan to reactivate this member.`
+      };
+    }
 
     const { error } = await serviceClient
       .from("business_members")
