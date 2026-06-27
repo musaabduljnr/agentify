@@ -16,6 +16,7 @@ export function StepWidget({ register, watch, setValue, errors }: any) {
   const addQuestion = (e: any) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
       const val = e.target.value.trim();
       if (val) {
         setValue("suggestedQuestions", [...suggestedQuestions, val]);
