@@ -110,31 +110,10 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       const res = await adminUpdateSubscriptionNotes(selectedSub.id, notesText);
       if (res.error) throw new Error(res.error);
 
-      // Local state update
-      setSubscriptions((prev) =>
-        prev.map((s) =>
-          s.id === selectedSub.id
-            ? {
-                ...s,
-                metadata: {
-                  ...s.metadata,
-                  admin_notes: notesText,
-                  last_admin_action: "notes_updated",
-                  last_admin_action_at: new Date().toISOString(),
-                },
-              }
-            : s
-        )
-      );
-      
-      // Update selected sub view
-      setSelectedSub((prev: any) => ({
-        ...prev,
-        metadata: {
-          ...prev.metadata,
-          admin_notes: notesText,
-        }
-      }));
+      if (res.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
+        setSelectedSub(res.subscription);
+      }
 
       triggerToast("success", "Admin notes updated successfully.");
     } catch (err: any) {
@@ -151,16 +130,17 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       const res = await adminChangeSubscriptionPlan(selectedSub.id, targetPlan as any);
       if (res.error) throw new Error(res.error);
 
-      // Fetch fresh details or update locally
-      const freshSub = subscriptions.find(s => s.id === selectedSub.id);
-      const updated = { 
-        ...freshSub, 
-        plan: targetPlan,
-        payment_provider: "manual",
-      };
-      
-      setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? updated : s)));
-      setSelectedSub(updated);
+      if (res.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
+        setSelectedSub(res.subscription);
+        // Sync limits input states
+        setLimitMsgs(res.subscription.message_limit ?? "");
+        setLimitKnowledge(res.subscription.knowledge_limit ?? "");
+        setLimitLeads(res.subscription.lead_limit ?? "");
+        setLimitWidgets(res.subscription.widget_limit ?? "");
+        setLimitEmbeddings(res.subscription.embedding_limit ?? "");
+        setCurrentUsageInput(res.subscription.current_usage ?? "");
+      }
       triggerToast("success", `Plan updated to ${targetPlan} (manual billing).`);
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to update plan.");
@@ -176,11 +156,10 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       const res = await adminChangeSubscriptionStatus(selectedSub.id, targetStatus);
       if (res.error) throw new Error(res.error);
 
-      const freshSub = subscriptions.find(s => s.id === selectedSub.id);
-      const updated = { ...freshSub, status: targetStatus };
-
-      setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? updated : s)));
-      setSelectedSub(updated);
+      if (res.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
+        setSelectedSub(res.subscription);
+      }
       triggerToast("success", `Status updated to ${targetStatus}.`);
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to update status.");
@@ -211,19 +190,10 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
 
       if (res.error) throw new Error(res.error);
 
-      const freshSub = subscriptions.find(s => s.id === selectedSub.id);
-      const updated = {
-        ...freshSub,
-        message_limit: msgLimit ?? freshSub.message_limit,
-        knowledge_limit: knowledgeLimit ?? freshSub.knowledge_limit,
-        lead_limit: leadLimit ?? freshSub.lead_limit,
-        widget_limit: widgetLimit ?? freshSub.widget_limit,
-        embedding_limit: embeddingLimit ?? freshSub.embedding_limit,
-        current_usage: usageVal ?? freshSub.current_usage,
-      };
-
-      setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? updated : s)));
-      setSelectedSub(updated);
+      if (res.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
+        setSelectedSub(res.subscription);
+      }
       triggerToast("success", "Custom limits override applied.");
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to apply custom limits.");
@@ -242,12 +212,11 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       const res = await adminResetSubscriptionUsage(selectedSub.id);
       if (res.error) throw new Error(res.error);
 
-      const freshSub = subscriptions.find(s => s.id === selectedSub.id);
-      const updated = { ...freshSub, current_usage: 0 };
-
-      setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? updated : s)));
-      setSelectedSub(updated);
-      setCurrentUsageInput(0);
+      if (res.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
+        setSelectedSub(res.subscription);
+        setCurrentUsageInput(res.subscription.current_usage ?? "");
+      }
       triggerToast("success", "Usage metrics reset successfully.");
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to reset usage.");
@@ -268,21 +237,10 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       const res = await adminExtendSubscriptionPeriod(selectedSub.id, param);
       if (res.error) throw new Error(res.error);
 
-      // Reload fresh details since reset_date / period_end change
-      const nextEnd = extendDays === "custom" 
-        ? new Date(customExtDate) 
-        : new Date(new Date(selectedSub.current_period_end || new Date()).getTime() + Number(extendDays) * 24 * 60 * 60 * 1000);
-
-      const freshSub = subscriptions.find(s => s.id === selectedSub.id);
-      const updated = {
-        ...freshSub,
-        current_period_end: nextEnd.toISOString(),
-        reset_date: nextEnd.toISOString(),
-        status: "active"
-      };
-
-      setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? updated : s)));
-      setSelectedSub(updated);
+      if (res.subscription) {
+        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
+        setSelectedSub(res.subscription);
+      }
       triggerToast("success", "Subscription period extended.");
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to extend subscription.");

@@ -28,6 +28,17 @@ async function writeAuditLog(
   }
 }
 
+// Helper to fetch full subscription details
+async function fetchSubscriptionById(id: string) {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from("subscriptions")
+    .select("*, businesses(id, name, slug, owner:profiles(email, full_name))")
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+
 // Zod Input Schemas
 const changePlanSchema = z.object({
   subscriptionId: z.string().uuid(),
@@ -162,9 +173,21 @@ export async function adminChangeSubscriptionPlan(
 
   // 2. Resolve default limits for the new plan
   const planLimits = getPlanLimits(input.plan);
+  
+  // daily_message_limit is not a column in subscriptions table! It should be saved in metadata.
+  const { daily_message_limit, ...dbPlanLimits } = planLimits;
+
   const now = new Date();
   const periodEnd = new Date();
   periodEnd.setDate(periodEnd.getDate() + 30);
+
+  const existingMetadata = currentSub.metadata || {};
+  const newMetadata = {
+    ...existingMetadata,
+    daily_message_limit,
+    last_plan_change_at: now.toISOString(),
+    last_plan_change_by: admin.id,
+  };
 
   // 3. Update subscription safely
   const { error: updateError } = await supabase
@@ -177,7 +200,8 @@ export async function adminChangeSubscriptionPlan(
       current_period_end: periodEnd.toISOString(),
       reset_date: periodEnd.toISOString(),
       cancel_at_period_end: false,
-      ...planLimits,
+      metadata: newMetadata,
+      ...dbPlanLimits,
       updated_at: now.toISOString(),
     })
     .eq("id", input.subscriptionId);
@@ -201,7 +225,9 @@ export async function adminChangeSubscriptionPlan(
 
   revalidatePath("/admin/subscriptions");
   revalidatePath("/dashboard/billing");
-  return { success: true };
+
+  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
+  return { success: true, subscription: updatedSubscription };
 }
 
 /**
@@ -257,7 +283,9 @@ export async function adminChangeSubscriptionStatus(
 
   revalidatePath("/admin/subscriptions");
   revalidatePath("/dashboard/billing");
-  return { success: true };
+
+  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
+  return { success: true, subscription: updatedSubscription };
 }
 
 /**
@@ -342,7 +370,9 @@ export async function adminUpdateSubscriptionLimits(
 
   revalidatePath("/admin/subscriptions");
   revalidatePath("/dashboard/billing");
-  return { success: true };
+
+  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
+  return { success: true, subscription: updatedSubscription };
 }
 
 /**
@@ -399,7 +429,9 @@ export async function adminResetSubscriptionUsage(subscriptionId: string, reason
 
   revalidatePath("/admin/subscriptions");
   revalidatePath("/dashboard/billing");
-  return { success: true };
+
+  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
+  return { success: true, subscription: updatedSubscription };
 }
 
 /**
@@ -466,7 +498,9 @@ export async function adminExtendSubscriptionPeriod(
 
   revalidatePath("/admin/subscriptions");
   revalidatePath("/dashboard/billing");
-  return { success: true };
+
+  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
+  return { success: true, subscription: updatedSubscription };
 }
 
 /**
@@ -514,5 +548,7 @@ export async function adminUpdateSubscriptionNotes(subscriptionId: string, notes
   }
 
   revalidatePath("/admin/subscriptions");
-  return { success: true };
+  
+  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
+  return { success: true, subscription: updatedSubscription };
 }
