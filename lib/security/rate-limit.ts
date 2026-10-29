@@ -33,6 +33,8 @@ export const RATE_LIMITS = {
   admin_actions:        { requests: 100, window: 60 * 60 },  // 100 / hr
   widget_config:        { requests: 60,  window: 60 * 60 },  // 60 / hr
   playground_chat:      { requests: 30,  window: 60 * 60 },  // 30 / hr
+  instant_generation:   { requests: 5,   window: 60 * 60 },  // 5  / hr
+  demo_chat:            { requests: 15,  window: 60 },       // 15 / min
 } as const;
 
 export type RateLimitPreset = keyof typeof RATE_LIMITS;
@@ -155,7 +157,15 @@ export async function rateLimit(
   if (process.env.NODE_ENV === "production") {
     if (!upstashUrl || !upstashToken) {
       console.error("[RateLimit] CRITICAL: Upstash Redis credentials are missing in production!");
-      // Fail safely (open): allow the request but do not fall back to in-memory store in production
+      if (preset === "instant_generation") {
+        // Enforce restrictive memory limiter fallback for expensive instant generation
+        return memoryRateLimit(key, { requests: 3, window: config.window });
+      }
+      if (preset === "demo_chat") {
+        // Enforce restrictive memory limiter fallback for demo chat
+        return memoryRateLimit(key, { requests: 10, window: config.window });
+      }
+      // Fail safely (open) for lightweight reads, but do not fall back to in-memory store
       return {
         success: true,
         remaining: 1,

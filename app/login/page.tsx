@@ -23,6 +23,10 @@ export default function LoginPage() {
       setVerificationEmail(emailParam ? decodeURIComponent(emailParam) : "");
       if (emailParam) setEmail(decodeURIComponent(emailParam));
     }
+    const claimParam = params.get("claim");
+    if (claimParam) {
+      document.cookie = `agentify_claim_demo=${encodeURIComponent(claimParam)}; path=/; max-age=604800; SameSite=Lax`;
+    }
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {

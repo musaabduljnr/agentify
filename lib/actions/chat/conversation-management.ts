@@ -52,6 +52,10 @@ export async function resolveOrCreateConversation({
         p_demo_id: demoBusinessId,
       });
 
+      await supabase.rpc("increment_demo_message_count", {
+        p_demo_id: demoBusinessId,
+      });
+
       await supabase.from("demo_events").insert({
         demo_business_id: demoBusinessId,
         visitor_id: visitorId,

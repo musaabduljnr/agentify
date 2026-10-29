@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Bot, Chrome, CheckCircle2, Loader2 } from "lucide-react";
+import { Bot, Chrome, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -17,6 +17,18 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [claimSlug, setClaimSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const claim = params.get("claim");
+      if (claim) {
+        setClaimSlug(claim);
+        document.cookie = `agentify_claim_demo=${encodeURIComponent(claim)}; path=/; max-age=604800; SameSite=Lax`;
+      }
+    }
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +59,13 @@ export default function SignupPage() {
     } else {
       await supabase.auth.signOut();
       const params = new URLSearchParams(window.location.search);
-      const nextParam = params.get("next") ? `&next=${encodeURIComponent(params.get("next")!)}` : "";
+      const claim = params.get("claim") || claimSlug;
+      if (claim) {
+        document.cookie = `agentify_claim_demo=${encodeURIComponent(claim)}; path=/; max-age=604800; SameSite=Lax`;
+      }
+      const nextParam = params.get("next")
+        ? `&next=${encodeURIComponent(params.get("next")!)}`
+        : (claim ? `&next=${encodeURIComponent("/dashboard")}` : "");
       router.replace(`/login?verification=sent&email=${encodeURIComponent(email)}${nextParam}`);
       router.refresh();
     }
@@ -93,6 +111,12 @@ export default function SignupPage() {
         {/* Right side: Form */}
         <div className="flex-1 p-6 sm:p-10 md:p-12">
           <div className="mb-10">
+            {claimSlug && (
+              <div className="mb-4 p-3.5 bg-indigo-50 border border-indigo-150 rounded-2xl flex items-center gap-2.5 text-xs font-semibold text-indigo-700">
+                <Sparkles className="h-4 w-4 shrink-0 text-indigo-600 animate-pulse" />
+                <span>You're claiming an AI assistant preview! Sign up to activate and claim this assistant for your account.</span>
+              </div>
+            )}
             <h1 className="text-2xl font-bold text-slate-900">Create account</h1>
             <p className="text-slate-500">Get started for free, no credit card required.</p>
           </div>

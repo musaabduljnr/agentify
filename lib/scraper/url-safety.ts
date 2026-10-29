@@ -25,6 +25,24 @@ function isPrivateIp(hostname: string): boolean {
   const normalized = hostname.replace(/^\[|\]$/g, "").toLowerCase();
   const ipVersion = isIP(normalized);
 
+  if (normalized.startsWith("::ffff:") || normalized.startsWith("0:0:0:0:0:ffff:")) {
+    const rest = normalized.replace(/^.*ffff:/, "");
+    if (rest.includes(".")) {
+      return isPrivateIp(rest);
+    }
+    const parts = rest.split(":");
+    if (parts.length === 2) {
+      const high = parseInt(parts[0], 16);
+      const low = parseInt(parts[1], 16);
+      const a = (high >> 8) & 0xff;
+      const b = high & 0xff;
+      const c = (low >> 8) & 0xff;
+      const d = low & 0xff;
+      return isPrivateIp(`${a}.${b}.${c}.${d}`);
+    }
+    return true;
+  }
+
   if (ipVersion === 4) {
     const parts = normalized.split(".").map(Number);
     const [a, b] = parts;
@@ -66,6 +84,7 @@ export function isPrivateOrLocalUrl(url: string): boolean {
     if (BLOCKED_HOSTS.includes(hostname)) return true;
     if (hostname.endsWith(".local")) return true;
     if (hostname.endsWith(".internal")) return true;
+    if (hostname.endsWith(".localhost")) return true;
     if (isPrivateIp(hostname)) return true;
 
     return false;
@@ -102,12 +121,15 @@ export async function assertPublicHttpUrl(url: string): Promise<void> {
     addresses = await lookup(hostname, { all: true });
   } catch (err) {
     console.warn(`[DNS Warning] Could not resolve ${hostname} using dns.lookup:`, err);
+    throw new Error(`Could not resolve hostname "${hostname}". Please check that the URL exists and is publicly accessible.`);
   }
 
   if (addresses && addresses.length > 0) {
     if (addresses.some((entry) => isPrivateIp(entry.address))) {
       throw new Error("Cannot scrape URLs that resolve to private or local networks.");
     }
+  } else {
+    throw new Error(`Could not resolve hostname "${hostname}". Please check that the URL is publicly accessible.`);
   }
 }
 

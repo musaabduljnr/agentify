@@ -45,6 +45,7 @@ describe("completeOnboarding Server Action", () => {
       widgetConfig: null,
       subscription: null,
       isComplete: false,
+      businesses: [],
     });
 
     await expect(completeOnboarding(validOnboardingData)).rejects.toThrow("Unauthorized");
@@ -59,6 +60,7 @@ describe("completeOnboarding Server Action", () => {
       widgetConfig: null,
       subscription: null,
       isComplete: false,
+      businesses: [],
     });
 
     const invalidData = { ...validOnboardingData, contactEmail: "invalid-email" };
@@ -92,6 +94,7 @@ describe("completeOnboarding Server Action", () => {
       widgetConfig: null,
       subscription: null,
       isComplete: false,
+      businesses: [],
     });
 
     vi.mocked(createClient).mockResolvedValueOnce(mockSupabase as any);

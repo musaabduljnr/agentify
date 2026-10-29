@@ -62,10 +62,10 @@ export default async function HostedDemoPage({ params, searchParams }: DemoPageP
 
   const supabase = createServiceClient();
 
-  // 1. Fetch demo business details
+  // 1. Fetch demo business details (sanitize to expose only public preview fields)
   const { data: demo, error: demoErr } = await supabase
     .from("demo_businesses")
-    .select("*")
+    .select("id, business_name, demo_slug, status, expires_at, placeholder_business_id, website_url, total_message_count")
     .eq("demo_slug", normalizedSlug)
     .maybeSingle();
 
@@ -89,17 +89,17 @@ export default async function HostedDemoPage({ params, searchParams }: DemoPageP
     return <DemoInactivePage status={demo.status} businessName={demo.business_name} />;
   }
 
-  // 3. Fetch placeholder business config details
+  // 3. Fetch placeholder business config details (only necessary fields)
   const [{ data: assistant }, { data: widgetConfig }] = await Promise.all([
     supabase
       .from("assistants")
-      .select("*")
+      .select("id, name, welcome_message, tone")
       .eq("business_id", demo.placeholder_business_id)
       .eq("is_active", true)
       .maybeSingle(),
     supabase
       .from("widget_configs")
-      .select("*")
+      .select("primary_color, suggested_questions")
       .eq("business_id", demo.placeholder_business_id)
       .maybeSingle(),
   ]);
@@ -126,6 +126,8 @@ export default async function HostedDemoPage({ params, searchParams }: DemoPageP
       suggestedQuestions={suggestedQuestions}
       contactParam={contact || null}
       websiteUrl={demo.website_url}
+      initialMessageCount={demo.total_message_count ?? 0}
+      maxMessageBudget={20}
     />
   );
 }

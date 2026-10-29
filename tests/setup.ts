@@ -15,6 +15,7 @@ vi.mock("next/cache", () => ({
 
 vi.mock("next/navigation", () => ({
   notFound: vi.fn(),
+  redirect: vi.fn(),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),

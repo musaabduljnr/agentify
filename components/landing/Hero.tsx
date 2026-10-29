@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Bot, Sparkles, Zap, Shield } from "lucide-react";
 import Link from "next/link";
+import { InstantAgentForm } from "@/components/landing/InstantAgentForm";
 
 export function Hero() {
   return (
@@ -18,16 +19,19 @@ export function Hero() {
             <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto lg:mx-0">
               Create a custom AI assistant trained on your business data. Embed it on your site in minutes and start converting visitors into leads automatically.
             </p>
-            <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-              <Link href="/signup" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto rounded-full px-8 h-14 text-lg">
-                  Start free trial
-                </Button>
+            {/* Instant Agent Generation Form */}
+            <div className="mb-8">
+              <InstantAgentForm />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 justify-center lg:justify-start text-xs text-slate-500 font-semibold">
+              <span>Looking for account signup?</span>
+              <Link href="/signup" className="text-indigo-600 hover:text-indigo-700 underline underline-offset-4">
+                Start 14-day free trial
               </Link>
-              <Link href="/demo" className="w-full sm:w-auto">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-full px-8 h-14 text-lg border-slate-300 bg-white text-slate-900 hover:bg-slate-50">
-                  View demo
-                </Button>
+              <span>•</span>
+              <Link href="/demo" className="text-slate-600 hover:text-slate-900 underline underline-offset-4">
+                View sample interactive demo
               </Link>
             </div>
             
