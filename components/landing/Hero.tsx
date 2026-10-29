@@ -2,7 +2,18 @@
 
 import Link from "next/link";
 import { InstantAgentForm } from "@/components/landing/InstantAgentForm";
-import { Sparkles, Zap, Shield, Star, ArrowRight, CheckCircle2 } from "lucide-react";
+import { 
+  Sparkles, 
+  Zap, 
+  ShieldCheck, 
+  Star, 
+  ArrowRight, 
+  CheckCircle2, 
+  Bot,
+  Globe,
+  Cpu,
+  Layers
+} from "lucide-react";
 
 const SOCIAL_PROOF_LOGOS = [
   { label: "Shopify", abbr: "SH" },
@@ -10,188 +21,165 @@ const SOCIAL_PROOF_LOGOS = [
   { label: "Webflow", abbr: "WF" },
   { label: "Wix", abbr: "WX" },
   { label: "Squarespace", abbr: "SS" },
+  { label: "Custom HTML", abbr: "JS" },
 ];
 
 const TRUST_ITEMS = [
-  { icon: CheckCircle2, label: "No credit card" },
-  { icon: Zap, label: "Ready in ~10 seconds" },
-  { icon: Shield, label: "Secure & private" },
+  { icon: CheckCircle2, label: "No credit card required" },
+  { icon: Zap, label: "Trained in ~10 seconds" },
+  { icon: ShieldCheck, label: "Enterprise-grade privacy" },
 ];
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#0a0a0f] pt-24 pb-16 px-4">
+    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#07080c] pt-28 pb-20 px-4">
       {/* Background grid */}
       <div
-        className="absolute inset-0 opacity-[0.035]"
+        className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
+          backgroundSize: "48px 48px",
         }}
       />
 
-      {/* Radial glow blob – center */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none" />
+      {/* Radial glow blobs */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[500px] rounded-full bg-indigo-600/15 blur-[140px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/3 -translate-x-1/2 w-[420px] h-[420px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none" />
+      <div className="absolute top-1/3 right-1/4 w-[360px] h-[360px] rounded-full bg-blue-600/10 blur-[100px] pointer-events-none" />
 
-      {/* Top-left accent */}
-      <div className="absolute top-0 left-0 w-96 h-96 rounded-full bg-violet-700/10 blur-[90px] pointer-events-none" />
-
-      {/* Bottom-right accent */}
-      <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full bg-blue-600/10 blur-[90px] pointer-events-none" />
-
-      {/* Content */}
+      {/* Content Container */}
       <div className="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center gap-8">
+        
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs sm:text-sm font-semibold tracking-wide backdrop-blur-sm">
-          <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-          <span>AI-Powered Business Assistant Generator</span>
-          <span className="inline-flex items-center gap-1 ml-1 text-emerald-400">
-            <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
-            Live
+        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-slate-300 text-xs sm:text-sm font-medium tracking-wide backdrop-blur-md shadow-inner">
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
+          <span className="text-white font-semibold">Agentify 2.0</span>
+          <span className="text-slate-500">•</span>
+          <span className="text-slate-400">Autonomous Business AI Engine</span>
         </div>
 
         {/* Heading */}
-        <div className="space-y-4">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-white leading-[1.08] tracking-tight">
-            Your website URL.{" "}
+        <div className="space-y-5 max-w-3xl">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold text-white tracking-tight leading-[1.08]">
+            <span className="text-slate-400 font-normal">Train an AI agent on</span>{" "}
             <br className="hidden sm:block" />
-            <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-blue-400 bg-clip-text text-transparent">
-              Your AI sales agent.
+            <span className="text-white">your entire business.</span>{" "}
+            <br className="hidden sm:block" />
+            <span className="bg-gradient-to-r from-indigo-400 via-violet-300 to-indigo-200 bg-clip-text text-transparent">
+              In under 10 seconds.
             </span>
-            <br className="hidden sm:block" />
-            In 10 seconds.
           </h1>
-          <p className="text-slate-400 text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed">
-            Paste any website URL and watch Agentify crawl it, train an AI agent on your content,
-            and give you an interactive chat preview — instantly, for free.
+          <p className="text-slate-400 text-base sm:text-lg md:text-xl max-w-2xl mx-auto leading-relaxed font-normal">
+            Enter your website URL. Agentify instantly crawls your pages, learns your products, policies, and tone, and generates a live customer sales agent.
           </p>
         </div>
 
-        {/* THE FORM — hero centerpiece */}
+        {/* THE FORM — Hero Centerpiece */}
         <div className="w-full max-w-2xl">
-          {/* Form card */}
-          <div className="relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-1 shadow-2xl shadow-indigo-500/10">
-            {/* Inner shimmer border */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500/20 via-transparent to-violet-500/20 pointer-events-none" />
-            <div className="relative z-10 p-4 sm:p-6 space-y-5">
-              {/* Label */}
-              <div className="text-left">
-                <p className="text-sm font-bold text-white/70 uppercase tracking-widest mb-1">
-                  🚀 Instant AI Agent Generator
-                </p>
-                <p className="text-white/40 text-xs">
-                  Crawls your site → Extracts your brand → Trains a custom AI → Live demo ready
-                </p>
-              </div>
-
-              {/* Steps flow (visual indicator) */}
-              <div className="hidden sm:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                {["1. Enter URL", "2. AI Crawls & Trains", "3. Test Your Agent"].map((step, i) => (
-                  <div key={step} className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full ${i === 0 ? "bg-indigo-600/30 text-indigo-300" : "bg-white/5 text-slate-500"}`}>
-                      {step}
-                    </span>
-                    {i < 2 && <ArrowRight className="w-3 h-3 text-slate-600" />}
+          <div className="relative rounded-2xl border border-white/10 bg-[#0d0f17]/80 backdrop-blur-xl p-1 shadow-2xl shadow-black/80">
+            {/* Subtle inner highlight glow */}
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.06] to-transparent pointer-events-none" />
+            
+            <div className="relative z-10 p-4 sm:p-6 space-y-4">
+              {/* Form Title Header (100% icons, zero emojis) */}
+              <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                    <Sparkles className="w-3.5 h-3.5" />
                   </div>
-                ))}
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Instant AI Agent Generator
+                  </span>
+                </div>
+                <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Globe className="w-3 h-3 text-indigo-400" /> Crawl
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-slate-600" />
+                  <span className="flex items-center gap-1">
+                    <Cpu className="w-3 h-3 text-violet-400" /> Index
+                  </span>
+                  <ArrowRight className="w-3 h-3 text-slate-600" />
+                  <span className="flex items-center gap-1">
+                    <Bot className="w-3 h-3 text-emerald-400" /> Live Demo
+                  </span>
+                </div>
               </div>
 
-              {/* The Instant Agent Form */}
+              {/* The Instant Agent Form Component */}
               <InstantAgentForm dark />
             </div>
           </div>
 
-          {/* Trust bar */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-500 font-medium">
+          {/* Trust Points */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-400 font-medium">
             {TRUST_ITEMS.map(({ icon: Icon, label }) => (
               <span key={label} className="flex items-center gap-1.5">
-                <Icon className="w-3.5 h-3.5 text-emerald-500" />
-                {label}
+                <Icon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span>{label}</span>
               </span>
             ))}
           </div>
         </div>
 
-        {/* Social proof: user count */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 text-sm text-slate-500">
+        {/* Social Proof metrics */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 text-sm text-slate-400 pt-2">
           {/* Avatar stack */}
-          <div className="flex items-center -space-x-2.5">
-            {["#6366f1", "#8b5cf6", "#ec4899", "#f97316", "#10b981"].map((color, i) => (
+          <div className="flex items-center -space-x-2">
+            {["#4f46e5", "#7c3aed", "#2563eb", "#059669", "#d97706"].map((color, i) => (
               <div
                 key={i}
-                className="w-8 h-8 rounded-full border-2 border-[#0a0a0f] flex items-center justify-center text-[10px] font-bold text-white"
+                className="w-7 h-7 rounded-full border-2 border-[#07080c] flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
                 style={{ backgroundColor: color }}
               >
                 {String.fromCharCode(65 + i)}
               </div>
             ))}
           </div>
-          <div className="text-center sm:text-left">
+          
+          <div className="text-center sm:text-left flex items-center gap-1.5">
             <span className="text-white font-bold">1,200+</span>
-            <span className="text-slate-500"> businesses already using Agentify</span>
+            <span className="text-slate-400">businesses deployed</span>
           </div>
-          {/* Star rating */}
-          <div className="flex items-center gap-1 text-amber-400 text-xs font-semibold">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
-            ))}
-            <span className="text-slate-500 ml-1">4.9/5</span>
-          </div>
-        </div>
 
-        {/* Divider text */}
-        <div className="flex items-center gap-4 text-xs text-slate-700 font-semibold uppercase tracking-widest">
-          <div className="flex-1 h-px bg-white/5" />
-          Works seamlessly with
-          <div className="flex-1 h-px bg-white/5" />
-        </div>
+          <span className="hidden sm:inline text-slate-700">•</span>
 
-        {/* Platform compatibility logos */}
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          {SOCIAL_PROOF_LOGOS.map(({ label, abbr }) => (
-            <div
-              key={label}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-white/8 bg-white/4 text-slate-400 hover:text-slate-200 hover:border-white/15 transition-all duration-200 text-sm font-semibold backdrop-blur-sm"
-            >
-              <span className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center text-[9px] font-extrabold text-slate-300">
-                {abbr}
-              </span>
-              {label}
+          {/* Rating */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="flex items-center gap-0.5 text-amber-400">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              ))}
             </div>
-          ))}
+            <span className="text-slate-300 font-semibold">4.9/5</span>
+            <span className="text-slate-500">(500+ reviews)</span>
+          </div>
         </div>
 
-        {/* Secondary links */}
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-600">
-          <Link
-            href="/signup"
-            className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors underline underline-offset-4"
-          >
-            Sign up for full account
-          </Link>
-          <span className="text-slate-800">•</span>
-          <Link
-            href="/demo"
-            className="text-slate-500 hover:text-slate-300 font-medium transition-colors"
-          >
-            View sample demo
-          </Link>
-          <span className="text-slate-800">•</span>
-          <Link
-            href="#pricing"
-            className="text-slate-500 hover:text-slate-300 font-medium transition-colors"
-          >
-            See pricing
-          </Link>
+        {/* Integration Platforms */}
+        <div className="w-full pt-4 space-y-3">
+          <p className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+            Embeds natively on any stack in 60 seconds
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            {SOCIAL_PROOF_LOGOS.map(({ label, abbr }) => (
+              <div
+                key={label}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-white/[0.07] bg-white/[0.02] text-slate-400 hover:text-white hover:border-white/15 transition-all text-xs font-medium"
+              >
+                <span className="w-5 h-5 rounded-md bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-indigo-300">
+                  {abbr}
+                </span>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-slate-700 text-[10px] font-semibold uppercase tracking-widest animate-bounce">
-        <span>Scroll</span>
-        <div className="w-px h-6 bg-gradient-to-b from-slate-700 to-transparent" />
       </div>
     </section>
   );
