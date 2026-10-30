@@ -17,7 +17,7 @@ import {
   RotateCcw
 } from "lucide-react";
 
-export function InstantAgentForm({ dark = true }: { dark?: boolean }) {
+export function InstantAgentForm(_props?: { dark?: boolean }) {
   const [url, setUrl] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +60,8 @@ export function InstantAgentForm({ dark = true }: { dark?: boolean }) {
         } else {
           setError(response.error);
         }
-      } catch (err: any) {
-        setError(err.message || "Failed to generate AI agent draft. Please try again.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to generate AI agent draft. Please try again.");
       }
     });
   };

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { InstantAgentForm } from "@/components/landing/InstantAgentForm";
 import { 
   Sparkles, 
@@ -11,8 +10,7 @@ import {
   CheckCircle2, 
   Bot,
   Globe,
-  Cpu,
-  Layers
+  Cpu
 } from "lucide-react";
 
 const SOCIAL_PROOF_LOGOS = [
