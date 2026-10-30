@@ -24,37 +24,44 @@ export default function LandingPage() {
       {/* 2. Hero Section with Interactive 3-Panel Showcase and InstantAgentForm */}
       <Hero />
 
-      {/* 3. Social Proof Logo Strip (Stitch Section 2) */}
-      <section className="w-full py-12 px-6 lg:px-12 bg-[#f2f4f8] border-y border-[#eceef2]">
+      {/* 3. Platform Compatibility Strip */}
+      <section className="w-full py-14 px-6 lg:px-12 bg-[#f2f4f8] border-y border-[#eceef2]">
         <div className="max-w-6xl mx-auto flex flex-col items-center">
-          <p className="text-[11px] uppercase tracking-widest text-[#575f6a] font-semibold mb-8 text-center">
-            Trusted by modern businesses & high-growth revenue teams
+          <p className="text-[11px] uppercase tracking-widest text-[#575f6a] font-semibold mb-10 text-center">
+            Works seamlessly with the platforms you already use
           </p>
-          {/* Minimalist Monochrome Logo Row from Stitch */}
-          <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-8 items-center justify-items-center opacity-70 grayscale hover:grayscale-0 transition-all">
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-tighter text-[#181c1f]">
-              <span className="w-5 h-5 rounded-full bg-[#181c1f] text-white flex items-center justify-center text-[10px] font-bold">C</span>
-              Capsule
+          <div className="w-full flex flex-wrap justify-center items-center gap-x-10 gap-y-8">
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/wordpress/21759B" alt="WordPress" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">WordPress</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-tighter text-[#181c1f]">
-              <span className="w-5 h-5 rounded-full bg-[#181c1f] text-white flex items-center justify-center text-[10px] font-bold">S</span>
-              Sisyphus
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/shopify/96BF48" alt="Shopify" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">Shopify</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-tighter text-[#181c1f]">
-              <span className="w-5 h-5 rounded-full bg-[#181c1f] text-white flex items-center justify-center text-[10px] font-bold">CT</span>
-              Catalog
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/wix/0C6EFC" alt="Wix" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">Wix</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-tighter text-[#181c1f]">
-              <span className="w-5 h-5 rounded-full bg-[#181c1f] text-white flex items-center justify-center text-[10px] font-bold">A</span>
-              Acme Corp
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/webflow/4353FF" alt="Webflow" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">Webflow</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-tighter text-[#181c1f]">
-              <span className="w-5 h-5 rounded-full bg-[#181c1f] text-white flex items-center justify-center text-[10px] font-bold">N</span>
-              Nietzsche
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/squarespace/000000" alt="Squarespace" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">Squarespace</span>
             </div>
-            <div className="flex items-center gap-2 text-sm font-semibold tracking-tighter text-[#181c1f]">
-              <span className="w-5 h-5 rounded-full bg-[#181c1f] text-white flex items-center justify-center text-[10px] font-bold">CW</span>
-              CloudWatch
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/framer/0055FF" alt="Framer" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">Framer</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/hubspot/FF7A59" alt="HubSpot" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">HubSpot</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 group">
+              <img src="https://cdn.simpleicons.org/nextdotjs/000000" alt="Next.js" className="w-8 h-8 grayscale group-hover:grayscale-0 transition-all duration-300" />
+              <span className="text-[11px] font-medium text-[#575f6a]">Next.js</span>
             </div>
           </div>
         </div>
