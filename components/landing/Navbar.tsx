@@ -23,55 +23,51 @@ export function Navbar() {
           : "bg-[#ffffff]/80 backdrop-blur-md border-b border-[#eceef2]"
       }`}
     >
-      <div className="h-16 max-w-7xl mx-auto px-6 lg:px-12 flex items-center justify-between">
+      <div className="h-16 max-w-7xl mx-auto px-6 lg:px-12 flex items-center justify-between relative">
         {/* Brand Logo & Name */}
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-lg bg-[#2a54c0] flex items-center justify-center text-white shadow-sm shadow-[#2a54c0]/30 transition-transform group-hover:scale-105">
-              <Image 
-                src="/icon.svg" 
-                alt="Agentify" 
-                width={20} 
-                height={20} 
-                className="w-5 h-5 invert brightness-0"
-              />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-[#181c1f]">
-              Agentify
-            </span>
+        <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
+          <Image
+            src="/icon.svg"
+            alt="Agentify"
+            width={32}
+            height={32}
+            className="w-8 h-8 rounded-lg transition-transform group-hover:scale-105"
+          />
+          <span className="text-xl font-bold tracking-tight text-[#181c1f]">
+            Agentify
+          </span>
+        </Link>
+
+        {/* Desktop Nav Links — absolutely centered */}
+        <nav className="hidden md:flex items-center gap-6 absolute left-1/2 -translate-x-1/2">
+          <Link
+            href="#how-it-works"
+            className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+          >
+            Platform
           </Link>
+          <Link
+            href="#capabilities"
+            className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+          >
+            Capabilities
+          </Link>
+          <Link
+            href="#solutions"
+            className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+          >
+            Solutions
+          </Link>
+          <Link
+            href="#faq"
+            className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+          >
+            Resources
+          </Link>
+        </nav>
 
-          {/* Desktop Nav Links from Stitch */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link
-              href="#how-it-works"
-              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
-            >
-              Platform
-            </Link>
-            <Link
-              href="#capabilities"
-              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
-            >
-              Capabilities
-            </Link>
-            <Link
-              href="#solutions"
-              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
-            >
-              Solutions
-            </Link>
-            <Link
-              href="#faq"
-              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
-            >
-              Resources
-            </Link>
-          </nav>
-        </div>
-
-        {/* Desktop Actions from Stitch */}
-        <div className="hidden md:flex items-center gap-3">
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center gap-3 flex-shrink-0">
           <Link
             href="/login"
             className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] px-3 py-2 transition-colors"
