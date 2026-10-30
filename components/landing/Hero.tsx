@@ -2,180 +2,242 @@
 
 import { InstantAgentForm } from "@/components/landing/InstantAgentForm";
 import { 
-  Sparkles, 
-  Zap, 
-  ShieldCheck, 
   Star, 
-  ArrowRight, 
+  ShieldCheck, 
+  Bot, 
   CheckCircle2, 
-  Bot,
-  Globe,
-  Cpu
+  RefreshCw,
+  Sparkles
 } from "lucide-react";
-
-const SOCIAL_PROOF_LOGOS = [
-  { label: "Shopify", abbr: "SH" },
-  { label: "WordPress", abbr: "WP" },
-  { label: "Webflow", abbr: "WF" },
-  { label: "Wix", abbr: "WX" },
-  { label: "Squarespace", abbr: "SS" },
-  { label: "Custom HTML", abbr: "JS" },
-];
-
-const TRUST_ITEMS = [
-  { icon: CheckCircle2, label: "No credit card required" },
-  { icon: Zap, label: "Trained in ~10 seconds" },
-  { icon: ShieldCheck, label: "Enterprise-grade privacy" },
-];
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-[#07080c] pt-28 pb-20 px-4">
-      {/* Background grid */}
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
-        }}
-      />
+    <section className="relative w-full overflow-hidden pt-28 pb-20 px-6 lg:px-12 bg-[#f7f9fd]">
+      {/* Atmospheric Ambient Glows from Stitch */}
+      <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[850px] h-[340px] bg-gradient-to-b from-[#dbe1ff]/50 via-[#f2f4f8]/30 to-transparent blur-3xl pointer-events-none -z-10 rounded-full" />
 
-      {/* Radial glow blobs */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[500px] rounded-full bg-indigo-600/15 blur-[140px] pointer-events-none" />
-      <div className="absolute top-1/2 left-1/3 -translate-x-1/2 w-[420px] h-[420px] rounded-full bg-violet-600/10 blur-[120px] pointer-events-none" />
-      <div className="absolute top-1/3 right-1/4 w-[360px] h-[360px] rounded-full bg-blue-600/10 blur-[100px] pointer-events-none" />
-
-      {/* Content Container */}
-      <div className="relative z-10 w-full max-w-4xl mx-auto text-center flex flex-col items-center gap-8">
+      <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
         
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.04] text-slate-300 text-xs sm:text-sm font-medium tracking-wide backdrop-blur-md shadow-inner">
-          <span className="flex h-2 w-2 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="text-white font-semibold">Agentify 2.0</span>
-          <span className="text-slate-500">•</span>
-          <span className="text-slate-400">Autonomous Business AI Engine</span>
-        </div>
-
-        {/* Heading */}
-        <div className="space-y-5 max-w-3xl">
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold text-white tracking-tight leading-[1.08]">
-            <span className="text-slate-400 font-normal">Train an AI agent on</span>{" "}
-            <br className="hidden sm:block" />
-            <span className="text-white">your entire business.</span>{" "}
-            <br className="hidden sm:block" />
-            <span className="bg-gradient-to-r from-indigo-400 via-violet-300 to-indigo-200 bg-clip-text text-transparent">
-              In under 10 seconds.
-            </span>
-          </h1>
-          <p className="text-slate-400 text-base sm:text-lg md:text-xl max-w-2xl mx-auto leading-relaxed font-normal">
-            Enter your website URL. Agentify instantly crawls your pages, learns your products, policies, and tone, and generates a live customer sales agent.
-          </p>
-        </div>
-
-        {/* THE FORM — Hero Centerpiece */}
-        <div className="w-full max-w-2xl">
-          <div className="relative rounded-2xl border border-white/10 bg-[#0d0f17]/80 backdrop-blur-xl p-1 shadow-2xl shadow-black/80">
-            {/* Subtle inner highlight glow */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.06] to-transparent pointer-events-none" />
-            
-            <div className="relative z-10 p-4 sm:p-6 space-y-4">
-              {/* Form Title Header (100% icons, zero emojis) */}
-              <div className="flex items-center justify-between pb-1 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                    Instant AI Agent Generator
-                  </span>
-                </div>
-                <div className="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-indigo-400" /> Crawl
-                  </span>
-                  <ArrowRight className="w-3 h-3 text-slate-600" />
-                  <span className="flex items-center gap-1">
-                    <Cpu className="w-3 h-3 text-violet-400" /> Index
-                  </span>
-                  <ArrowRight className="w-3 h-3 text-slate-600" />
-                  <span className="flex items-center gap-1">
-                    <Bot className="w-3 h-3 text-emerald-400" /> Live Demo
-                  </span>
-                </div>
-              </div>
-
-              {/* The Instant Agent Form Component */}
-              <InstantAgentForm dark />
-            </div>
-          </div>
-
-          {/* Trust Points */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-400 font-medium">
-            {TRUST_ITEMS.map(({ icon: Icon, label }) => (
-              <span key={label} className="flex items-center gap-1.5">
-                <Icon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>{label}</span>
-              </span>
+        {/* Social Proof Rating Chip */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#ffffff] border border-[#eceef2] shadow-sm mb-8 transition-transform hover:scale-[1.02]">
+          <div className="flex items-center text-amber-400">
+            {[...Array(5)].map((_, i) => (
+              <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
             ))}
           </div>
+          <span className="text-[13px] font-semibold text-[#181c1f]">4.9 rating</span>
+          <span className="w-1 h-1 rounded-full bg-[#c4c6d5]"></span>
+          <span className="text-[13px] text-[#575f6a]">50k+ conversations handled</span>
         </div>
 
-        {/* Social Proof metrics */}
-        <div className="flex flex-col sm:flex-row items-center gap-4 text-sm text-slate-400 pt-2">
-          {/* Avatar stack */}
-          <div className="flex items-center -space-x-2">
-            {["#4f46e5", "#7c3aed", "#2563eb", "#059669", "#d97706"].map((color, i) => (
-              <div
-                key={i}
-                className="w-7 h-7 rounded-full border-2 border-[#07080c] flex items-center justify-center text-[10px] font-bold text-white shadow-sm"
-                style={{ backgroundColor: color }}
-              >
-                {String.fromCharCode(65 + i)}
-              </div>
-            ))}
-          </div>
+        {/* Main Headline */}
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-[#181c1f] tracking-tight max-w-4xl mb-6 leading-[1.12]">
+          Your business deserves an AI assistant.
+        </h1>
+
+        {/* Subheadline */}
+        <p className="text-base sm:text-lg text-[#575f6a] max-w-2xl mb-10 leading-relaxed">
+          Answer customer questions, capture qualified leads, and provide instant support around the clock with an intelligent agent trained specifically on your business.
+        </p>
+
+        {/* Instant URL Generator Interaction Bar */}
+        <div className="w-full max-w-xl mx-auto mb-4">
+          <InstantAgentForm />
+        </div>
+
+        {/* Trust Microcopy */}
+        <div className="flex items-center justify-center gap-2 text-[#575f6a] text-xs sm:text-[13px] mb-16">
+          <ShieldCheck className="w-4 h-4 text-[#2a54c0] shrink-0" />
+          <span>No technical setup required. See your agent in action instantly.</span>
+        </div>
+
+        {/* 3-Panel Interactive Showcase from Stitch */}
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch text-left">
           
-          <div className="text-center sm:text-left flex items-center gap-1.5">
-            <span className="text-white font-bold">1,200+</span>
-            <span className="text-slate-400">businesses deployed</span>
-          </div>
-
-          <span className="hidden sm:inline text-slate-700">•</span>
-
-          {/* Rating */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="flex items-center gap-0.5 text-amber-400">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              ))}
-            </div>
-            <span className="text-slate-300 font-semibold">4.9/5</span>
-            <span className="text-slate-500">(500+ reviews)</span>
-          </div>
-        </div>
-
-        {/* Integration Platforms */}
-        <div className="w-full pt-4 space-y-3">
-          <p className="text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
-            Embeds natively on any stack in 60 seconds
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-            {SOCIAL_PROOF_LOGOS.map(({ label, abbr }) => (
-              <div
-                key={label}
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-white/[0.07] bg-white/[0.02] text-slate-400 hover:text-white hover:border-white/15 transition-all text-xs font-medium"
-              >
-                <span className="w-5 h-5 rounded-md bg-white/[0.06] flex items-center justify-center text-[9px] font-bold text-indigo-300">
-                  {abbr}
-                </span>
-                <span>{label}</span>
+          {/* Left Panel: Floating Customer Inquiry Card */}
+          <div className="lg:col-span-3 bg-[#f2f4f8]/80 border border-[#eceef2] rounded-xl p-5 flex flex-col justify-between shadow-xs relative group overflow-hidden">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#2a54c0] animate-pulse"></span>
+                  <span className="text-[11px] font-semibold text-[#575f6a] uppercase tracking-wider">
+                    Inbound Visitor
+                  </span>
+                </div>
+                <span className="text-[11px] text-[#747684]">Just now</span>
               </div>
-            ))}
+
+              {/* Customer Message Bubble */}
+              <div className="bg-[#ffffff] p-4 rounded-xl border border-[#eceef2] shadow-xs mb-4">
+                <div className="flex items-start gap-3 mb-2">
+                  <div className="w-7 h-7 rounded-full bg-[#dce3f1] flex items-center justify-center text-[#151c26] text-xs font-bold">
+                    MR
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-[#181c1f]">Marcus Reed</p>
+                    <p className="text-[11px] text-[#747684]">Verified Buyer</p>
+                  </div>
+                </div>
+                <p className="text-[13px] text-[#181c1f] leading-snug">
+                  &ldquo;Do you offer international enterprise shipping and same-day pickup for this item?&rdquo;
+                </p>
+              </div>
+            </div>
+
+            {/* Processing State Banner */}
+            <div className="bg-[#dbe1ff]/60 border border-[#b4c5ff] p-3 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[#013daa]">
+                <RefreshCw className="w-4 h-4 animate-spin text-[#2a54c0]" />
+                <span className="text-xs font-medium">Neural Synapse Processing...</span>
+              </div>
+              <span className="text-[11px] text-[#013daa] font-mono">14ms</span>
+            </div>
           </div>
+
+          {/* Center Panel: Agentify Dashboard Insights Preview */}
+          <div className="lg:col-span-6 bg-[#ffffff] border border-[#eceef2] rounded-xl p-6 shadow-sm flex flex-col justify-between">
+            <div>
+              {/* Dashboard Card Top Bar */}
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#eceef2]">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#f2f4f8] border border-[#eceef2] flex items-center justify-center text-[#2a54c0]">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#181c1f]">Live Autonomous Overview</h3>
+                    <p className="text-xs text-[#575f6a]">
+                      Active Agents: <span className="font-semibold text-[#181c1f]">Support & Growth-01</span>
+                    </p>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#ECFDF3] text-[#027A48] text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#027A48] animate-ping" />
+                  99.98% Autonomous
+                </span>
+              </div>
+
+              {/* Key Numbers Split */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-[#f2f4f8] p-3.5 rounded-lg border border-[#eceef2]/60">
+                  <span className="text-[11px] font-semibold text-[#575f6a] uppercase tracking-wider block mb-1">
+                    Total Handled
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[#181c1f]">18,420</span>
+                    <span className="text-xs font-semibold text-[#027A48]">+24.8%</span>
+                  </div>
+                </div>
+                <div className="bg-[#f2f4f8] p-3.5 rounded-lg border border-[#eceef2]/60">
+                  <span className="text-[11px] font-semibold text-[#575f6a] uppercase tracking-wider block mb-1">
+                    Lead Conversion
+                  </span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[#181c1f]">34.2%</span>
+                    <span className="text-xs font-semibold text-[#027A48]">+4.1%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi-layer SVG Graphic from Stitch */}
+              <div className="w-full mb-4">
+                <div className="flex items-center justify-between text-[#575f6a] text-xs mb-2">
+                  <span>Inquiries Autonomous Resolution (Last 7 Days)</span>
+                  <span className="font-mono text-[11px]">Avg Latency: 1.2s</span>
+                </div>
+                <svg className="w-full h-32 overflow-visible" preserveAspectRatio="none" viewBox="0 0 500 120">
+                  <defs>
+                    <linearGradient id="primaryGrad" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#2a54c0" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#2a54c0" stopOpacity="0.0" />
+                    </linearGradient>
+                    <linearGradient id="secondaryGrad" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#476edb" stopOpacity="0.45" />
+                      <stop offset="100%" stopColor="#476edb" stopOpacity="0.02" />
+                    </linearGradient>
+                  </defs>
+                  {/* Baseline Grid */}
+                  <line stroke="#eceef2" strokeDasharray="3 3" strokeWidth="1" x1="0" x2="500" y1="20" y2="20" />
+                  <line stroke="#eceef2" strokeDasharray="3 3" strokeWidth="1" x1="0" x2="500" y1="60" y2="60" />
+                  <line stroke="#eceef2" strokeDasharray="3 3" strokeWidth="1" x1="0" x2="500" y1="100" y2="100" />
+                  {/* Background Volume Area */}
+                  <path d="M0,95 Q75,70 150,85 T300,50 T420,30 T500,25 L500,120 L0,120 Z" fill="url(#primaryGrad)" />
+                  <path d="M0,95 Q75,70 150,85 T300,50 T420,30 T500,25" fill="none" stroke="#2a54c0" strokeLinecap="round" strokeWidth="2.5" />
+                  {/* Lead Capture Accent Curve */}
+                  <path d="M0,110 Q90,95 180,90 T320,70 T440,55 T500,45 L500,120 L0,120 Z" fill="url(#secondaryGrad)" />
+                  <path d="M0,110 Q90,95 180,90 T320,70 T440,55 T500,45" fill="none" stroke="#476edb" strokeLinecap="round" strokeWidth="2" />
+                  {/* Focus Node */}
+                  <circle cx="420" cy="30" fill="#2a54c0" r="4.5" stroke="#ffffff" strokeWidth="2" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Bottom Micro Sandbox Trigger */}
+            <div className="bg-[#f2f4f8] p-2.5 rounded-lg border border-[#eceef2] flex flex-col sm:flex-row items-start sm:items-center justify-between text-[#575f6a] gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#2a54c0] shrink-0" />
+                <span className="text-xs text-[#181c1f]">
+                  Auto-trained on: <strong className="font-semibold">help-center, catalog-api, pricing.pdf</strong>
+                </span>
+              </div>
+              <span className="text-xs text-[#2a54c0] font-semibold cursor-pointer hover:underline shrink-0">
+                Live Knowledge Synapse
+              </span>
+            </div>
+          </div>
+
+          {/* Right Panel: AI Live Response Preview */}
+          <div className="lg:col-span-3 bg-[#f2f4f8]/80 border border-[#eceef2] rounded-xl p-5 flex flex-col justify-between shadow-xs">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-[#2a54c0] flex items-center justify-center text-white text-[12px]">
+                    <Bot className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-[13px] font-semibold text-[#181c1f]">Agentify AI</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-[#ffffff] border border-[#eceef2] text-[11px] text-[#575f6a] font-mono">
+                  99.4% confidence
+                </span>
+              </div>
+
+              {/* Agent Generated Response Card */}
+              <div className="bg-[#ffffff] p-4 rounded-xl border border-[#eceef2] shadow-xs mb-4">
+                <p className="text-[13px] text-[#181c1f] mb-3 leading-relaxed">
+                  &ldquo;Yes! International shipping is available to 45+ countries with expedited tracking. Same-day pickup is available at our flagship downtown hub.&rdquo;
+                </p>
+                <div className="p-2.5 rounded-lg bg-[#f2f4f8] flex items-center gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-[#2a54c0] shrink-0" />
+                  <span className="text-[#575f6a]">
+                    Referenced: <span className="text-[#181c1f] font-semibold">Shipping Policy §4.2</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Lead Capture Action Card */}
+            <div className="bg-[#ffffff] p-3.5 rounded-xl border border-[#eceef2] shadow-xs">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold text-[#575f6a] uppercase tracking-wider">
+                  Automated Conversion
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] text-[#027A48] font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  CRM Synced
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#dce3f1] flex items-center justify-center text-[#151c26] text-xs font-bold">
+                  SJ
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold text-[#181c1f] truncate">Sarah Jenkins</p>
+                  <p className="text-[11px] text-[#747684] truncate">sarah@lumina.io</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
         </div>
 
       </div>

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Bot, Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { Menu, X, ArrowRight } from "lucide-react";
+import Image from "next/image";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -17,99 +17,133 @@ export function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-white/8 shadow-xl shadow-black/30"
-          : "bg-transparent border-b border-transparent"
+          ? "bg-[#ffffff]/90 backdrop-blur-xl border-b border-[#eceef2] shadow-[0_1px_8px_rgba(0,0,0,0.03)]"
+          : "bg-[#ffffff]/80 backdrop-blur-md border-b border-[#eceef2]"
       }`}
     >
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-extrabold text-white tracking-tight">
-            Agentify
-          </span>
-        </Link>
+      <div className="h-16 max-w-7xl mx-auto px-6 lg:px-12 flex items-center justify-between">
+        {/* Brand Logo & Name */}
+        <div className="flex items-center gap-8">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-[#2a54c0] flex items-center justify-center text-white shadow-sm shadow-[#2a54c0]/30 transition-transform group-hover:scale-105">
+              <Image 
+                src="/icon.svg" 
+                alt="Agentify" 
+                width={20} 
+                height={20} 
+                className="w-5 h-5 invert brightness-0"
+              />
+            </div>
+            <span className="text-xl font-bold tracking-tight text-[#181c1f]">
+              Agentify
+            </span>
+          </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
-          <Link href="#features" className="hover:text-white transition-colors">
-            Features
-          </Link>
-          <Link href="#pricing" className="hover:text-white transition-colors">
-            Pricing
-          </Link>
-          <Link href="/demo" className="hover:text-white transition-colors">
-            Demo
-          </Link>
-        </nav>
-
-        {/* Desktop CTAs */}
-        <div className="hidden md:flex items-center gap-3">
-          <Link href="/login">
-            <Button
-              variant="ghost"
-              className="text-slate-400 hover:text-white hover:bg-white/8 text-sm"
+          {/* Desktop Nav Links from Stitch */}
+          <nav className="hidden md:flex items-center gap-6">
+            <Link
+              href="#how-it-works"
+              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
             >
-              Login
-            </Button>
+              Platform
+            </Link>
+            <Link
+              href="#capabilities"
+              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+            >
+              Capabilities
+            </Link>
+            <Link
+              href="#solutions"
+              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+            >
+              Solutions
+            </Link>
+            <Link
+              href="#faq"
+              className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+            >
+              Resources
+            </Link>
+          </nav>
+        </div>
+
+        {/* Desktop Actions from Stitch */}
+        <div className="hidden md:flex items-center gap-3">
+          <Link
+            href="/login"
+            className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] px-3 py-2 transition-colors"
+          >
+            Sign in
           </Link>
-          <Link href="/signup">
-            <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-5 text-sm shadow-lg shadow-indigo-600/30 transition-all">
-              Get Started Free
-            </Button>
+          <Link
+            href="/signup"
+            className="text-[13px] font-semibold bg-[#181c1f] text-white hover:bg-[#2d3134] px-4 py-2 rounded-full transition-all shadow-[0_1px_3px_rgba(17,19,24,0.08)] flex items-center gap-1.5 active:scale-95"
+          >
+            <span>Get Started</span>
+            <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        {/* Mobile hamburger */}
+        {/* Mobile menu button */}
         <button
-          className="md:hidden text-slate-400 hover:text-white p-2 transition-colors"
+          className="md:hidden text-[#434653] hover:text-[#181c1f] p-2 transition-colors"
           onClick={() => setMenuOpen((v) => !v)}
-          aria-label="Toggle menu"
+          aria-label="Toggle navigation menu"
         >
           {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile Drawer Menu */}
       {menuOpen && (
-        <div className="md:hidden bg-[#0a0a0f]/95 backdrop-blur-xl border-b border-white/8 px-4 pb-6 pt-2 space-y-4">
-          <nav className="flex flex-col gap-3 text-sm font-medium text-slate-400">
+        <div className="md:hidden bg-[#ffffff] border-b border-[#eceef2] px-6 py-5 space-y-4 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+          <nav className="flex flex-col gap-3 text-sm font-medium text-[#434653]">
             <Link
-              href="#features"
+              href="#how-it-works"
               onClick={() => setMenuOpen(false)}
-              className="hover:text-white transition-colors py-1"
+              className="hover:text-[#181c1f] py-1"
             >
-              Features
+              Platform
             </Link>
             <Link
-              href="#pricing"
+              href="#capabilities"
               onClick={() => setMenuOpen(false)}
-              className="hover:text-white transition-colors py-1"
+              className="hover:text-[#181c1f] py-1"
             >
-              Pricing
+              Capabilities
             </Link>
             <Link
-              href="/demo"
+              href="#solutions"
               onClick={() => setMenuOpen(false)}
-              className="hover:text-white transition-colors py-1"
+              className="hover:text-[#181c1f] py-1"
             >
-              Demo
+              Solutions
+            </Link>
+            <Link
+              href="#faq"
+              onClick={() => setMenuOpen(false)}
+              className="hover:text-[#181c1f] py-1"
+            >
+              Resources
             </Link>
           </nav>
-          <div className="flex flex-col gap-2 pt-2 border-t border-white/8">
-            <Link href="/login" className="w-full">
-              <Button variant="ghost" className="w-full text-slate-400 hover:text-white justify-start">
-                Login
-              </Button>
+          <div className="pt-3 border-t border-[#eceef2] flex flex-col gap-2">
+            <Link
+              href="/login"
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-center py-2 text-sm font-medium text-[#434653] hover:text-[#181c1f]"
+            >
+              Sign in
             </Link>
-            <Link href="/signup" className="w-full">
-              <Button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl">
-                Get Started Free
-              </Button>
+            <Link
+              href="/signup"
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-center py-2.5 bg-[#181c1f] text-white rounded-xl text-sm font-semibold shadow-sm"
+            >
+              Get Started Free
             </Link>
           </div>
         </div>

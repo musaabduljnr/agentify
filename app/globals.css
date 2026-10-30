@@ -6,8 +6,27 @@
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  --background: #f7f9fd;
+  --foreground: #181c1f;
+  
+  /* Stitch Agentify Precision System Tokens */
+  --surface: #f7f9fd;
+  --surface-low: #f2f4f8;
+  --surface-lowest: #ffffff;
+  --surface-container: #eceef2;
+  --surface-container-high: #e6e8ec;
+  --on-surface: #181c1f;
+  --on-surface-variant: #434653;
+  --outline: #747684;
+  --outline-variant: #c4c6d5;
+  --primary: #2a54c0;
+  --primary-container: #476edb;
+  --primary-fixed: #dbe1ff;
+  --on-primary-fixed-variant: #013daa;
+  --secondary: #575f6a;
+  --secondary-fixed: #dce3f1;
+  --on-secondary-fixed: #151c26;
+  --border-delicate: #e8ebf0;
 }
 
 html {

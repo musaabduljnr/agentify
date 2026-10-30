@@ -51,5 +51,6 @@ test_*
 .env.*.local
 nul
 /nul
+.agents/mcp_config.json
 
 

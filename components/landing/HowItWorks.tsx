@@ -1,89 +1,99 @@
-import { Globe, Cpu, Code2, Rocket, ArrowRight } from "lucide-react";
-
-const steps = [
-  {
-    step: "01",
-    title: "Input Website URL",
-    description: "Provide your public website address or upload custom business documents, PDF guides, or product sheets.",
-    icon: Globe,
-  },
-  {
-    step: "02",
-    title: "Autonomous Ingestion",
-    description: "Our neural engine scans your structure, extracts core facts, and builds an accurate semantic vector index.",
-    icon: Cpu,
-  },
-  {
-    step: "03",
-    title: "Deploy 1-Line Embed",
-    description: "Paste your lightweight script snippet into your site header, WordPress plugin, or Shopify theme.",
-    icon: Code2,
-  },
-  {
-    step: "04",
-    title: "24/7 Intelligent Support",
-    description: "Your assistant immediately resolves inquiries, qualifies buyer interest, and captures high-intent leads.",
-    icon: Rocket,
-  },
-];
+import { 
+  Globe2, 
+  Terminal, 
+  Rocket, 
+  Check, 
+  Link as LinkIcon, 
+  TrendingUp 
+} from "lucide-react";
 
 export function HowItWorks() {
   return (
-    <section className="py-28 bg-[#07080c] relative overflow-hidden border-t border-white/[0.06]">
-      {/* Background radial glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none" />
-
-      <div className="container mx-auto px-4 relative z-10">
+    <section id="how-it-works" className="w-full py-24 px-6 lg:px-12 bg-[#f7f9fd]">
+      <div className="max-w-6xl mx-auto">
         
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-20 space-y-4">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-white/10 bg-white/[0.03] text-slate-400 text-xs font-semibold tracking-wider uppercase">
-            <span>Seamless Onboarding</span>
-          </div>
-          <h2 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
-            Live in four simple steps
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <span className="text-[11px] uppercase tracking-wider text-[#2a54c0] font-semibold block mb-3">
+            Simple 3-Minute Setup
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#181c1f] tracking-tight mb-4">
+            How Agentify powers your customer operations
           </h2>
-          <p className="text-slate-400 text-base sm:text-lg leading-relaxed">
-            Zero engineering required. Go from raw website URL to a fully operational AI agent in less than two minutes.
+          <p className="text-base sm:text-lg text-[#575f6a] leading-relaxed">
+            No coding, no prompt engineering bottlenecks. Connect your domain knowledge and let autonomous agents execute support workflows.
           </p>
         </div>
-        
-        {/* Steps Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
-          {steps.map((step, index) => (
-            <div 
-              key={index} 
-              className="group relative rounded-2xl p-6 bg-[#0b0c13] border border-white/[0.08] hover:border-indigo-500/30 transition-all flex flex-col justify-between"
-            >
-              {/* Step indicator header */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                  <step.icon className="w-5 h-5" />
-                </div>
-                <span className="text-xs font-mono font-bold text-slate-500 group-hover:text-indigo-400 transition-colors">
-                  {step.step}
-                </span>
-              </div>
 
-              {/* Step content */}
-              <div>
-                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-indigo-200 transition-colors">
-                  {step.title}
-                </h3>
-                <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                  {step.description}
-                </p>
+        {/* 3 Step Cards from Stitch */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          {/* Step 1 */}
+          <div className="bg-[#ffffff] p-8 rounded-xl border border-[#eceef2] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-[#f2f4f8] border border-[#eceef2] flex items-center justify-center text-[#2a54c0] mb-6">
+                <Globe2 className="w-6 h-6" />
               </div>
-
-              {/* Bottom accent indicator */}
-              <div className="mt-6 pt-4 border-t border-white/[0.04] flex items-center text-[11px] font-semibold text-slate-500 group-hover:text-slate-300 transition-colors">
-                <span>Step {step.step} of 04</span>
-                {index < steps.length - 1 && (
-                  <ArrowRight className="w-3 h-3 ml-auto text-slate-600 group-hover:text-indigo-400" />
-                )}
-              </div>
+              <span className="text-[11px] text-[#575f6a] uppercase font-semibold">
+                Step 01
+              </span>
+              <h3 className="text-xl font-bold text-[#181c1f] mt-1 mb-3">
+                Scan & Connect
+              </h3>
+              <p className="text-sm text-[#575f6a] leading-relaxed mb-6">
+                Paste your website URL, sync your help center, or drop PDF manuals. Our crawler maps and ingests your product knowledge safely in seconds.
+              </p>
             </div>
-          ))}
+            <div className="p-3 bg-[#f2f4f8] rounded-lg font-mono text-xs text-[#575f6a] flex items-center gap-2 border border-[#eceef2]">
+              <Check className="w-4 h-4 text-[#027A48] shrink-0" />
+              <span className="truncate">Crawled 128 sub-pages • Zero hallucinations</span>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="bg-[#ffffff] p-8 rounded-xl border border-[#eceef2] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-[#dbe1ff] border border-[#b4c5ff] flex items-center justify-center text-[#013daa] mb-6">
+                <Terminal className="w-6 h-6" />
+              </div>
+              <span className="text-[11px] text-[#575f6a] uppercase font-semibold">
+                Step 02
+              </span>
+              <h3 className="text-xl font-bold text-[#181c1f] mt-1 mb-3">
+                Deploy in Seconds
+              </h3>
+              <p className="text-sm text-[#575f6a] leading-relaxed mb-6">
+                Embed a customized chat widget via one line of HTML, or share standalone Hosted Chat Links across email signatures, WhatsApp, or Instagram bio.
+              </p>
+            </div>
+            <div className="p-3 bg-[#f2f4f8] rounded-lg font-mono text-xs text-[#575f6a] flex items-center gap-2 border border-[#eceef2]">
+              <LinkIcon className="w-4 h-4 text-[#2a54c0] shrink-0" />
+              <span className="font-semibold text-[#181c1f] truncate">agentify.chat/your-company</span>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="bg-[#ffffff] p-8 rounded-xl border border-[#eceef2] shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-[#f2f4f8] border border-[#eceef2] flex items-center justify-center text-[#2a54c0] mb-6">
+                <Rocket className="w-6 h-6" />
+              </div>
+              <span className="text-[11px] text-[#575f6a] uppercase font-semibold">
+                Step 03
+              </span>
+              <h3 className="text-xl font-bold text-[#181c1f] mt-1 mb-3">
+                Automate & Convert
+              </h3>
+              <p className="text-sm text-[#575f6a] leading-relaxed mb-6">
+                Your AI handles up to 85% of tier-1 support tickets instantaneously, captures warm enterprise leads, and alerts human operators when necessary.
+              </p>
+            </div>
+            <div className="p-3 bg-[#ECFDF3] rounded-lg font-mono text-xs text-[#027A48] flex items-center gap-2 border border-[#a6f4c5]">
+              <TrendingUp className="w-4 h-4 shrink-0" />
+              <span className="font-semibold truncate">+34% Lead Conversion Rate verified</span>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
