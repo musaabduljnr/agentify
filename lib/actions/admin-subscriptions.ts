@@ -42,13 +42,13 @@ async function fetchSubscriptionById(id: string) {
 // Zod Input Schemas
 const changePlanSchema = z.object({
   subscriptionId: z.string().uuid(),
-  plan: z.enum(["free_trial", "starter", "growth", "business", "enterprise"]),
+  plan: z.enum(["starter", "growth", "business", "enterprise"]),
   reason: z.string().optional(),
 });
 
 const changeStatusSchema = z.object({
   subscriptionId: z.string().uuid(),
-  status: z.enum(["active", "trialing", "inactive", "suspended", "cancelled", "past_due"]),
+  status: z.enum(["active", "trialing", "pending", "inactive", "suspended", "cancelled", "past_due"]),
   reason: z.string().optional(),
 });
 

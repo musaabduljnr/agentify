@@ -29,7 +29,7 @@ async function getCurrentContext() {
   return {
     user,
     business,
-    plan: subscription?.plan ?? "free_trial",
+    plan: subscription?.plan ?? "starter",
     role,
   };
 }

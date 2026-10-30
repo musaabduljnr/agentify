@@ -43,7 +43,7 @@ export function DemoChatClient({
   contactParam,
   websiteUrl,
   initialMessageCount = 0,
-  maxMessageBudget = 20,
+  maxMessageBudget = 9,
 }: DemoChatClientProps) {
   const [messages, setMessages] = useState<Message[]>([
     { id: "welcome", role: "assistant", content: welcomeText },
@@ -199,7 +199,7 @@ export function DemoChatClient({
           className="flex items-center gap-1.5 bg-white text-indigo-700 hover:bg-indigo-50 px-4 py-1.5 rounded-full font-bold shadow transition-all duration-200 hover:scale-[1.03] active:scale-[0.98] shrink-0"
         >
           <Sparkles className="h-3.5 w-3.5" />
-          Claim this assistant for free
+          Claim this assistant
         </Link>
       </div>
 
@@ -228,7 +228,7 @@ export function DemoChatClient({
                 Live Demo
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white/90">
-                {Math.max(0, maxMessageBudget - messageCount)} msgs left
+                {Math.max(0, maxMessageBudget - messageCount)} replies left
               </span>
               <button
                 onClick={() => setShowSettings(!showSettings)}
@@ -334,10 +334,10 @@ export function DemoChatClient({
             {isBudgetExceeded ? (
               <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-center space-y-2">
                 <p className="text-xs font-bold text-slate-800">
-                  Preview message limit reached ({maxMessageBudget}/{maxMessageBudget} messages).
+                  Preview limit reached ({maxMessageBudget}/{maxMessageBudget} AI responses).
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Want to keep chatting, customize this assistant, or embed it on your website?
+                  Unlock full access, customize this assistant, or embed it on your website.
                 </p>
                 <Link
                   href={`/signup?claim=${encodeURIComponent(demoSlug)}`}
@@ -349,7 +349,7 @@ export function DemoChatClient({
                   className="inline-flex items-center justify-center gap-1.5 w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition active:scale-95"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  Claim This Assistant Free
+                  Claim This Assistant
                 </Link>
               </div>
             ) : (
@@ -439,7 +439,7 @@ export function DemoChatClient({
                 <div className="border-t border-slate-100 pt-5 space-y-3">
                   <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Want this for your business?</h4>
                   <p className="text-xs text-slate-500 leading-relaxed">
-                    Create your free account to customize this assistant, add documents and FAQs, connect integrations, and embed the chat widget on your website.
+                    Create your account to customize this assistant, add documents and FAQs, connect integrations, and embed the chat widget on your website.
                   </p>
                   <Link
                     href={`/signup?claim=${encodeURIComponent(demoSlug)}`}
@@ -450,7 +450,7 @@ export function DemoChatClient({
                     }}
                     className="w-full inline-flex items-center justify-center py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition active:scale-[0.98]"
                   >
-                    Claim This Assistant Free
+                    Claim This Assistant
                   </Link>
                 </div>
               </div>

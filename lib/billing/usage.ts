@@ -279,38 +279,5 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
     };
   }
 
-  // 5. If free plan, check Global Free Daily Quota
-  if (plan === "free_trial") {
-    // Get all free subscriptions
-    const { data: freeSubs } = await supabase
-      .from("subscriptions")
-      .select("business_id")
-      .eq("plan", "free_trial");
-
-    const freeBizIds = (freeSubs || []).map((s: any) => s.business_id);
-
-    if (freeBizIds.length > 0) {
-      const { data: globalLogs } = await supabase
-        .from("usage_logs")
-        .select("amount")
-        .in("business_id", freeBizIds)
-        .in("type", ["message", "widget_chat"])
-        .gte("created_at", startOfToday.toISOString());
-
-      const globalUsed = (globalLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
-      const globalLimit = 1000;
-      
-      if (globalUsed >= globalLimit) {
-        return {
-          allowed: false,
-          reason: "global_free_limit",
-          message: "Free AI capacity has been reached for today. Please try again tomorrow or upgrade your plan.",
-          used: globalUsed,
-          limit: globalLimit
-        };
-      }
-    }
-  }
-
   return { allowed: true };
 }

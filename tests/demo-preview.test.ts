@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { POST, MAX_DEMO_MESSAGES } from "@/app/api/demo/chat/route";
+import { POST, MAX_DEMO_AI_REPLIES } from "@/app/api/demo/chat/route";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { createServiceClient } from "@/utils/supabase/service";
 import { runBusinessChat } from "@/lib/actions/chat";
@@ -59,6 +59,7 @@ function createMockSupabase(overrides?: {
                 placeholder_business_id: PLACEHOLDER_BIZ_ID,
                 status: "active",
                 expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+                demo_ai_reply_count: 5,
                 total_message_count: 5,
               },
               error: null,
@@ -118,7 +119,7 @@ describe("Milestone 2: Interactive AI Agent Preview Test Suite", () => {
     expect(data.reply).toBe("We provide automated cloud accounting and financial reporting.");
     expect(data.conversationId).toBe(CONVERSATION_ID);
     expect(data.totalMessageCount).toBe(6);
-    expect(data.maxMessages).toBe(MAX_DEMO_MESSAGES);
+    expect(data.maxMessages).toBe(MAX_DEMO_AI_REPLIES);
 
     // Verify runBusinessChat was called with the placeholder business and isDemo flag
     expect(runBusinessChat).toHaveBeenCalledWith(
@@ -303,14 +304,14 @@ describe("Milestone 2: Interactive AI Agent Preview Test Suite", () => {
     const rateLimitedRes = await POST(rateLimitedReq);
     expect(rateLimitedRes.status).toBe(429);
 
-    // 6b. Hard message budget limit (MAX_DEMO_MESSAGES = 20)
+    // 6b. Hard AI reply budget limit (MAX_DEMO_AI_REPLIES = 9)
     const budgetExceededSupabase = createMockSupabase({
       demoResult: {
         id: VALID_DEMO_ID,
         placeholder_business_id: PLACEHOLDER_BIZ_ID,
         status: "active",
         expires_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        total_message_count: 20, // reached 20 limit
+        demo_ai_reply_count: 9, // reached 9 limit
       },
     });
     vi.mocked(createServiceClient).mockReturnValueOnce(budgetExceededSupabase as any);
@@ -328,7 +329,7 @@ describe("Milestone 2: Interactive AI Agent Preview Test Suite", () => {
     expect(budgetRes.status).toBe(429);
     const budgetData = await budgetRes.json();
     expect(budgetData.limitReached).toBe(true);
-    expect(budgetData.error).toContain("Preview message limit reached");
+    expect(budgetData.error).toContain("Preview limit reached");
   });
 
   // 7. AI-provider failures and retry behavior

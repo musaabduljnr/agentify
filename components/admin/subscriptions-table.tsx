@@ -285,7 +285,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
             className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 font-semibold focus:outline-none focus:border-indigo-500"
           >
             <option value="all">All Plans</option>
-            <option value="free_trial">Free Trial</option>
             <option value="starter">Starter</option>
             <option value="growth">Growth</option>
             <option value="business">Business</option>
@@ -300,6 +299,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
           >
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
+            <option value="pending">Pending</option>
             <option value="trialing">Trialing</option>
             <option value="suspended">Suspended</option>
             <option value="inactive">Inactive</option>
@@ -528,7 +528,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                           onChange={(e) => setTargetPlan(e.target.value)}
                           className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-medium focus:outline-none"
                         >
-                          <option value="free_trial">Free Trial</option>
                           <option value="starter">Starter</option>
                           <option value="growth">Growth</option>
                           <option value="business">Business</option>
@@ -556,6 +555,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                           className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-medium focus:outline-none"
                         >
                           <option value="active">Active</option>
+                          <option value="pending">Pending</option>
                           <option value="trialing">Trialing</option>
                           <option value="inactive">Inactive</option>
                           <option value="suspended">Suspended</option>

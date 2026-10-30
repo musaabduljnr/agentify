@@ -257,7 +257,7 @@ export default async function BillingPage({
           </div>
 
           {/* Cancel / Reactivate */}
-          {subscription.plan !== "free_trial" && subscription.payment_provider !== "manual" && (
+          {subscription.status === "active" && subscription.payment_provider !== "manual" && (
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
               <h4 className="text-base font-bold text-slate-900 mb-1">Manage Subscription</h4>
               <p className="text-xs text-slate-500 mb-5 leading-relaxed">
@@ -343,31 +343,40 @@ export default async function BillingPage({
                 ))}
               </ul>
 
-              {/* Standard Quick Upgrade Actions */}
-              {subscription.plan === "free_trial" && (
+              {/* Quick Activation / Upgrade Actions */}
+              {subscription.status === "pending" && (
                 <div className="space-y-3">
                   <UpgradeButton
                     planId="starter"
                     provider="paystack"
-                    label="Upgrade to Starter"
+                    label="Activate Starter ($2/mo)"
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 shadow-lg shadow-indigo-900/30"
                   />
+                  <UpgradeButton
+                    planId="growth"
+                    provider="paystack"
+                    label="Activate Growth ($10/mo)"
+                    className="bg-white/10 hover:bg-white/15 text-white font-bold h-12 border border-white/10"
+                  />
                   <p className="text-[10px] text-slate-500 text-center">
-                    Billed locally via Paystack secure checkout
+                    Billed via Paystack secure checkout
                   </p>
                 </div>
               )}
-              {subscription.plan === "starter" && (
+              {subscription.status === "active" && subscription.plan === "starter" && (
                 <div className="space-y-3">
                   <UpgradeButton
                     planId="growth"
                     provider="paystack"
-                    label="Upgrade to Growth"
+                    label="Upgrade to Growth ($10/mo)"
                     className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 shadow-lg shadow-indigo-900/30"
                   />
+                  <p className="text-[10px] text-slate-500 text-center">
+                    Billed via Paystack secure checkout
+                  </p>
                 </div>
               )}
-              {subscription.plan !== "free_trial" && subscription.plan !== "starter" && (
+              {subscription.status === "active" && subscription.plan !== "starter" && (
                 <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-center text-xs text-slate-300">
                   ⚡ You are currently subscribed to a paid premium tier!
                 </div>

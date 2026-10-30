@@ -65,7 +65,7 @@ export default async function HostedDemoPage({ params, searchParams }: DemoPageP
   // 1. Fetch demo business details (sanitize to expose only public preview fields)
   const { data: demo, error: demoErr } = await supabase
     .from("demo_businesses")
-    .select("id, business_name, demo_slug, status, expires_at, placeholder_business_id, website_url, total_message_count")
+    .select("id, business_name, demo_slug, status, expires_at, placeholder_business_id, website_url, total_message_count, demo_ai_reply_count")
     .eq("demo_slug", normalizedSlug)
     .maybeSingle();
 
@@ -126,8 +126,8 @@ export default async function HostedDemoPage({ params, searchParams }: DemoPageP
       suggestedQuestions={suggestedQuestions}
       contactParam={contact || null}
       websiteUrl={demo.website_url}
-      initialMessageCount={demo.total_message_count ?? 0}
-      maxMessageBudget={20}
+      initialMessageCount={(demo as any).demo_ai_reply_count ?? 0}
+      maxMessageBudget={9}
     />
   );
 }

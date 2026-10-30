@@ -40,10 +40,14 @@ function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | nul
   const price = Object.prototype.hasOwnProperty.call(override || {}, "price_ngn")
     ? asFiniteNumber(override?.price_ngn)
     : fallback.price_ngn;
+  const priceUsd = Object.prototype.hasOwnProperty.call(override || {}, "price_usd")
+    ? asFiniteNumber(override?.price_usd)
+    : fallback.price_usd;
 
   return {
     id: planId,
     name: typeof override?.name === "string" && override.name.trim() ? override.name.trim() : fallback.name,
+    price_usd: priceUsd,
     price_ngn: price,
     messages: Object.prototype.hasOwnProperty.call(override || {}, "messages")
       ? asFiniteNumber(override?.messages)
@@ -138,7 +142,7 @@ export async function getEffectivePlanConfigs(): Promise<Record<PlanId, Editable
 
 export async function getEffectivePlanConfig(planId: string): Promise<EditablePlanConfig> {
   const configs = await getEffectivePlanConfigs();
-  return configs[planId as PlanId] || configs.free_trial;
+  return configs[planId as PlanId] || configs.starter;
 }
 
 export async function getEffectivePlanLimits(planId: string) {

@@ -29,7 +29,7 @@ export async function getAdminOverviewStats() {
     { count: usersCount },
     { count: businessesCount },
     { data: activeSubs },
-    { data: trialSubs },
+    { data: pendingSubs },
     { count: convsCount },
     { count: leadsCount },
     { data: paymentsData },
@@ -41,7 +41,7 @@ export async function getAdminOverviewStats() {
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("businesses").select("*", { count: "exact", head: true }),
     supabase.from("subscriptions").select("*").eq("status", "active"),
-    supabase.from("subscriptions").select("*").eq("plan", "free_trial"),
+    supabase.from("subscriptions").select("*").eq("status", "pending"),
     supabase.from("conversations").select("*", { count: "exact", head: true }),
     supabase.from("leads").select("*", { count: "exact", head: true }),
     supabase.from("payment_transactions").select("*").eq("status", "success"),
@@ -57,26 +57,12 @@ export async function getAdminOverviewStats() {
   // Sum of AI messages used across all active subscriptions
   const totalAIMessagesUsed = (activeSubs || []).reduce((sum, s) => sum + (s.current_usage || 0), 0);
 
-  // Free Slots Used: Count of active subscriptions on the free trial plan
-  const freeSlotsUsed = (activeSubs || []).filter(s => s.plan === "free_trial").length;
+  // Pending Subscriptions: Count of subscriptions awaiting activation
+  const pendingCount = pendingSubs?.length || 0;
 
-  // Free Requests Today & Gemini Safety Buffer
+  // Requests Today & Gemini Safety Buffer
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
-
-  const freeBizIds = (trialSubs || []).map((s: any) => s.business_id);
-  
-  let freeRequestsToday = 0;
-  if (freeBizIds.length > 0) {
-    const { data: globalLogs } = await supabase
-      .from("usage_logs")
-      .select("amount")
-      .in("business_id", freeBizIds)
-      .in("type", ["message", "widget_chat"])
-      .gte("created_at", startOfToday.toISOString());
-
-    freeRequestsToday = (globalLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
-  }
 
   // Calculate total requests today (all plans combined) to estimate Gemini's developer free limit usage
   const { data: allLogsToday } = await supabase
@@ -92,7 +78,7 @@ export async function getAdminOverviewStats() {
     totalUsers: usersCount || 0,
     totalBusinesses: businessesCount || 0,
     activeSubscriptions: activeSubs?.length || 0,
-    trialUsers: trialSubs?.length || 0,
+    trialUsers: pendingCount,
     totalConversations: convsCount || 0,
     totalLeads: leadsCount || 0,
     totalPayments: paymentsData?.length || 0,
@@ -103,8 +89,8 @@ export async function getAdminOverviewStats() {
     recentPayments: (paymentsData || []).slice(0, 5),
     recentLeads: recentLeads || [],
     highUsageBusinesses: highUsageSubs || [],
-    freeSlotsUsed,
-    freeRequestsToday,
+    freeSlotsUsed: pendingCount,
+    freeRequestsToday: totalRequestsToday,
     safetyBuffer,
   };
 }

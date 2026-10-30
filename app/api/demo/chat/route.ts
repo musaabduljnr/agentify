@@ -18,7 +18,9 @@ export async function OPTIONS() {
   return new Response(null, { headers: corsHeaders });
 }
 
-export const MAX_DEMO_MESSAGES = 20;
+export const MAX_DEMO_AI_REPLIES = 9;
+/** @deprecated Use MAX_DEMO_AI_REPLIES */
+export const MAX_DEMO_MESSAGES = MAX_DEMO_AI_REPLIES;
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,10 +41,10 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Fetch demo business to resolve placeholder_business_id, status, expiry, and total_message_count
+    // Fetch demo business to resolve placeholder_business_id, status, expiry, and demo_ai_reply_count
     const { data: demo, error: demoErr } = await supabase
       .from("demo_businesses")
-      .select("placeholder_business_id, status, expires_at, total_message_count")
+      .select("placeholder_business_id, status, expires_at, total_message_count, demo_ai_reply_count")
       .eq("id", demoBusinessId)
       .single();
 
@@ -64,11 +66,11 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: "This demo has expired." }, { status: 403 });
     }
 
-    // Enforce hard message budget for anonymous preview drafts
-    const currentMessageCount = demo.total_message_count ?? 0;
-    if (currentMessageCount >= MAX_DEMO_MESSAGES) {
+    // Enforce strict 9 AI reply budget for anonymous preview drafts
+    const currentAiReplyCount = demo.demo_ai_reply_count ?? 0;
+    if (currentAiReplyCount >= MAX_DEMO_AI_REPLIES) {
       return jsonWithCors({
-        error: `Preview message limit reached (${MAX_DEMO_MESSAGES}/${MAX_DEMO_MESSAGES} messages). Create your free account to unlock unlimited messaging.`,
+        error: `Preview limit reached (${MAX_DEMO_AI_REPLIES}/${MAX_DEMO_AI_REPLIES} AI responses). Create your account to unlock full access.`,
         limitReached: true,
       }, { status: 429 });
     }
@@ -88,11 +90,17 @@ export async function POST(req: NextRequest) {
       return jsonWithCors({ error: result.reply || "Failed to generate reply." }, { status: 400 });
     }
 
+    // Increment AI reply count atomically via RPC after successful AI generation
+    await supabase.rpc("increment_demo_ai_reply_count", {
+      p_demo_id: demoBusinessId,
+    });
+
     return jsonWithCors({
       conversationId: result.conversationId,
       reply: result.reply,
-      totalMessageCount: currentMessageCount + 1,
-      maxMessages: MAX_DEMO_MESSAGES,
+      aiReplyCount: currentAiReplyCount + 1,
+      totalMessageCount: currentAiReplyCount + 1,
+      maxMessages: MAX_DEMO_AI_REPLIES,
     });
   } catch (error: any) {
     logErrorSync(error, "widget-chat");

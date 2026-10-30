@@ -4,10 +4,11 @@ import { getConfiguredOptionalEnv } from "@/lib/env";
 // Plan Configuration
 // ══════════════════════════════════════════════════════════════
 
-export type PlanId = "free_trial" | "starter" | "growth" | "business" | "enterprise";
+export type PlanId = "starter" | "growth" | "enterprise" | "business";
 
 export type PlanConfig = {
   name: string;
+  price_usd: number | null;
   price_ngn: number | null; // null = custom pricing (enterprise)
   messages: number | null; // null = unlimited
   daily_messages: number | null; // null = unlimited
@@ -17,54 +18,33 @@ export type PlanConfig = {
   embeddings: number | null;
   team_members: number | null; // null = unlimited
   features: string[];
-  paystack_plan_code: string | null; // placeholder — set via env later
-  flutterwave_plan_id: string | null; // placeholder — set via env later
+  paystack_plan_code: string | null;
+  flutterwave_plan_id: string | null;
   contact_sales?: boolean;
+  highlighted?: boolean;
 };
 
 export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
-  free_trial: {
-    name: "Free Early Access",
-    price_ngn: 0,
-    messages: 100,
-    daily_messages: 20,
-    knowledge_sources: 5,
-    leads: 50,
-    widgets: 1,
-    embeddings: 1000,
-    team_members: 0,
-    features: [
-      "1 AI Assistant",
-      "100 messages/month",
-      "20 daily messages limit",
-      "5 knowledge sources",
-      "50 leads",
-      "1 widget",
-      "Basic support",
-    ],
-    paystack_plan_code: null,
-    flutterwave_plan_id: null,
-  },
-
   starter: {
     name: "Starter",
-    price_ngn: 10000,
-    messages: 5000,
-    daily_messages: 250,
+    price_usd: 2,
+    price_ngn: 3200,
+    messages: 200,
+    daily_messages: 50,
     knowledge_sources: 25,
-    leads: 1000,
+    leads: 50,
     widgets: 1,
-    embeddings: 20000,
-    team_members: 2,
+    embeddings: 5000,
+    team_members: 1,
     features: [
       "1 AI Assistant",
-      "5,000 messages/month",
-      "250 daily messages soft cap",
+      "200 AI replies/month",
       "25 knowledge sources",
-      "1,000 leads",
-      "1 widget",
+      "50 leads captured",
+      "1 chat widget",
+      "Basic analytics",
       "Email support",
-      "Remove branding",
+      "Agentify branding",
     ],
     paystack_plan_code: getConfiguredOptionalEnv("PAYSTACK_STARTER_PLAN_CODE"),
     flutterwave_plan_id: null,
@@ -72,24 +52,26 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
 
   growth: {
     name: "Growth",
-    price_ngn: 25000,
-    messages: 15000,
-    daily_messages: 750,
+    price_usd: 10,
+    price_ngn: 16000,
+    messages: 1500,
+    daily_messages: 200,
     knowledge_sources: 100,
-    leads: 10000,
+    leads: null, // unlimited leads
     widgets: 3,
-    embeddings: 100000,
-    team_members: 5,
+    embeddings: 50000,
+    team_members: 3,
+    highlighted: true,
     features: [
-      "3 AI Assistants",
-      "15,000 messages/month",
-      "750 daily messages soft cap",
+      "Up to 3 AI Assistants",
+      "1,500 AI replies/month",
       "100 knowledge sources",
-      "10,000 leads",
-      "3 widgets",
-      "Priority support",
-      "Remove branding",
-      "Custom domain",
+      "Unlimited leads captured",
+      "3 chat widgets",
+      "Advanced analytics",
+      "Remove Agentify branding",
+      "Custom domain & webhooks",
+      "Priority email support",
     ],
     paystack_plan_code: getConfiguredOptionalEnv("PAYSTACK_GROWTH_PLAN_CODE"),
     flutterwave_plan_id: null,
@@ -97,6 +79,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
 
   enterprise: {
     name: "Enterprise",
+    price_usd: null,
     price_ngn: null,
     messages: null, // unlimited
     daily_messages: null,
@@ -107,22 +90,24 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     team_members: null,
     features: [
       "Unlimited AI Assistants",
-      "Unlimited messages",
-      "Custom daily soft caps",
+      "Custom AI reply volume",
       "Unlimited knowledge sources",
       "Unlimited leads",
       "Unlimited widgets",
-      "Dedicated support",
-      "Custom integrations",
+      "Custom integrations & CRM sync",
+      "Dedicated account manager",
       "SLA guarantee",
+      "Custom training & onboarding",
     ],
     paystack_plan_code: null,
     flutterwave_plan_id: null,
     contact_sales: true,
   },
 
+  // Legacy fallback for existing business subscribers (not exposed in active UI)
   business: {
     name: "Business",
+    price_usd: 35,
     price_ngn: 50000,
     messages: 50000,
     daily_messages: 2500,
@@ -155,10 +140,10 @@ export function isUnlimited(limit: number | null): boolean {
 }
 
 /**
- * Get plan config by plan ID, with fallback to free_trial.
+ * Get plan config by plan ID, with fallback to starter.
  */
 export function getPlanConfig(planId: string): PlanConfig {
-  return PLAN_CONFIG[planId as PlanId] || PLAN_CONFIG.free_trial;
+  return PLAN_CONFIG[planId as PlanId] || PLAN_CONFIG.starter;
 }
 
 /**
@@ -180,13 +165,17 @@ export function getPlanLimits(planId: string) {
 /**
  * Format price for display.
  */
-export function formatPlanPrice(plan: PlanConfig): string {
-  if (plan.price_ngn === null) return "Custom";
+export function formatPlanPrice(plan: PlanConfig, currency: "USD" | "NGN" = "USD"): string {
+  if (plan.price_usd === null && plan.price_ngn === null) return "Custom";
+  if (currency === "USD") {
+    if (plan.price_usd === 0) return "Free";
+    return `$${plan.price_usd}/mo`;
+  }
   if (plan.price_ngn === 0) return "Free";
-  return `₦${plan.price_ngn.toLocaleString()}`;
+  return `₦${plan.price_ngn?.toLocaleString()}/mo`;
 }
 
 /**
- * All plan IDs in order.
+ * All active public plan IDs in order.
  */
-export const PLAN_ORDER: PlanId[] = ["free_trial", "starter", "growth", "business", "enterprise"];
+export const PLAN_ORDER: PlanId[] = ["starter", "growth", "enterprise"];

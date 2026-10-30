@@ -57,9 +57,9 @@ export async function repairCurrentBusinessSetup() {
     if (!setup.subscription) {
       const { error: subError } = await supabase.from("subscriptions").insert({
         business_id: businessId,
-        plan: "free_trial",
-        status: "active",
-        message_limit: 100,
+        plan: "starter",
+        status: "pending",
+        message_limit: 200,
         current_usage: 0,
       });
       if (subError) throw subError;

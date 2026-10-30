@@ -214,7 +214,7 @@ export async function requestDowngrade(targetPlan: string) {
     const business = await getCurrentBusiness();
     if (!business) return { error: "No business found." };
 
-    const allowedDowngrades = ["free_trial", "starter"];
+    const allowedDowngrades = ["starter"];
     if (!allowedDowngrades.includes(targetPlan)) {
       return { error: "Invalid target plan for downgrade." };
     }

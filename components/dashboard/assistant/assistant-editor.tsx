@@ -53,9 +53,7 @@ export function AssistantEditor({ initialBusiness, initialAssistants, subscripti
   }, [selectedId, assistants, initialBusiness]);
 
   const limit = subscription?.widget_limit || 1;
-  const planName = subscription?.plan === "free_trial" 
-    ? "Free Early Access" 
-    : (subscription?.plan || "Starter").charAt(0).toUpperCase() + (subscription?.plan || "Starter").slice(1);
+  const planName = (subscription?.plan || "Starter").charAt(0).toUpperCase() + (subscription?.plan || "Starter").slice(1);
   const isLimitReached = assistants.length >= limit;
 
   const handleSave = async () => {

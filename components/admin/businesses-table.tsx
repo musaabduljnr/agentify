@@ -91,7 +91,7 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
         </div>
 
         <div className="flex gap-2 shrink-0">
-          {["all", "free_trial", "starter", "growth"].map((plan) => (
+          {["all", "starter", "growth", "business", "enterprise"].map((plan) => (
             <button
               key={plan}
               onClick={() => setPlanFilter(plan)}
@@ -178,7 +178,7 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                       <td className="py-4 px-6 whitespace-nowrap">
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <span className="font-bold text-white capitalize whitespace-nowrap">
-                            {sub.plan ? sub.plan.replace("_", " ") : "free_trial"}
+                            {sub.plan ? sub.plan.replace("_", " ") : "starter"}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap ${

@@ -83,17 +83,17 @@ export default async function AdminOverviewPage() {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <StatCard
-            title="Free Early Access Slots"
-            value={`${stats.freeSlotsUsed} / 50`}
+            title="Pending Activations"
+            value={`${stats.freeSlotsUsed}`}
             icon={<Sparkles className="w-4 h-4" />}
-            description="Active free trial businesses onboarded (50 slots hard limit)"
+            description="Accounts awaiting subscription activation"
             color="amber"
           />
           <StatCard
-            title="Free AI Requests Today"
-            value={`${stats.freeRequestsToday.toLocaleString()} / 1,000`}
+            title="AI Requests Today"
+            value={`${stats.freeRequestsToday.toLocaleString()}`}
             icon={<Activity className="w-4 h-4" />}
-            description="Combined free usage today (1,000 requests hard cap)"
+            description="Total AI assistant messages generated today"
             color="blue"
           />
           <StatCard
@@ -130,10 +130,10 @@ export default async function AdminOverviewPage() {
           color="emerald"
         />
         <StatCard
-          title="Trial Subscriptions"
+          title="Pending Subscriptions"
           value={stats.trialUsers.toLocaleString()}
           icon={<Sparkles className="w-4 h-4" />}
-          description="Users exploring on free trials"
+          description="Awaiting checkout activation"
           color="amber"
         />
         <StatCard

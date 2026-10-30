@@ -160,7 +160,7 @@ export async function inviteTeamMember(email: string, role: string) {
 
     let limit = subscription?.team_member_limit;
     if (limit === null || limit === undefined) {
-      const planLimits = await getEffectivePlanLimits(subscription?.plan || "free_trial");
+      const planLimits = await getEffectivePlanLimits(subscription?.plan || "starter");
       limit = planLimits.team_member_limit;
     }
 
@@ -570,7 +570,7 @@ export async function reactivateTeamMember(memberId: string) {
 
     let limit = subscription?.team_member_limit;
     if (limit === null || limit === undefined) {
-      const planLimits = await getEffectivePlanLimits(subscription?.plan || "free_trial");
+      const planLimits = await getEffectivePlanLimits(subscription?.plan || "starter");
       limit = planLimits.team_member_limit;
     }
 

@@ -716,28 +716,27 @@ export async function claimDemoAssistant(slug: string, userId: string) {
       throw new Error(`Failed to claim business assistant: ${transferError.message}`);
     }
 
-    // 3. Setup a free trial subscription for this business if they don't have one
+    // 3. Setup a pending subscription for this business if they don't have one
     const { data: existingSub } = await serviceClient
       .from("subscriptions")
-      .select("id")
+      .select("id, status")
       .eq("business_id", demo.placeholder_business_id)
       .maybeSingle();
 
     if (!existingSub) {
       await serviceClient.from("subscriptions").insert({
         business_id: demo.placeholder_business_id,
-        plan: "free_trial",
-        status: "active",
-        message_limit: 100,
+        plan: "starter",
+        status: "pending",
+        message_limit: 200,
         current_usage: 0,
       });
-    } else {
-      // Ensure active trial status
+    } else if (existingSub.status !== "active") {
       await serviceClient
         .from("subscriptions")
         .update({
-          plan: "free_trial",
-          status: "active",
+          plan: "starter",
+          status: "pending",
         })
         .eq("business_id", demo.placeholder_business_id);
     }

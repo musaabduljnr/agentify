@@ -27,10 +27,10 @@ export default async function DashboardLayout({
     } catch (e) {
       // fallback
       subscriptionData = {
-        plan: setup.subscription.plan || "free_trial",
-        status: setup.subscription.status || "active",
+        plan: setup.subscription.plan || "starter",
+        status: setup.subscription.status || "pending",
         messagesUsed: setup.subscription.current_usage || 0,
-        messagesLimit: setup.subscription.message_limit || 100,
+        messagesLimit: setup.subscription.message_limit || 200,
       };
     }
 
