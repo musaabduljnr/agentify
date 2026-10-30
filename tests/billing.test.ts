@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { incrementUsage, checkUsageLimit } from "@/lib/billing/usage";
+import { incrementUsage, checkUsageLimit, verifyAIUsageLimits } from "@/lib/billing/usage";
 import { createServiceClient } from "@/utils/supabase/service";
 
 // Mock Supabase service client
@@ -116,5 +116,99 @@ describe("Billing Usage Tracking", () => {
     expect(result.used).toBe(30);
     expect(result.limit).toBe(100);
     expect(result.remaining).toBe(70);
+  });
+
+  describe("verifyAIUsageLimits", () => {
+    it("should deny AI generation if no subscription exists", async () => {
+      const serviceClient = createServiceClient();
+      vi.mocked(serviceClient.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      } as any);
+
+      const result = await verifyAIUsageLimits("biz-123");
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe("no_subscription");
+    });
+
+    it("should deny AI generation if subscription is not active (e.g. pending or past_due)", async () => {
+      const serviceClient = createServiceClient();
+      vi.mocked(serviceClient.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            id: "sub-123",
+            business_id: "biz-123",
+            status: "pending",
+            plan: "starter",
+            message_limit: 200,
+          },
+          error: null,
+        }),
+      } as any);
+
+      const result = await verifyAIUsageLimits("biz-123");
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe("inactive_subscription");
+    });
+
+    it("should deny AI generation if monthly message quota is exhausted", async () => {
+      const serviceClient = createServiceClient();
+      vi.mocked(serviceClient.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            id: "sub-123",
+            business_id: "biz-123",
+            status: "active",
+            plan: "starter",
+            message_limit: 200,
+            current_period_start: "2026-10-01T00:00:00Z",
+          },
+          error: null,
+        }),
+        in: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockResolvedValue({
+          data: [{ amount: 150 }, { amount: 50 }], // 200 total used
+          error: null,
+        }),
+      } as any);
+
+      const result = await verifyAIUsageLimits("biz-123");
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBe("monthly_limit");
+      expect(result.used).toBe(200);
+      expect(result.limit).toBe(200);
+    });
+
+    it("should allow AI generation when subscription is active and within quotas", async () => {
+      const serviceClient = createServiceClient();
+      vi.mocked(serviceClient.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            id: "sub-123",
+            business_id: "biz-123",
+            status: "active",
+            plan: "starter",
+            message_limit: 200,
+            current_period_start: "2026-10-01T00:00:00Z",
+          },
+          error: null,
+        }),
+        in: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockResolvedValue({
+          data: [{ amount: 20 }], // 20 used out of 200
+          error: null,
+        }),
+      } as any);
+
+      const result = await verifyAIUsageLimits("biz-123");
+      expect(result.allowed).toBe(true);
+    });
   });
 });

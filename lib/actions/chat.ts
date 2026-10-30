@@ -80,6 +80,27 @@ export async function updateAssistant(data: {
 
       if (error) throw new Error(error.message);
     } else {
+      const { data: sub } = await supabase
+        .from("subscriptions")
+        .select("widget_limit")
+        .eq("business_id", business.id)
+        .maybeSingle();
+
+      const limit = sub?.widget_limit || 1;
+
+      const { count, error: countErr } = await supabase
+        .from("assistants")
+        .select("*", { count: "exact", head: true })
+        .eq("business_id", business.id);
+
+      if (countErr) throw countErr;
+
+      if ((count || 0) >= limit) {
+        return {
+          error: `You've reached the maximum number of assistants (${limit}) allowed under your current plan. Please upgrade to create more.`
+        };
+      }
+
       const { error } = await supabase.from("assistants").insert({
         business_id: business.id,
         name: data.name,

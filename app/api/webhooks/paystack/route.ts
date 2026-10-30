@@ -156,7 +156,8 @@ export async function POST(request: Request) {
       const periodEnd = new Date();
       periodEnd.setDate(periodEnd.getDate() + 30);
 
-      await supabase
+      // Atomically claim transaction: only proceed if status was 'pending' (Audit M3 guard)
+      const { data: claimedTx } = await supabase
         .from("payment_transactions")
         .update({
           status: "success",
@@ -169,7 +170,16 @@ export async function POST(request: Request) {
             webhook_verification: verified,
           },
         })
-        .eq("id", tx.id);
+        .eq("id", tx.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+
+      if (!claimedTx) {
+        // Already processed by client callback or concurrent webhook
+        await markWebhookProcessed();
+        return NextResponse.json({ received: true });
+      }
 
       // Upgrade subscription records
       await supabase
@@ -235,13 +245,47 @@ export async function POST(request: Request) {
     else if (event === "subscription.disable") {
       const subscriptionCode = stringValue(data.subscription_code);
       if (subscriptionCode) {
-        await supabase
+        // Audit H2: Check if there is a pending downgrade before setting status to cancelled
+        const { data: sub } = await supabase
           .from("subscriptions")
-          .update({
-            status: "cancelled",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("provider_subscription_id", subscriptionCode);
+          .select("id, business_id, metadata")
+          .eq("provider_subscription_id", subscriptionCode)
+          .maybeSingle();
+
+        const pendingDowngrade = asRecord(sub?.metadata).downgrade_to as string | undefined;
+        if (sub && pendingDowngrade && ["starter", "growth"].includes(pendingDowngrade)) {
+          const targetPlan = pendingDowngrade as PlanId;
+          const planLimits = await getEffectivePlanLimits(targetPlan);
+          const now = new Date();
+          const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+          const cleanMetadata = { ...asRecord(sub.metadata) };
+          delete cleanMetadata.downgrade_to;
+          delete cleanMetadata.downgrade_requested_at;
+
+          await supabase
+            .from("subscriptions")
+            .update({
+              plan: targetPlan,
+              status: "active",
+              cancel_at_period_end: false,
+              metadata: cleanMetadata,
+              current_usage: 0,
+              current_period_start: now.toISOString(),
+              current_period_end: periodEnd.toISOString(),
+              reset_date: periodEnd.toISOString(),
+              ...planLimits,
+              updated_at: now.toISOString(),
+            })
+            .eq("id", sub.id);
+        } else {
+          await supabase
+            .from("subscriptions")
+            .update({
+              status: "cancelled",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("provider_subscription_id", subscriptionCode);
+        }
       }
     } 
     

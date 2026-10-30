@@ -63,7 +63,7 @@ export async function resetAllExpiredBusinessUsage(): Promise<number> {
     .from("subscriptions")
     .select("business_id")
     .lte("current_period_end", new Date().toISOString())
-    .in("status", ["active", "trialing"]);
+    .in("status", ["active"]);
 
   if (!expiredSubs || expiredSubs.length === 0) return 0;
 

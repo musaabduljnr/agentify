@@ -63,7 +63,7 @@ export async function requireActiveSubscription(businessId: string): Promise<Sub
     throw new Error("No subscription found. Please set up your account.");
   }
 
-  const activeStatuses = ["active", "trialing"];
+  const activeStatuses = ["active"];
   if (!activeStatuses.includes(sub.status)) {
     throw new Error(
       `Your subscription is ${sub.status}. Please update your billing to continue.`
@@ -189,11 +189,47 @@ export async function resetMonthlyUsageIfNeeded(
 
   if (!needsReset) return;
 
-  // Reset usage counter
-  const nextResetDate = new Date();
-  nextResetDate.setDate(nextResetDate.getDate() + 30);
+  const nextResetDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-  const { error } = await supabase
+  // Audit H2: If there is a pending downgrade scheduled for period end, apply it now
+  const pendingDowngrade = sub.metadata?.downgrade_to as string | undefined;
+  if (pendingDowngrade && ["starter", "growth"].includes(pendingDowngrade)) {
+    const targetLimits = await getEffectivePlanLimits(pendingDowngrade as PlanId);
+    const cleanMetadata = { ...sub.metadata };
+    delete cleanMetadata.downgrade_to;
+    delete cleanMetadata.downgrade_requested_at;
+
+    const { data: updatedDowngrade, error: downgradeError } = await supabase
+      .from("subscriptions")
+      .update({
+        plan: pendingDowngrade,
+        cancel_at_period_end: false,
+        metadata: cleanMetadata,
+        current_usage: 0,
+        reset_date: nextResetDate.toISOString(),
+        current_period_start: now.toISOString(),
+        current_period_end: nextResetDate.toISOString(),
+        ...targetLimits,
+        updated_at: now.toISOString(),
+      })
+      .eq("business_id", businessId)
+      .or(`current_period_end.lte.${now.toISOString()},reset_date.lte.${now.toISOString()}`)
+      .select("id");
+
+    if (!downgradeError && updatedDowngrade && updatedDowngrade.length > 0) {
+      sub.plan = pendingDowngrade;
+      sub.current_usage = 0;
+      sub.cancel_at_period_end = false;
+      sub.metadata = cleanMetadata;
+      sub.current_period_start = now.toISOString();
+      sub.current_period_end = nextResetDate.toISOString();
+      sub.reset_date = nextResetDate.toISOString();
+      return;
+    }
+  }
+
+  // Audit M8: Use conditional update to prevent multiple writes on consecutive failed requests
+  const { data: updatedRows, error } = await supabase
     .from("subscriptions")
     .update({
       current_usage: 0,
@@ -202,9 +238,16 @@ export async function resetMonthlyUsageIfNeeded(
       current_period_end: nextResetDate.toISOString(),
       updated_at: now.toISOString(),
     })
-    .eq("business_id", businessId);
+    .eq("business_id", businessId)
+    .or(`current_period_end.lte.${now.toISOString()},reset_date.lte.${now.toISOString()}`)
+    .select("id");
 
   if (error) {
     console.error("Failed to reset monthly usage:", error);
+  } else if (updatedRows && updatedRows.length > 0) {
+    sub.current_usage = 0;
+    sub.reset_date = nextResetDate.toISOString();
+    sub.current_period_start = now.toISOString();
+    sub.current_period_end = nextResetDate.toISOString();
   }
 }

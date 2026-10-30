@@ -220,7 +220,7 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
   }
 
   // 2. Check active subscription status
-  const activeStatuses = ["active", "trialing"];
+  const activeStatuses = ["active"];
   if (!activeStatuses.includes(sub.status)) {
     return {
       allowed: false,

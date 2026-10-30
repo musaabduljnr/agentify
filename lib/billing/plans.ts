@@ -104,7 +104,12 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     contact_sales: true,
   },
 
-  // Legacy fallback for existing business subscribers (not exposed in active UI)
+  /**
+   * LEGACY PLAN — "business" (Audit M6)
+   * Preserved exclusively for backward compatibility with existing grandfathered subscribers.
+   * This plan is intentionally excluded from PLAN_ORDER and is not selectable in onboarding
+   * or the pricing/upgrade UI. Do not delete without migrating existing customers.
+   */
   business: {
     name: "Business",
     price_usd: 35,

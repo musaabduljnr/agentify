@@ -156,22 +156,14 @@ export async function rateLimit(
 
   if (process.env.NODE_ENV === "production") {
     if (!upstashUrl || !upstashToken) {
-      console.error("[RateLimit] CRITICAL: Upstash Redis credentials are missing in production!");
+      console.error("[RateLimit] CRITICAL: Upstash Redis credentials are missing in production! Falling back to in-memory rate limiting.");
       if (preset === "instant_generation") {
-        // Enforce restrictive memory limiter fallback for expensive instant generation
         return memoryRateLimit(key, { requests: 3, window: config.window });
       }
       if (preset === "demo_chat") {
-        // Enforce restrictive memory limiter fallback for demo chat
         return memoryRateLimit(key, { requests: 10, window: config.window });
       }
-      // Fail safely (open) for lightweight reads, but do not fall back to in-memory store
-      return {
-        success: true,
-        remaining: 1,
-        reset: Math.floor(Date.now() / 1000) + config.window,
-        limit: config.requests,
-      };
+      return memoryRateLimit(key, config);
     }
     return upstashRateLimit(key, config, upstashUrl, upstashToken);
   }

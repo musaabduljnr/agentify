@@ -16,7 +16,7 @@ export async function getDashboardNotifications(
   const notifications: DashboardNotification[] = [];
   const supabase = createServiceClient();
 
-  if (subscription?.status && !["active", "trialing"].includes(subscription.status)) {
+  if (subscription?.status && !["active"].includes(subscription.status)) {
     notifications.push({
       id: "billing-status",
       title: "Billing needs attention",

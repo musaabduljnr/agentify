@@ -89,8 +89,12 @@ export async function createCheckoutSession(
       return { error: "Invalid plan selected." };
     }
 
-    // 5. Validate plan is paid
-    if (planConfig.price_ngn === null || planConfig.price_ngn === 0) {
+    // 5. Validate plan is paid and determine price based on configured currency
+    const isUsd = (billingSettings.currency || "NGN").toUpperCase() === "USD";
+    const checkoutCurrency = isUsd ? "USD" : "NGN";
+    const checkoutAmount = isUsd ? (planConfig.price_usd ?? 0) : (planConfig.price_ngn ?? 0);
+
+    if (!checkoutAmount || checkoutAmount <= 0) {
       return { error: "Selected plan cannot be subscribed to directly." };
     }
 
@@ -116,8 +120,8 @@ export async function createCheckoutSession(
 
       const paystackRes = await initializePaystackTransaction({
         email: user.email || business.contact_email || "billing@agentify.com",
-        amount: planConfig.price_ngn,
-        currency: billingSettings.currency,
+        amount: checkoutAmount,
+        currency: checkoutCurrency,
         planCode: planCode || undefined, // One-time fallback if missing
         reference,
         businessId: business.id,
@@ -151,8 +155,8 @@ export async function createCheckoutSession(
         provider,
         reference,
         plan,
-        amount: planConfig.price_ngn,
-        currency: billingSettings.currency,
+        amount: checkoutAmount,
+        currency: checkoutCurrency,
         status: "pending",
         checkout_url: checkoutUrl,
         raw_response: rawResponse,
@@ -228,6 +232,27 @@ export async function verifyPaymentReference(reference: string) {
       rawPaystackResponse = paystackData;
 
       if (paystackData.status === "success") {
+        // Audit H5 / cross-validation: verify reference and amount match
+        const expectedMinorUnits = Math.round(Number(transaction.amount) * 100);
+        if (
+          paystackData.reference !== reference ||
+          Number(paystackData.amount) !== expectedMinorUnits
+        ) {
+          await serviceClient
+            .from("payment_transactions")
+            .update({
+              status: "failed",
+              raw_response: {
+                ...((transaction.raw_response as Record<string, any>) || {}),
+                verification: rawPaystackResponse,
+                error: "Verification failed: amount or reference mismatch.",
+              },
+            })
+            .eq("id", transaction.id);
+
+          return { error: "Payment verification failed: transaction parameters mismatch." };
+        }
+
         paymentVerified = true;
         customerCode = paystackData.customer?.customer_code || "";
         subscriptionCode = paystackData.subscription || "";
@@ -243,18 +268,28 @@ export async function verifyPaymentReference(reference: string) {
       const periodEnd = new Date();
       periodEnd.setDate(periodEnd.getDate() + 30);
 
-      // 1. Mark transaction success
-      await serviceClient
+      // 1. Atomically mark transaction success only if still pending (Audit M3 guard)
+      const { data: claimedTx } = await serviceClient
         .from("payment_transactions")
         .update({
           status: "success",
           verified_at: now.toISOString(),
+          provider_customer_id: customerCode || null,
+          provider_subscription_id: subscriptionCode || null,
           raw_response: {
             ...((transaction.raw_response as Record<string, any>) || {}),
             verification: rawPaystackResponse,
           },
         })
-        .eq("id", transaction.id);
+        .eq("id", transaction.id)
+        .eq("status", "pending")
+        .select("id")
+        .maybeSingle();
+
+      if (!claimedTx) {
+        // Concurrently processed by webhook
+        return { success: true, plan: transaction.plan };
+      }
 
       // 2. Upgrade subscription
       const { error: subError } = await serviceClient
