@@ -42,13 +42,13 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               process.env.NODE_ENV === "production"
-                ? "script-src 'self' 'unsafe-inline' https://js.paystack.co"
-                : "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.paystack.co",
+                ? "script-src 'self' 'unsafe-inline' https://checkout.bachs.io"
+                : "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.bachs.io",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://generativelanguage.googleapis.com",
-              "frame-src https://js.paystack.co",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.bachs.io https://generativelanguage.googleapis.com",
+              "frame-src https://checkout.bachs.io",
               "object-src 'none'",
               "base-uri 'self'",
             ].join("; "),

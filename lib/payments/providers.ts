@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// Payment Provider Configuration
+// Payment Provider Configuration (USD Only via Bachs)
 // ══════════════════════════════════════════════════════════════
 
 import type { PaymentProvider } from "./types";
@@ -12,26 +12,20 @@ export const SUPPORTED_PAYMENT_PROVIDERS: {
   logo?: string;
 }[] = [
   {
-    id: "paystack",
-    name: "Paystack",
-    description: "Pay with card, bank transfer, or mobile money via Paystack.",
-    enabled: true,
-  },
-  {
-    id: "flutterwave",
-    name: "Flutterwave",
-    description: "Pay with card, bank transfer, USSD, or mobile money via Flutterwave.",
+    id: "bachs",
+    name: "Bachs",
+    description: "Secure USD card payments and recurring subscription billing powered by Bachs.",
     enabled: true,
   },
   {
     id: "manual",
-    name: "Manual / Bank Transfer",
-    description: "Contact sales for manual payment or bank transfer.",
+    name: "Manual / Enterprise Invoice",
+    description: "Contact sales for manual custom enterprise invoicing.",
     enabled: true,
   },
 ];
 
-export const DEFAULT_PAYMENT_PROVIDER: PaymentProvider = "paystack";
+export const DEFAULT_PAYMENT_PROVIDER: PaymentProvider = "bachs";
 
 /**
  * Get provider config by ID.

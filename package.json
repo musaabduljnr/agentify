@@ -9,9 +9,11 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "bachs:setup": "tsx scripts/setup-bachs-products.ts"
   },
   "dependencies": {
+    "@bachs/sdk": "^2.0.0",
     "@google/genai": "^2.3.0",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-slot": "^1.1.0",

@@ -11,7 +11,7 @@ import {
 export type BillingPlatformSettings = {
   currency: string;
   currency_symbol: string;
-  default_payment_provider: "paystack" | "flutterwave" | "manual";
+  default_payment_provider: "bachs" | "manual";
 };
 
 export type EditablePlanConfig = PlanConfig & {
@@ -19,9 +19,9 @@ export type EditablePlanConfig = PlanConfig & {
 };
 
 export const DEFAULT_BILLING_SETTINGS: BillingPlatformSettings = {
-  currency: "NGN",
-  currency_symbol: "₦",
-  default_payment_provider: "paystack",
+  currency: "USD",
+  currency_symbol: "$",
+  default_payment_provider: "bachs",
 };
 
 function asFiniteNumber(value: unknown): number | null {
@@ -37,9 +37,6 @@ function asStringArray(value: unknown, fallback: string[]): string[] {
 
 function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | null | undefined): EditablePlanConfig {
   const fallback = getPlanConfig(planId);
-  const price = Object.prototype.hasOwnProperty.call(override || {}, "price_ngn")
-    ? asFiniteNumber(override?.price_ngn)
-    : fallback.price_ngn;
   const priceUsd = Object.prototype.hasOwnProperty.call(override || {}, "price_usd")
     ? asFiniteNumber(override?.price_usd)
     : fallback.price_usd;
@@ -48,7 +45,8 @@ function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | nul
     id: planId,
     name: typeof override?.name === "string" && override.name.trim() ? override.name.trim() : fallback.name,
     price_usd: priceUsd,
-    price_ngn: price,
+    price_ngn: null,
+    amount_decimal: typeof override?.amount_decimal === "string" ? override.amount_decimal : fallback.amount_decimal,
     messages: Object.prototype.hasOwnProperty.call(override || {}, "messages")
       ? asFiniteNumber(override?.messages)
       : fallback.messages,
@@ -71,14 +69,10 @@ function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | nul
       ? asFiniteNumber(override?.team_members)
       : fallback.team_members,
     features: asStringArray(override?.features, fallback.features),
-    paystack_plan_code:
-      typeof override?.paystack_plan_code === "string" && override.paystack_plan_code.trim()
-        ? override.paystack_plan_code.trim()
-        : fallback.paystack_plan_code,
-    flutterwave_plan_id:
-      typeof override?.flutterwave_plan_id === "string" && override.flutterwave_plan_id.trim()
-        ? override.flutterwave_plan_id.trim()
-        : fallback.flutterwave_plan_id,
+    bachs_product_id:
+      typeof override?.bachs_product_id === "string" && override.bachs_product_id.trim()
+        ? override.bachs_product_id.trim()
+        : fallback.bachs_product_id,
     contact_sales:
       typeof override?.contact_sales === "boolean" ? override.contact_sales : fallback.contact_sales,
   };

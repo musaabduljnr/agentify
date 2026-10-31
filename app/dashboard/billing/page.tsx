@@ -7,6 +7,7 @@ import { DowngradeDialog } from "@/components/billing/downgrade-dialog";
 import { BillingHistoryTable } from "@/components/billing/billing-history-table";
 import { PaymentMethodsCard } from "@/components/billing/payment-methods-card";
 import { BillingInfoForm } from "@/components/billing/billing-info-form";
+import { ManageBillingButton } from "@/components/billing/manage-billing-button";
 import { Button } from "@/components/ui/button";
 import {
   CreditCard,
@@ -21,7 +22,7 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
-  HelpCircle,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -58,59 +59,86 @@ function UsageCard({
     <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-100 flex flex-col justify-between">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-bold text-slate-700">{label}</span>
-        <span className="text-xs font-extrabold text-slate-900">
-          {isUnlimited ? (
-            <span className="text-emerald-700 font-bold">Unlimited</span>
-          ) : (
-            `${used.toLocaleString()} / ${limit.toLocaleString()} ${unit}`.trim()
-          )}
-        </span>
+        {isUnlimited ? (
+          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+            Unlimited
+          </span>
+        ) : (
+          <span className="text-xs font-bold font-mono text-slate-500">
+            {used.toLocaleString()} / {limit.toLocaleString()} {unit}
+          </span>
+        )}
       </div>
 
-      <div className="h-2 w-full bg-slate-200/70 rounded-full overflow-hidden mb-2">
-        <div
-          className={`h-full ${barColor} rounded-full transition-all duration-700 ease-out`}
-          style={{ width: isUnlimited ? "4%" : `${Math.max(2, pct)}%` }}
-        />
+      <div className="space-y-1.5">
+        <div className="w-full h-2 rounded-full bg-slate-200/70 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${isUnlimited ? 5 : pct}%` }}
+          />
+        </div>
+        <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+          <span>{isUnlimited ? "No quota caps" : `${pct}% consumed`}</span>
+          {!isUnlimited && <span>{Math.max(0, limit - used).toLocaleString()} remaining</span>}
+        </div>
       </div>
-
-      <p className="text-[10px] text-slate-400 font-medium">
-        {isUnlimited
-          ? "Uncapped capacity on your plan."
-          : pct >= 100
-          ? "Monthly limit reached. Upgrade to expand capacity."
-          : `${pct}% used this period.`}
-      </p>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    pending: "bg-amber-50 text-amber-700 border-amber-200",
-    past_due: "bg-red-50 text-red-700 border-red-200",
-    cancelled: "bg-slate-100 text-slate-700 border-slate-200",
-    suspended: "bg-red-50 text-red-700 border-red-200",
-    expired: "bg-slate-100 text-slate-500 border-slate-200",
+  const config: Record<string, { label: string; class: string; icon: any }> = {
+    active: {
+      label: "Active",
+      class: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: CheckCircle2,
+    },
+    pending: {
+      label: "Pending Payment",
+      class: "bg-amber-50 text-amber-700 border-amber-200",
+      icon: Clock,
+    },
+    past_due: {
+      label: "Past Due",
+      class: "bg-red-50 text-red-700 border-red-200",
+      icon: AlertTriangle,
+    },
+    canceled: {
+      label: "Cancelled",
+      class: "bg-slate-100 text-slate-600 border-slate-200",
+      icon: AlertCircle,
+    },
+    cancelled: {
+      label: "Cancelled",
+      class: "bg-slate-100 text-slate-600 border-slate-200",
+      icon: AlertCircle,
+    },
+    unpaid: {
+      label: "Unpaid",
+      class: "bg-red-50 text-red-700 border-red-200",
+      icon: AlertCircle,
+    },
+    trialing: {
+      label: "Active",
+      class: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: CheckCircle2,
+    },
   };
 
-  const labels: Record<string, string> = {
-    active: "Active",
-    pending: "Pending Payment",
-    past_due: "Past Due",
-    cancelled: "Cancelled",
-    suspended: "Suspended",
-    expired: "Expired",
+  const current = config[status.toLowerCase()] || {
+    label: status.toUpperCase(),
+    class: "bg-slate-100 text-slate-700 border-slate-200",
+    icon: Clock,
   };
+
+  const Icon = current.icon;
 
   return (
     <span
-      className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-wider border ${
-        styles[status] || styles.cancelled
-      }`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wider ${current.class}`}
     >
-      {labels[status] || status}
+      <Icon className="w-3.5 h-3.5" />
+      <span>{current.label}</span>
     </span>
   );
 }
@@ -118,10 +146,10 @@ function StatusBadge({ status }: { status: string }) {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams?: any;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const resolvedParams = searchParams instanceof Promise ? await searchParams : (searchParams || {});
-  const showSuccess = resolvedParams.success === "true";
+  const resolvedParams = searchParams ? await searchParams : {};
+  const showSuccess = resolvedParams.status === "success";
 
   const [billingData, warnings, history] = await Promise.all([
     getBillingData(),
@@ -131,59 +159,71 @@ export default async function BillingPage({
 
   if (!billingData) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-black text-slate-900 mb-2">Billing & Subscription</h1>
-          <p className="text-sm text-slate-500">Manage your subscription, quotas, and billing settings.</p>
-        </div>
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-16 text-center">
-          <CreditCard className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-slate-900 mb-2">No Active Subscription Found</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mb-6">
-            Please complete your account onboarding to initialize your subscription.
+      <div className="p-8 max-w-5xl mx-auto">
+        <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-4">
+          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+          <h2 className="text-xl font-bold text-slate-900">Billing Unavailable</h2>
+          <p className="text-sm text-slate-500 max-w-md mx-auto">
+            Unable to load your business billing record. Please make sure you have created your business workspace first.
           </p>
-          <Button asChild className="rounded-2xl px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold">
-            <Link href="/onboarding">Complete Setup</Link>
+          <Button asChild className="rounded-2xl">
+            <Link href="/dashboard">Return to Dashboard</Link>
           </Button>
         </div>
       </div>
     );
   }
 
-  const { business, subscription, currentPlan, billingSettings, usage, plans } = billingData;
+  const { subscription, currentPlan, billingSettings, usage, plans, business } = billingData;
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  const isActive = subscription.status === "active";
+  const isPending = subscription.status === "pending";
+  const isPastDue = subscription.status === "past_due";
+  const hasBachsCustomer = Boolean(subscription.bachs_customer_id);
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return "End of billing cycle";
+    try {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return dateString;
+    }
   };
 
   const periodStart = formatDate(subscription.current_period_start);
   const periodEnd = formatDate(subscription.current_period_end || subscription.reset_date);
-  const scheduledDowngrade = subscription.metadata?.downgrade_to;
-  const isPending = subscription.status === "pending";
-  const isActive = subscription.status === "active";
-
-  const currencySymbol = billingSettings.currency_symbol || (billingSettings.currency === "USD" ? "$" : "₦");
+  const scheduledDowngrade = subscription.metadata?.scheduled_downgrade;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 pb-16">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 font-sans">
       
-      {/* Page Title */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">Billing & Plans</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage your subscription, usage quotas, payment methods, and invoices.
-            </p>
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+              Billing & Subscription (USD)
+            </span>
           </div>
-          <Button asChild variant="outline" className="rounded-2xl text-xs font-bold border-slate-200 self-start sm:self-auto">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Account Billing
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage your subscription, usage quotas, payment methods, and invoices powered by Bachs.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {hasBachsCustomer && (
+            <ManageBillingButton />
+          )}
+          <Button asChild variant="outline" className="rounded-2xl text-xs font-bold border-slate-200">
             <Link href="/pricing" target="_blank" className="flex items-center gap-1.5">
-              <span>View Public Pricing</span>
+              <span>View Pricing</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </Button>
@@ -203,23 +243,44 @@ export default async function BillingPage({
         </div>
       )}
 
+      {/* Failed Payment Warning Banner */}
+      {isPastDue && (
+        <div className="p-6 bg-red-50 border border-red-200 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3.5">
+            <AlertCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-bold text-red-950">Payment Failed: Renewal Past Due</h4>
+              <p className="text-xs text-red-800 mt-0.5 leading-relaxed">
+                We were unable to charge your card for the latest billing period. Please update your payment method to avoid service interruption.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 w-full md:w-auto">
+            <ManageBillingButton
+              variant="default"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold h-11 px-6 shadow-md"
+              label="Update Payment Method"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Pending Payment Notice */}
-      {isPending && (
+      {isPending && !isPastDue && (
         <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
           <div className="flex items-start gap-3.5">
             <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <h4 className="text-sm font-bold text-amber-950">Action Needed: Subscription Pending Payment</h4>
               <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                Your subscription is currently inactive. Please complete your checkout to activate AI features and agent responses.
+                Your subscription is currently pending payment. Complete checkout via Bachs to activate your AI replies and quotas.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2.5 w-full md:w-auto">
             <UpgradeButton
               planId={subscription.plan === "growth" ? "growth" : "starter"}
-              provider="paystack"
-              label={`Pay ${subscription.plan === "growth" ? "$10 / ₦16,000" : "$2 / ₦3,200"}`}
+              label={`Pay ${subscription.plan === "growth" ? "$10.00" : "$2.00"} USD`}
               className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-11 px-6 shadow-md"
             />
           </div>
@@ -255,26 +316,45 @@ export default async function BillingPage({
               <div className="sm:text-right">
                 <div className="text-3xl font-black text-slate-900 tracking-tight">
                   {currentPlan.price}
+                  <span className="text-sm font-normal text-slate-500 ml-1">/mo</span>
                 </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                  Billed monthly via Paystack
+                  Billed monthly in USD via Bachs
                 </span>
               </div>
             </div>
 
             {/* Scheduled downgrade warning if active */}
             {scheduledDowngrade && (
-              <div className="mb-6 p-4 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-center justify-between gap-4">
-                <div className="text-xs text-amber-900">
-                  <strong>Scheduled Downgrade:</strong> Your plan will switch to <span className="capitalize font-bold">{scheduledDowngrade}</span> on <strong>{periodEnd}</strong>.
+              <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start justify-between gap-3 text-xs">
+                <div>
+                  <p className="font-bold text-amber-950">
+                    Scheduled Downgrade to {String(scheduledDowngrade.target_plan).toUpperCase()}
+                  </p>
+                  <p className="text-amber-800 mt-0.5">
+                    Your plan will automatically switch to {scheduledDowngrade.target_plan} on {formatDate(scheduledDowngrade.effective_at)}.
+                  </p>
                 </div>
+                <DowngradeDialog
+                  currentPlan={currentPlan.name}
+                  targetPlan="starter"
+                  targetPrice="$2.00/mo"
+                  periodEndDate={periodEnd}
+                  isScheduled={true}
+                />
               </div>
             )}
 
-            {/* Scheduled cancellation warning if active */}
-            {subscription.cancel_at_period_end && !scheduledDowngrade && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-900">
-                <strong>Cancellation Notice:</strong> Your subscription will cancel on <strong>{periodEnd}</strong>. You retain full access to your plan until that date.
+            {/* Scheduled cancellation notice */}
+            {subscription.cancel_at_period_end && (
+              <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 flex items-start gap-3 text-xs">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-red-950">Subscription Set to Cancel</p>
+                  <p className="text-red-800 mt-0.5">
+                    Your subscription will not renew. You maintain full access to your plan features until {periodEnd}.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -318,15 +398,26 @@ export default async function BillingPage({
 
           {/* SECTION C: Manage Subscription Actions */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 space-y-6">
-            <h3 className="text-base font-bold text-slate-900">Subscription Controls</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Subscription Controls</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update your tier, schedule downgrades, or access the Bachs customer portal.
+                </p>
+              </div>
+
+              {hasBachsCustomer && (
+                <ManageBillingButton />
+              )}
+            </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               {/* Downgrade Action (if on Growth) */}
               {subscription.plan === "growth" && isActive && (
                 <DowngradeDialog
                   currentPlan={currentPlan.name}
                   targetPlan="starter"
-                  targetPrice={billingSettings.currency === "USD" ? "$2/mo" : "₦3,200/mo"}
+                  targetPrice="$2.00/mo"
                   periodEndDate={periodEnd}
                   isScheduled={!!scheduledDowngrade}
                 />
@@ -382,58 +473,62 @@ export default async function BillingPage({
               {subscription.plan === "starter" && (
                 <div className="space-y-3 mb-6">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-white">$10</span>
+                    <span className="text-3xl font-black text-white">$10.00</span>
                     <span className="text-xs text-slate-400">/month</span>
-                    <span className="text-[11px] font-semibold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30">
-                      ₦16,000/mo
-                    </span>
                   </div>
 
-                  <UpgradeButton
-                    planId="growth"
-                    provider="paystack"
-                    label="Upgrade to Growth Plan"
-                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 shadow-lg shadow-indigo-600/30"
-                  />
-                  <p className="text-[10px] text-slate-400 text-center">
-                    Instant upgrade · Verified server-side via Paystack
-                  </p>
+                  <ul className="space-y-2 text-xs text-slate-300 py-2 border-y border-white/10">
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>1,500 AI replies per billing cycle</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>Up to 3 AI assistants / widgets</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>100 knowledge sources</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span>Remove Agentify branding</span>
+                    </li>
+                  </ul>
                 </div>
+              )}
+
+              {subscription.plan === "starter" && (
+                <UpgradeButton
+                  planId="growth"
+                  label="Upgrade to Growth ($10/mo)"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-12 shadow-lg shadow-indigo-600/30"
+                />
               )}
 
               {subscription.plan === "growth" && (
-                <div className="p-4 bg-white/5 rounded-2xl border border-white/10 text-xs text-slate-300 mb-6">
-                  <div className="flex items-center gap-2 font-bold text-emerald-400 mb-1">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Highest standard tier active</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Need custom reply volumes or SLA? Inquire about Enterprise.
-                  </p>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-white/10">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full h-10 rounded-2xl border-white/20 text-white hover:bg-white/10 font-bold text-xs"
-                >
-                  <Link href="mailto:sales@agentify.app?subject=Agentify%20Enterprise%20Inquiry">
-                    Contact Enterprise Sales
-                  </Link>
+                <Button asChild variant="outline" className="w-full rounded-2xl border-white/20 text-white hover:bg-white/10 font-bold h-12">
+                  <Link href="/pricing#enterprise">Contact Enterprise Sales</Link>
                 </Button>
-              </div>
+              )}
             </div>
           </div>
 
           {/* SECTION E: Payment Methods Card */}
-          <PaymentMethodsCard lastTransaction={history?.[0]} />
+          <PaymentMethodsCard
+            lastTransaction={history[0]}
+            hasActiveCustomer={hasBachsCustomer}
+          />
 
-          {/* SECTION F: Billing Information Card */}
+          {/* SECTION F: Billing Profile Information */}
           <BillingInfoForm
-            business={business}
-            metadata={subscription.metadata}
+            initialData={{
+              name: business?.name,
+              contact_email: business?.contact_email,
+              phone: business?.phone,
+              address: business?.address,
+              country: business?.country,
+            }}
           />
 
         </div>

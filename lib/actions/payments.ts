@@ -3,27 +3,24 @@
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import {
-  initializePaystackTransaction,
-  PaystackProviderError,
-  verifyPaystackTransaction,
-} from "@/lib/payments/paystack";
+  createBachsCheckoutSession,
+  createBachsCustomerPortalSession,
+  getBachsSubscription,
+  BachsApiError,
+} from "@/lib/payments/bachs";
 import { type PlanId } from "@/lib/billing/plans";
 import {
-  getBillingPlatformSettings,
   getEffectivePlanConfig,
-  getEffectivePlanLimits,
 } from "@/lib/billing/platform";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
-import { sendTransactionalEmail } from "@/lib/email/send-email";
-import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
-import { PaymentFailedEmail } from "@/lib/email/templates/payment-failed-email";
-import { getConfig, getSecretWithEnvFallback } from "@/lib/config/platform-config";
+import { getConfig } from "@/lib/config/platform-config";
 
 async function getAppBaseUrl(): Promise<string> {
   const dbUrl = await getConfig("platform", "app_url");
   const configuredUrl =
     dbUrl ||
+    process.env.APP_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
@@ -38,13 +35,12 @@ async function getAppBaseUrl(): Promise<string> {
 }
 
 /**
- * Creates a checkout session using Paystack (primary) or Flutterwave (secondary).
- * Safe, server-side validated, and generates unique transaction references.
+ * Creates a hosted checkout session using Bachs (USD Only).
+ * Fully server-side validated: resolves trusted product IDs, enforces USD currency,
+ * and sets user/business metadata.
  */
 export async function createCheckoutSession(
-  plan: "starter" | "growth",
-  provider: "paystack" | "flutterwave" = "paystack",
-  currency?: "USD" | "NGN"
+  plan: "starter" | "growth"
 ) {
   try {
     // 0. Check feature flag
@@ -52,11 +48,12 @@ export async function createCheckoutSession(
     if (paymentsEnabled === "false") {
       return { error: "Payments are temporarily disabled. Please try again later." };
     }
+
     // 1. Get authenticated user
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      return { error: "Unauthorized" };
+      return { error: "Unauthorized. Please log in to continue." };
     }
 
     // 2. Get current business
@@ -78,113 +75,91 @@ export async function createCheckoutSession(
       .maybeSingle();
 
     if (!subscription) {
-      return { error: "No subscription found. Please contact support." };
+      return { error: "No subscription record found. Please contact support." };
     }
 
-    // 4. Get plan config
-    const [planConfig, billingSettings] = await Promise.all([
-      getEffectivePlanConfig(plan),
-      getBillingPlatformSettings(),
-    ]);
+    // 4. Resolve trusted plan config and product ID
+    const planConfig = await getEffectivePlanConfig(plan);
     if (!planConfig) {
       return { error: "Invalid plan selected." };
     }
 
-    // 5. Validate plan is paid and determine price based on configured currency
-    const chosenCurrency = (currency || billingSettings.currency || "NGN").toUpperCase();
-    const isUsd = chosenCurrency === "USD";
-    const checkoutCurrency = isUsd ? "USD" : "NGN";
-    const checkoutAmount = isUsd ? (planConfig.price_usd ?? 0) : (planConfig.price_ngn ?? 0);
+    const productId =
+      planConfig.bachs_product_id ||
+      (plan === "starter"
+        ? process.env.BACHS_STARTER_PRODUCT_ID
+        : process.env.BACHS_GROWTH_PRODUCT_ID);
 
-    if (!checkoutAmount || checkoutAmount <= 0) {
-      return { error: "Selected plan cannot be subscribed to directly." };
+    if (!productId || productId.includes("placeholder")) {
+      return {
+        error: `Bachs Product ID is not configured for the ${planConfig.name} plan. Please contact support.`,
+      };
     }
 
-    // 6. Create unique reference: agentify_{businessIdShort}_{timestamp}
+    const appBaseUrl = await getAppBaseUrl();
+    const successUrl = `${appBaseUrl}/dashboard/billing?status=success&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${appBaseUrl}/dashboard/billing?status=cancelled`;
+
+    // 5. Initialize Bachs checkout session
+    const customerId = subscription.bachs_customer_id || subscription.provider_customer_id;
+    const checkoutRes = await createBachsCheckoutSession({
+      productId,
+      customerEmail: user.email || business.contact_email || "billing@agentify.co",
+      customerName: business.name || user.user_metadata?.name || undefined,
+      customerId: customerId || undefined,
+      businessId: business.id,
+      userId: user.id,
+      plan,
+      successUrl,
+      cancelUrl,
+    });
+
+    // 6. Record pending transaction using service client
+    const serviceClient = createServiceClient();
     const businessIdShort = business.id.substring(0, 8);
     const reference = `agentify_${businessIdShort}_${Date.now()}`;
+    const amountNumber = plan === "starter" ? 2 : 10;
 
-    // 7. Call payment provider to initialize transaction
-    let checkoutUrl = "";
-    let rawResponse = {};
-
-    if (provider === "paystack") {
-      const planCode = planConfig.paystack_plan_code;
-      if (!planCode) {
-        logErrorSync(
-          new Error(`No paystack_plan_code configured for plan "${plan}". Falling back to one-time transaction checkout.`),
-          "payment-checkout",
-          { businessId: business.id, userId: user.id }
-        );
-      }
-
-      const callbackUrl = `${await getAppBaseUrl()}/payment/callback`;
-
-      const paystackRes = await initializePaystackTransaction({
-        email: user.email || business.contact_email || "billing@agentify.com",
-        amount: checkoutAmount,
-        currency: checkoutCurrency,
-        planCode: planCode || undefined, // One-time fallback if missing
-        reference,
-        businessId: business.id,
-        callbackUrl,
-        metadata: {
-          plan,
-          userId: user.id,
-        },
-      });
-
-      checkoutUrl = paystackRes.authorizationUrl;
-      rawResponse = paystackRes;
-    } else if (provider === "flutterwave") {
-      // Flutterwave is secondary and throws error if keys are missing
-      const flwSecret = await getSecretWithEnvFallback("flutterwave", "secret_key", "FLUTTERWAVE_SECRET_KEY");
-      if (!flwSecret || flwSecret.includes("placeholder")) {
-        return { error: "Flutterwave payment is not enabled yet." };
-      }
-      return { error: "Flutterwave checkout is not fully implemented yet." };
-    } else {
-      return { error: "Unsupported payment provider selected." };
-    }
-
-    // 8. Save pending transaction in payment_transactions table using service role
-    const serviceClient = createServiceClient();
     const { error: insertError } = await serviceClient
       .from("payment_transactions")
       .insert({
         business_id: business.id,
         subscription_id: subscription.id,
-        provider,
+        provider: "bachs",
         reference,
+        checkout_id: checkoutRes.checkoutId,
         plan,
-        amount: checkoutAmount,
-        currency: checkoutCurrency,
+        amount: amountNumber,
+        currency: "USD",
         status: "pending",
-        checkout_url: checkoutUrl,
-        raw_response: rawResponse,
+        checkout_url: checkoutRes.checkoutUrl,
+        raw_response: {
+          checkout_id: checkoutRes.checkoutId,
+          status: checkoutRes.status,
+          product_id: productId,
+        },
       });
 
     if (insertError) {
-      logErrorSync(insertError, "payment-checkout", { businessId: business.id, userId: user.id });
-      return { error: "Failed to record payment transaction record." };
+      logErrorSync(insertError, "bachs-checkout", { businessId: business.id, userId: user.id });
+      return { error: "Failed to record checkout session." };
     }
 
-    // 9. Return checkout URL
-    return { checkoutUrl };
+    return { checkoutUrl: checkoutRes.checkoutUrl };
   } catch (error: any) {
-    logErrorSync(error, "payment-checkout");
-    if (error instanceof PaystackProviderError) {
-      return { error: `Paystack checkout failed: ${error.message}` };
+    logErrorSync(error, "bachs-checkout");
+    if (error instanceof BachsApiError) {
+      return { error: `Checkout initialization failed: ${error.message} (${error.errorCode})` };
     }
-    return { error: getUserFriendlyError("payment-checkout") };
+    return { error: error.message || getUserFriendlyError("payment-checkout") };
   }
 }
 
 /**
- * Verifies transaction reference on redirect callback.
- * Safely updates database transaction logs and upgrades the business's subscription plans.
+ * Creates an authenticated Bachs Customer Portal session for managing subscriptions,
+ * updating payment methods, viewing invoices, or cancellations.
  */
-export async function verifyPaymentReference(reference: string) {
+export async function createPortalSession() {
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -192,177 +167,68 @@ export async function verifyPaymentReference(reference: string) {
       return { error: "Unauthorized" };
     }
 
-    // Fetch transaction details using service role client
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+    if (!business) {
+      return { error: "Business not found." };
+    }
+
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("bachs_customer_id, provider_customer_id")
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    const customerId = subscription?.bachs_customer_id || subscription?.provider_customer_id;
+    if (!customerId) {
+      return { error: "No active billing customer found. Please subscribe to a plan first." };
+    }
+
+    const session = await createBachsCustomerPortalSession(customerId);
+    return { url: session.url };
+  } catch (error: any) {
+    logErrorSync(error, "bachs-portal-session");
+    if (error instanceof BachsApiError) {
+      return { error: `Could not open customer portal: ${error.message}` };
+    }
+    return { error: "Could not open billing portal. Please contact support." };
+  }
+}
+
+/**
+ * Reconciles payment status for the user dashboard.
+ * Note: Subscriptions are authoritatively updated by Bachs webhooks.
+ */
+export async function verifyPaymentReference(reference: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
     const serviceClient = createServiceClient();
-    const { data: transaction, error: fetchTxError } = await serviceClient
+    const { data: transaction } = await serviceClient
       .from("payment_transactions")
       .select("*")
       .eq("reference", reference)
       .maybeSingle();
 
-    if (fetchTxError || !transaction) {
+    if (!transaction) {
       return { error: "Transaction not found." };
     }
 
-    // Verify ownership of the business
-    const { data: business } = await serviceClient
-      .from("businesses")
-      .select("name, owner_id, contact_email")
-      .eq("id", transaction.business_id)
-      .single();
-
-    if (!business || business.owner_id !== user.id) {
-      return { error: "Unauthorized to verify this transaction." };
-    }
-
-    // If transaction is already handled, return immediate result
-    if (transaction.status === "success") {
-      return { success: true, plan: transaction.plan };
-    }
-    if (transaction.status !== "pending") {
-      return { error: `Transaction has already been finalized as '${transaction.status}'.` };
-    }
-
-    let paymentVerified = false;
-    let customerCode = "";
-    let subscriptionCode = "";
-    let planCode = "";
-    let rawPaystackResponse = {};
-
-    if (transaction.provider === "paystack") {
-      const paystackData = await verifyPaystackTransaction(reference);
-      rawPaystackResponse = paystackData;
-
-      if (paystackData.status === "success") {
-        // Audit H5 / cross-validation: verify reference and amount match
-        const expectedMinorUnits = Math.round(Number(transaction.amount) * 100);
-        if (
-          paystackData.reference !== reference ||
-          Number(paystackData.amount) !== expectedMinorUnits
-        ) {
-          await serviceClient
-            .from("payment_transactions")
-            .update({
-              status: "failed",
-              raw_response: {
-                ...((transaction.raw_response as Record<string, any>) || {}),
-                verification: rawPaystackResponse,
-                error: "Verification failed: amount or reference mismatch.",
-              },
-            })
-            .eq("id", transaction.id);
-
-          return { error: "Payment verification failed: transaction parameters mismatch." };
-        }
-
-        paymentVerified = true;
-        customerCode = paystackData.customer?.customer_code || "";
-        subscriptionCode = paystackData.subscription || "";
-        planCode = paystackData.plan || "";
-      }
-    } else {
-      return { error: "Unsupported payment provider." };
-    }
-
-    if (paymentVerified) {
-      const planLimits = await getEffectivePlanLimits(transaction.plan as PlanId);
-      const now = new Date();
-      const periodEnd = new Date();
-      periodEnd.setDate(periodEnd.getDate() + 30);
-
-      // 1. Atomically mark transaction success only if still pending (Audit M3 guard)
-      const { data: claimedTx } = await serviceClient
-        .from("payment_transactions")
-        .update({
-          status: "success",
-          verified_at: now.toISOString(),
-          provider_customer_id: customerCode || null,
-          provider_subscription_id: subscriptionCode || null,
-          raw_response: {
-            ...((transaction.raw_response as Record<string, any>) || {}),
-            verification: rawPaystackResponse,
-          },
-        })
-        .eq("id", transaction.id)
-        .eq("status", "pending")
-        .select("id")
-        .maybeSingle();
-
-      if (!claimedTx) {
-        // Concurrently processed by webhook
-        return { success: true, plan: transaction.plan };
-      }
-
-      // 2. Upgrade subscription
-      const { error: subError } = await serviceClient
-        .from("subscriptions")
-        .update({
-          plan: transaction.plan,
-          status: "active",
-          payment_provider: transaction.provider,
-          provider_customer_id: customerCode || null,
-          provider_subscription_id: subscriptionCode || null,
-          provider_plan_code: planCode || null,
-          provider_reference: reference,
-          current_period_start: now.toISOString(),
-          current_period_end: periodEnd.toISOString(),
-          reset_date: periodEnd.toISOString(),
-          cancel_at_period_end: false,
-          ...planLimits,
-          updated_at: now.toISOString(),
-        })
-        .eq("business_id", transaction.business_id);
-
-      if (subError) throw subError;
-
-      await sendTransactionalEmail({
-        businessId: transaction.business_id,
-        to: user.email || business.contact_email,
-        subject: "Payment successful — your Agentify plan is active",
-        templateName: "payment-success-email",
-        react: PaymentSuccessEmail({
-          businessName: business?.name || "there",
-          plan: String(transaction.plan),
-          amount: transaction.amount ? `${transaction.currency} ${Number(transaction.amount).toLocaleString()}` : null,
-          billingUrl: `${await getAppBaseUrl()}/dashboard/billing`,
-        }),
-      });
-
-      revalidatePath("/dashboard/billing");
-      return { success: true, plan: transaction.plan };
-    } else {
-      // Finalize transaction failure
-      await serviceClient
-        .from("payment_transactions")
-        .update({
-          status: "failed",
-          raw_response: {
-            ...((transaction.raw_response as Record<string, any>) || {}),
-            verification: rawPaystackResponse,
-          },
-        })
-        .eq("id", transaction.id);
-
-      await sendTransactionalEmail({
-        businessId: transaction.business_id,
-        to: user.email || business.contact_email,
-        subject: "Payment failed — action needed",
-        templateName: "payment-failed-email",
-        react: PaymentFailedEmail({
-          businessName: business?.name || "there",
-          plan: String(transaction.plan),
-          billingUrl: `${await getAppBaseUrl()}/dashboard/billing`,
-        }),
-      });
-
-      return { error: "Payment verification failed." };
-    }
+    return {
+      status: transaction.status,
+      plan: transaction.plan,
+      isPending: transaction.status === "pending",
+      isSuccess: transaction.status === "success",
+    };
   } catch (error: any) {
-    logErrorSync(error, "payment-verification");
-    if (error instanceof PaystackProviderError) {
-      return { error: `Paystack verification failed: ${error.message}` };
-    }
-    return { error: "Payment verification failed. Please contact support if you were charged." };
+    logErrorSync(error, "payment-reference-check");
+    return { error: "Could not check payment status." };
   }
 }
 

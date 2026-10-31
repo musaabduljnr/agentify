@@ -25,7 +25,6 @@ interface PricingViewProps {
     status: string;
     current_period_end?: string | null;
   } | null;
-  defaultCurrency?: "USD" | "NGN";
 }
 
 const COMPARISON_FEATURES = [
@@ -71,7 +70,7 @@ const FAQS = [
   {
     question: "What payment currencies and methods do you support?",
     answer:
-      "We accept all major debit and credit cards (Visa, Mastercard, Verve), bank transfers, and USSD via our secure payment gateway (Paystack). You can choose between USD ($) and NGN (₦) billing.",
+      "We accept all major debit and credit cards (Visa, Mastercard, American Express) via our secure payment gateway. All plans are billed in USD ($).",
   },
   {
     question: "How do cancellations work?",
@@ -93,10 +92,9 @@ const FAQS = [
 export function PricingView({
   user,
   subscription,
-  defaultCurrency = "USD",
 }: PricingViewProps) {
   const router = useRouter();
-  const [currency, setCurrency] = useState<"USD" | "NGN">(defaultCurrency);
+  // USD-only billing — no currency toggle
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -108,9 +106,9 @@ export function PricingView({
   const handleSelectPlan = async (plan: "starter" | "growth") => {
     setCheckoutError(null);
 
-    // If user is not authenticated, redirect to signup preserving plan and currency
+    // If user is not authenticated, redirect to signup preserving plan
     if (!user) {
-      router.push(`/signup?plan=${plan}&currency=${currency}`);
+      router.push(`/signup?plan=${plan}`);
       return;
     }
 
@@ -118,13 +116,13 @@ export function PricingView({
     if (plan === "starter" && isStarterCurrent) return;
     if (plan === "growth" && isGrowthCurrent) return;
 
-    // Trigger server-side Paystack checkout session
+    // Trigger server-side Bachs checkout session
     setLoadingPlan(plan);
     try {
       const response = await fetch("/api/payments/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, currency, provider: "paystack" }),
+        body: JSON.stringify({ plan }),
       });
 
       const data = await response.json();
@@ -169,31 +167,11 @@ export function PricingView({
             No surprise overage fees, no complex usage tiers. Select the plan that fits your customer engagement scale.
           </p>
 
-          {/* Currency Selector Toggle */}
+          {/* USD-only billing badge */}
           <div className="pt-6 flex items-center justify-center">
-            <div className="inline-flex items-center p-1 rounded-2xl bg-[#12131d] border border-white/10 shadow-lg">
-              <button
-                type="button"
-                onClick={() => setCurrency("USD")}
-                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                  currency === "USD"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                USD ($)
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrency("NGN")}
-                className={`px-5 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
-                  currency === "NGN"
-                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                NGN (₦)
-              </button>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#12131d] border border-white/10 shadow-lg text-xs font-semibold text-slate-300">
+              <span className="text-base leading-none">💳</span>
+              <span>Billed in <strong className="text-white">USD</strong> · Secured by Bachs</span>
             </div>
           </div>
         </div>
@@ -233,7 +211,7 @@ export function PricingView({
 
                 <div className="mt-4 mb-3 flex items-baseline gap-2">
                   <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                    {currency === "USD" ? "$2" : "₦3,200"}
+                    $2
                   </span>
                   <span className="text-sm font-medium text-slate-400">/month</span>
                 </div>
@@ -337,7 +315,7 @@ export function PricingView({
 
                 <div className="mt-4 mb-3 flex items-baseline gap-2">
                   <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                    {currency === "USD" ? "$10" : "₦16,000"}
+                    $10
                   </span>
                   <span className="text-sm font-medium text-slate-400">/month</span>
                 </div>

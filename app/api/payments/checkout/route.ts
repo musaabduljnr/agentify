@@ -7,8 +7,8 @@ import { z } from "zod";
 
 const checkoutSchema = z.object({
   plan: z.enum(["starter", "growth"]),
-  provider: z.enum(["paystack", "flutterwave"]).default("paystack"),
-  currency: z.enum(["USD", "NGN"]).optional(),
+  // Currency is strictly USD; client overrides are ignored or validated
+  currency: z.literal("USD").optional().default("USD"),
 });
 
 export async function POST(request: Request) {
@@ -25,14 +25,18 @@ export async function POST(request: Request) {
     if (!rl.success) return rateLimitResponse(rl);
 
     // 2. Read body
-    const parsed = checkoutSchema.safeParse(await request.json().catch(() => ({})));
+    const body = await request.json().catch(() => ({}));
+    const parsed = checkoutSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid payment checkout request." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid payment checkout request. Only USD Starter and Growth plans are supported." },
+        { status: 400 }
+      );
     }
-    const { plan, provider, currency } = parsed.data;
+    const { plan } = parsed.data;
 
-    // 3. Create checkout session via server action helper
-    const result = await createCheckoutSession(plan, provider, currency);
+    // 3. Create checkout session via Bachs server action helper
+    const result = await createCheckoutSession(plan);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 400 });

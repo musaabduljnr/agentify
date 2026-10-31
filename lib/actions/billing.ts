@@ -59,8 +59,7 @@ export async function getBillingData() {
       return {
         id,
         name: config.name,
-        price: formatCurrencyAmount(config.price_ngn, billingSettings),
-        price_ngn: config.price_ngn,
+        price: formatCurrencyAmount(config.price_usd, billingSettings),
         price_usd: config.price_usd,
         features: config.features,
         isCurrent: id === planId,
@@ -69,10 +68,9 @@ export async function getBillingData() {
       };
     });
 
-    const isUsd = (billingSettings.currency || "NGN").toUpperCase() === "USD";
-    const planCost = isUsd
-      ? `$${plan.price_usd ?? 0}`
-      : `₦${Number(plan.price_ngn ?? 0).toLocaleString()}`;
+    const planCost = plan.price_usd !== null && plan.price_usd !== undefined
+      ? `$${plan.price_usd}`
+      : "Custom";
 
     return {
       business,
@@ -80,7 +78,9 @@ export async function getBillingData() {
         id: subscription.id,
         plan: subscription.plan,
         status: subscription.status,
-        payment_provider: subscription.payment_provider,
+        payment_provider: subscription.payment_provider || "bachs",
+        bachs_customer_id: subscription.bachs_customer_id || subscription.provider_customer_id,
+        bachs_subscription_id: subscription.bachs_subscription_id || subscription.provider_subscription_id,
         current_period_start: subscription.current_period_start,
         current_period_end: subscription.current_period_end,
         reset_date: subscription.reset_date,
@@ -91,7 +91,6 @@ export async function getBillingData() {
         id: planId,
         name: plan.name,
         price: planCost,
-        price_ngn: plan.price_ngn,
         price_usd: plan.price_usd,
       },
       billingSettings,

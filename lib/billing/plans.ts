@@ -9,7 +9,8 @@ export type PlanId = "starter" | "growth" | "enterprise" | "business";
 export type PlanConfig = {
   name: string;
   price_usd: number | null;
-  price_ngn: number | null; // null = custom pricing (enterprise)
+  price_ngn?: number | null; // deprecated - null for all plans
+  amount_decimal?: string | null; // e.g. "2.00", "10.00"
   messages: number | null; // null = unlimited
   daily_messages: number | null; // null = unlimited
   knowledge_sources: number | null;
@@ -18,8 +19,7 @@ export type PlanConfig = {
   embeddings: number | null;
   team_members: number | null; // null = unlimited
   features: string[];
-  paystack_plan_code: string | null;
-  flutterwave_plan_id: string | null;
+  bachs_product_id: string | null;
   contact_sales?: boolean;
   highlighted?: boolean;
 };
@@ -28,7 +28,8 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
   starter: {
     name: "Starter",
     price_usd: 2,
-    price_ngn: 3200,
+    price_ngn: null,
+    amount_decimal: "2.00",
     messages: 200,
     daily_messages: 50,
     knowledge_sources: 25,
@@ -46,14 +47,14 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
       "Email support",
       "Agentify branding",
     ],
-    paystack_plan_code: getConfiguredOptionalEnv("PAYSTACK_STARTER_PLAN_CODE"),
-    flutterwave_plan_id: null,
+    bachs_product_id: getConfiguredOptionalEnv("BACHS_STARTER_PRODUCT_ID"),
   },
 
   growth: {
     name: "Growth",
     price_usd: 10,
-    price_ngn: 16000,
+    price_ngn: null,
+    amount_decimal: "10.00",
     messages: 1500,
     daily_messages: 200,
     knowledge_sources: 100,
@@ -73,14 +74,14 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
       "Custom domain & webhooks",
       "Priority email support",
     ],
-    paystack_plan_code: getConfiguredOptionalEnv("PAYSTACK_GROWTH_PLAN_CODE"),
-    flutterwave_plan_id: null,
+    bachs_product_id: getConfiguredOptionalEnv("BACHS_GROWTH_PRODUCT_ID"),
   },
 
   enterprise: {
     name: "Enterprise",
     price_usd: null,
     price_ngn: null,
+    amount_decimal: null,
     messages: null, // unlimited
     daily_messages: null,
     knowledge_sources: null,
@@ -99,8 +100,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
       "SLA guarantee",
       "Custom training & onboarding",
     ],
-    paystack_plan_code: null,
-    flutterwave_plan_id: null,
+    bachs_product_id: null,
     contact_sales: true,
   },
 
@@ -113,7 +113,8 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
   business: {
     name: "Business",
     price_usd: 35,
-    price_ngn: 50000,
+    price_ngn: null,
+    amount_decimal: "35.00",
     messages: 50000,
     daily_messages: 2500,
     knowledge_sources: 250,
@@ -132,8 +133,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
       "Remove branding",
       "Custom domain & webhooks",
     ],
-    paystack_plan_code: null,
-    flutterwave_plan_id: null,
+    bachs_product_id: null,
   },
 };
 
