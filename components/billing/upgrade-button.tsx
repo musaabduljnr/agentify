@@ -7,6 +7,7 @@ import { Loader2, ArrowUpRight, Sparkles } from "lucide-react";
 interface UpgradeButtonProps {
   planId: "starter" | "growth";
   provider?: "paystack" | "flutterwave";
+  currency?: "USD" | "NGN";
   label?: string;
   className?: string;
   variant?: "default" | "outline" | "secondary" | "ghost" | "link";
@@ -15,6 +16,7 @@ interface UpgradeButtonProps {
 export function UpgradeButton({
   planId,
   provider = "paystack",
+  currency,
   label = "Upgrade",
   className = "",
   variant = "default",
@@ -31,7 +33,7 @@ export function UpgradeButton({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ plan: planId, provider }),
+        body: JSON.stringify({ plan: planId, provider, currency }),
       });
 
       const data = await response.json();

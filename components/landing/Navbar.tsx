@@ -59,6 +59,12 @@ export function Navbar() {
             Solutions
           </Link>
           <Link
+            href="/pricing"
+            className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
+          >
+            Pricing
+          </Link>
+          <Link
             href="#faq"
             className="text-[13px] font-medium text-[#434653] hover:text-[#181c1f] transition-colors py-1"
           >
@@ -119,6 +125,13 @@ export function Navbar() {
               Solutions
             </Link>
             <Link
+              href="/pricing"
+              onClick={() => setMenuOpen(false)}
+              className="hover:text-[#181c1f] py-1"
+            >
+              Pricing
+            </Link>
+            <Link
               href="#faq"
               onClick={() => setMenuOpen(false)}
               className="hover:text-[#181c1f] py-1"
@@ -139,7 +152,7 @@ export function Navbar() {
               onClick={() => setMenuOpen(false)}
               className="w-full text-center py-2.5 bg-[#181c1f] text-white rounded-xl text-sm font-semibold shadow-sm"
             >
-              Get Started Free
+              Get Started
             </Link>
           </div>
         </div>

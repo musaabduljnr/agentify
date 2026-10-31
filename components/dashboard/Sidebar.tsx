@@ -69,7 +69,7 @@ export function Sidebar({ isOpen, setIsOpen, subscription }: SidebarProps) {
       : Math.min(100, Math.round((subscription.messagesUsed / subscription.messagesLimit) * 100))
     : 0;
   
-  const planLabel = subscription?.plan?.replace("_", " ") || "Free Trial";
+  const planLabel = subscription?.plan?.replace("_", " ") || "Starter";
   const planUpperLabel = planLabel.charAt(0).toUpperCase() + planLabel.slice(1);
 
   return (

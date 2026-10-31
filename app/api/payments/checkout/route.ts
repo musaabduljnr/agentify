@@ -8,6 +8,7 @@ import { z } from "zod";
 const checkoutSchema = z.object({
   plan: z.enum(["starter", "growth"]),
   provider: z.enum(["paystack", "flutterwave"]).default("paystack"),
+  currency: z.enum(["USD", "NGN"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -28,10 +29,10 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid payment checkout request." }, { status: 400 });
     }
-    const { plan, provider } = parsed.data;
+    const { plan, provider, currency } = parsed.data;
 
     // 3. Create checkout session via server action helper
-    const result = await createCheckoutSession(plan, provider);
+    const result = await createCheckoutSession(plan, provider, currency);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: 400 });

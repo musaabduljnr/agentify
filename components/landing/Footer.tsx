@@ -103,8 +103,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="#pricing" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
-                  Pricing Models
+                <Link href="/pricing" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
+                  Pricing & Plans
                 </Link>
               </li>
               <li>

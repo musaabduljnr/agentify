@@ -23,7 +23,7 @@ async function getCurrentBusiness() {
 
   const { data: business } = await supabase
     .from("businesses")
-    .select("id")
+    .select("id, name, contact_email, phone, address, website_url")
     .eq("owner_id", user.id)
     .single();
 
@@ -38,16 +38,20 @@ export async function getBillingData() {
     const business = await getCurrentBusiness();
     if (!business) return null;
 
-    const [planData, usage, billingSettings, effectivePlans] = await Promise.all([
+    const supabase = await createClient();
+    const [planData, usage, billingSettings, effectivePlans, assistantsRes] = await Promise.all([
       getCurrentPlan(business.id),
       getUsageSummary(business.id),
       getBillingPlatformSettings(),
       getEffectivePlanConfigs(),
+      supabase.from("assistants").select("id", { count: "exact", head: true }).eq("business_id", business.id),
     ]);
 
     if (!planData) return null;
 
     const { subscription, plan, planId } = planData;
+    const assistantCount = assistantsRes.count ?? 1;
+    const widgetLimit = plan.widgets ?? 999999999;
 
     // Build plan comparison for all plans
     const plans = PLAN_ORDER.map((id) => {
@@ -57,6 +61,7 @@ export async function getBillingData() {
         name: config.name,
         price: formatCurrencyAmount(config.price_ngn, billingSettings),
         price_ngn: config.price_ngn,
+        price_usd: config.price_usd,
         features: config.features,
         isCurrent: id === planId,
         isUpgrade: PLAN_ORDER.indexOf(id) > PLAN_ORDER.indexOf(planId),
@@ -64,7 +69,13 @@ export async function getBillingData() {
       };
     });
 
+    const isUsd = (billingSettings.currency || "NGN").toUpperCase() === "USD";
+    const planCost = isUsd
+      ? `$${plan.price_usd ?? 0}`
+      : `₦${Number(plan.price_ngn ?? 0).toLocaleString()}`;
+
     return {
+      business,
       subscription: {
         id: subscription.id,
         plan: subscription.plan,
@@ -74,15 +85,25 @@ export async function getBillingData() {
         current_period_end: subscription.current_period_end,
         reset_date: subscription.reset_date,
         cancel_at_period_end: subscription.cancel_at_period_end,
+        metadata: subscription.metadata || {},
       },
       currentPlan: {
         id: planId,
         name: plan.name,
-        price: formatCurrencyAmount(plan.price_ngn, billingSettings),
+        price: planCost,
         price_ngn: plan.price_ngn,
+        price_usd: plan.price_usd,
       },
       billingSettings,
-      usage,
+      usage: {
+        ...usage,
+        widgets: {
+          used: assistantCount,
+          limit: widgetLimit,
+          remaining: Math.max(0, widgetLimit - assistantCount),
+          allowed: assistantCount < widgetLimit,
+        },
+      },
       plans,
     };
   } catch (err: any) {
@@ -240,5 +261,117 @@ export async function requestDowngrade(targetPlan: string) {
   } catch (err: any) {
     console.error("requestDowngrade error:", err);
     return { error: "Failed to request downgrade. Please try again." };
+  }
+}
+
+/**
+ * Cancel a pending scheduled downgrade.
+ */
+export async function cancelPendingDowngrade() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const business = await getCurrentBusiness();
+    if (!business) return { error: "No business found." };
+
+    const serviceClient = createServiceClient();
+    const { data: sub } = await serviceClient
+      .from("subscriptions")
+      .select("metadata")
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    const cleanMetadata = { ...((sub?.metadata as Record<string, any>) || {}) };
+    delete cleanMetadata.downgrade_to;
+    delete cleanMetadata.downgrade_requested_at;
+
+    const { error } = await serviceClient
+      .from("subscriptions")
+      .update({
+        cancel_at_period_end: false,
+        metadata: cleanMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("business_id", business.id);
+
+    if (error) throw error;
+
+    revalidatePath("/dashboard/billing");
+    return { success: true, message: "Scheduled downgrade has been cancelled." };
+  } catch (err: any) {
+    console.error("cancelPendingDowngrade error:", err);
+    return { error: "Failed to cancel scheduled downgrade. Please try again." };
+  }
+}
+
+/**
+ * Update billing profile information.
+ */
+export async function updateBillingInformation(data: {
+  business_name?: string;
+  contact_email?: string;
+  phone?: string;
+  address?: string;
+  website_url?: string;
+  billing_name?: string;
+  country?: string;
+}) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    const business = await getCurrentBusiness();
+    if (!business) return { error: "No business found." };
+
+    const serviceClient = createServiceClient();
+
+    // 1. Update business table fields
+    const businessUpdate: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (data.business_name !== undefined) businessUpdate.name = data.business_name.trim();
+    if (data.contact_email !== undefined) businessUpdate.contact_email = data.contact_email.trim();
+    if (data.phone !== undefined) businessUpdate.phone = data.phone.trim();
+    if (data.address !== undefined) businessUpdate.address = data.address.trim();
+    if (data.website_url !== undefined) businessUpdate.website_url = data.website_url.trim();
+
+    const { error: bizError } = await serviceClient
+      .from("businesses")
+      .update(businessUpdate)
+      .eq("id", business.id);
+
+    if (bizError) throw bizError;
+
+    // 2. Update subscription metadata for billing_name and country
+    const { data: sub } = await serviceClient
+      .from("subscriptions")
+      .select("metadata")
+      .eq("business_id", business.id)
+      .maybeSingle();
+
+    const updatedMetadata = {
+      ...((sub?.metadata as Record<string, any>) || {}),
+      billing_name: data.billing_name?.trim() || "",
+      country: data.country?.trim() || "NG",
+    };
+
+    const { error: subError } = await serviceClient
+      .from("subscriptions")
+      .update({
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("business_id", business.id);
+
+    if (subError) throw subError;
+
+    revalidatePath("/dashboard/billing");
+    return { success: true, message: "Billing details saved successfully." };
+  } catch (err: any) {
+    console.error("updateBillingInformation error:", err);
+    return { error: "Failed to update billing details. Please try again." };
   }
 }

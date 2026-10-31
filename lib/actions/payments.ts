@@ -43,7 +43,8 @@ async function getAppBaseUrl(): Promise<string> {
  */
 export async function createCheckoutSession(
   plan: "starter" | "growth",
-  provider: "paystack" | "flutterwave" = "paystack"
+  provider: "paystack" | "flutterwave" = "paystack",
+  currency?: "USD" | "NGN"
 ) {
   try {
     // 0. Check feature flag
@@ -90,7 +91,8 @@ export async function createCheckoutSession(
     }
 
     // 5. Validate plan is paid and determine price based on configured currency
-    const isUsd = (billingSettings.currency || "NGN").toUpperCase() === "USD";
+    const chosenCurrency = (currency || billingSettings.currency || "NGN").toUpperCase();
+    const isUsd = chosenCurrency === "USD";
     const checkoutCurrency = isUsd ? "USD" : "NGN";
     const checkoutAmount = isUsd ? (planConfig.price_usd ?? 0) : (planConfig.price_ngn ?? 0);
 
