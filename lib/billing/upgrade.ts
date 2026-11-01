@@ -179,8 +179,10 @@ export async function activateSubscriptionPlan(
   }
 
   // Fallback based on amount ($10 => growth, $2 => starter)
+  // Bachs may send amount in minor units (cents): 1000 = $10, 200 = $2
   if (targetPlan === "starter" && params.amount) {
-    if (params.amount >= 9.0) {
+    const normalizedAmount = params.amount > 100 ? params.amount / 100 : params.amount;
+    if (normalizedAmount >= 9.0) {
       targetPlan = "growth";
     }
   }
