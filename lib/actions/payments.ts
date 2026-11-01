@@ -6,12 +6,14 @@ import {
   createBachsCheckoutSession,
   createBachsCustomerPortalSession,
   getBachsSubscription,
+  getBachsCheckoutSession,
   BachsApiError,
 } from "@/lib/payments/bachs";
 import { type PlanId } from "@/lib/billing/plans";
 import {
   getEffectivePlanConfig,
 } from "@/lib/billing/platform";
+import { activateSubscriptionPlan } from "@/lib/billing/upgrade";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { getConfig } from "@/lib/config/platform-config";
@@ -97,11 +99,16 @@ export async function createCheckoutSession(
     }
 
     const appBaseUrl = await getAppBaseUrl();
-    const successUrl = `${appBaseUrl}/dashboard/billing?status=success&session_id={CHECKOUT_SESSION_ID}`;
+    // Bachs automatically appends ?checkout_id=chk_xxx to the success URL.
+    // Do NOT use {CHECKOUT_SESSION_ID} - that is a Stripe-only convention and Bachs will NOT substitute it.
+    const successUrl = `${appBaseUrl}/dashboard/billing?status=success`;
     const cancelUrl = `${appBaseUrl}/dashboard/billing?status=cancelled`;
 
-    // 5. Initialize Bachs checkout session
+    // 5. Generate durable reference and initialize Bachs checkout session
+    const businessIdShort = business.id.substring(0, 8);
+    const reference = `agentify_${businessIdShort}_${Date.now()}`;
     const customerId = (subscription as any).bachs_customer_id || subscription.provider_customer_id;
+
     const checkoutRes = await createBachsCheckoutSession({
       productId,
       customerEmail: user.email || business.contact_email || "billing@agentify.co",
@@ -110,14 +117,13 @@ export async function createCheckoutSession(
       businessId: business.id,
       userId: user.id,
       plan,
+      reference,
       successUrl,
       cancelUrl,
     });
 
     // 6. Record pending transaction using service client
     const serviceClient = createServiceClient();
-    const businessIdShort = business.id.substring(0, 8);
-    const reference = `agentify_${businessIdShort}_${Date.now()}`;
     const amountNumber = plan === "starter" ? 2 : 10;
 
     const { error: insertError } = await serviceClient
@@ -137,6 +143,10 @@ export async function createCheckoutSession(
           checkout_id: checkoutRes.checkoutId,
           status: checkoutRes.status,
           product_id: productId,
+          reference,
+          user_id: user.id,
+          business_id: business.id,
+          plan,
         },
       });
 
@@ -263,3 +273,74 @@ export async function getPaymentHistory() {
     return [];
   }
 }
+
+/**
+ * Verifies a Bachs checkout session directly via the Bachs API and synchronizes the subscription.
+ * Serves as an immediate reconciliation check when the user returns to the dashboard,
+ * ensuring verified payments upgrade the plan with 0ms user-visible delay even before
+ * or concurrent with webhook delivery.
+ */
+export async function reconcileCheckoutSession(checkoutId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "Unauthorized" };
+
+    if (!checkoutId || checkoutId.includes("{CHECKOUT_SESSION_ID}")) {
+      return { isSuccess: false, message: "Invalid session ID." };
+    }
+
+    const session = await getBachsCheckoutSession(checkoutId);
+    if (!session) {
+      return { isSuccess: false, message: "Session not found." };
+    }
+
+    const isPaid =
+      session.payment_status === "paid" ||
+      session.payment_status === "succeeded" ||
+      session.status === "completed";
+
+    if (!isPaid) {
+      return {
+        isSuccess: false,
+        status: session.status,
+        paymentStatus: session.payment_status,
+      };
+    }
+
+    const metadata = (session.metadata as Record<string, any>) || {};
+    const customerId =
+      (session.customer as any)?.id ||
+      (session.customer as any)?.customer_id ||
+      (typeof session.customer === "string" ? session.customer : null);
+    const subscriptionId =
+      typeof (session as any).subscription === "string"
+        ? (session as any).subscription
+        : ((session as any).subscription?.id || null);
+    const productId = (session as any).product_cart?.[0]?.product_id || null;
+    const plan = metadata.plan || (productId === process.env.BACHS_GROWTH_PRODUCT_ID ? "growth" : "starter");
+
+    const result = await activateSubscriptionPlan({
+      businessId: metadata.business_id || null,
+      userId: metadata.user_id || user.id,
+      plan,
+      productId,
+      checkoutId,
+      customerId,
+      subscriptionId,
+      amount: Number(session.amount) || (plan === "growth" ? 10.0 : 2.0),
+      reference: (session.reference as string) || null,
+      sourceEvent: "client_reconciliation",
+    });
+
+    return {
+      isSuccess: result.success,
+      plan: result.plan,
+      status: "active",
+    };
+  } catch (error: any) {
+    logErrorSync(error, "reconcile-checkout-session");
+    return { error: error.message || "Failed to reconcile checkout session." };
+  }
+}
+

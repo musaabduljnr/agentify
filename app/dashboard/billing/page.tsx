@@ -1,5 +1,5 @@
 import { getBillingData, getUsageWarnings } from "@/lib/actions/billing";
-import { getPaymentHistory } from "@/lib/actions/payments";
+import { getPaymentHistory, reconcileCheckoutSession } from "@/lib/actions/payments";
 import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { UpgradeButton } from "@/components/billing/upgrade-button";
 import { CancelPlanDialog } from "@/components/billing/cancel-plan-dialog";
@@ -150,6 +150,23 @@ export default async function BillingPage({
 }) {
   const resolvedParams = searchParams ? await searchParams : {};
   const showSuccess = resolvedParams.status === "success";
+  // Bachs appends `checkout_id` to the redirect URL (not `session_id` which is a Stripe convention).
+  // We also fall back to `session_id` in case the SDK behaviour changes.
+  const checkoutId =
+    (typeof resolvedParams.checkout_id === "string" ? resolvedParams.checkout_id : undefined) ||
+    (typeof resolvedParams.session_id === "string" &&
+    !resolvedParams.session_id.includes("{CHECKOUT_SESSION_ID}")
+      ? resolvedParams.session_id
+      : undefined);
+
+  // If user returns from a successful checkout, reconcile immediately with Bachs API
+  if (showSuccess && checkoutId) {
+    try {
+      await reconcileCheckoutSession(checkoutId);
+    } catch (e) {
+      console.warn("[BillingPage] Checkout reconciliation warning:", e);
+    }
+  }
 
   const [billingData, warnings, history] = await Promise.all([
     getBillingData(),
