@@ -202,10 +202,22 @@ export async function activateSubscriptionPlan(
     const currentPlanIndex = PLAN_ORDER.indexOf(currentSub.plan as PlanId);
     const targetPlanIndex = PLAN_ORDER.indexOf(targetPlan);
 
-    if (
+    // Guard: Never let an incoming payment/webhook event downgrade a higher active plan (e.g. Growth -> Starter).
+    // Downgrades only happen via explicit cancellation or scheduled downgrade at period end.
+    const isExplicitDowngradeEvent =
+      params.sourceEvent === "customer.subscription.deleted" ||
+      params.sourceEvent === "subscription.canceled" ||
+      params.sourceEvent === "admin_downgrade";
+
+    if (currentPlanIndex > targetPlanIndex && !isExplicitDowngradeEvent && currentSub.status === "active") {
+      console.log(
+        `[activateSubscriptionPlan] Retaining active higher plan '${currentSub.plan}' over incoming '${targetPlan}' for business ${targetBusinessId}`
+      );
+      targetPlan = currentSub.plan as PlanId;
+    } else if (
       currentSub.updated_at &&
       Date.parse(currentSub.updated_at) > Date.parse(eventTime) + 30000 &&
-      currentPlanIndex > targetPlanIndex
+      currentPlanIndex >= targetPlanIndex
     ) {
       console.log(
         `[activateSubscriptionPlan] Ignoring out-of-order event for ${targetBusinessId}. Current plan ${currentSub.plan} is newer than ${targetPlan}`
@@ -305,60 +317,64 @@ export async function activateSubscriptionPlan(
     finalSubscriptionId = newSub.id;
   }
 
-  // 6. Update or record successful payment transaction
-  const txRef = params.reference || matchedTransaction?.reference || `tx_${targetBusinessId.substring(0, 8)}_${Date.now()}`;
-  const checkoutId = params.checkoutId || matchedTransaction?.checkout_id || null;
+  // 6. Update or record successful payment transaction (non-fatal if table update fails)
+  try {
+    const txRef = params.reference || matchedTransaction?.reference || `tx_${targetBusinessId.substring(0, 8)}_${Date.now()}`;
+    const checkoutId = params.checkoutId || matchedTransaction?.checkout_id || null;
 
-  if (matchedTransaction) {
-    await serviceClient
-      .from("payment_transactions")
-      .update({
-        status: "success",
-        plan: targetPlan,
-        amount: finalAmount,
-        currency: "USD",
-        charge_id: params.chargeId || matchedTransaction.charge_id || null,
-        invoice_id: params.invoiceId || matchedTransaction.invoice_id || null,
-        provider_customer_id: params.customerId || matchedTransaction.provider_customer_id || null,
-        provider_subscription_id: params.subscriptionId || matchedTransaction.provider_subscription_id || null,
-        verified_at: eventTime,
-      })
-      .eq("id", matchedTransaction.id);
-  } else if (checkoutId) {
-    await serviceClient
-      .from("payment_transactions")
-      .update({
-        status: "success",
-        plan: targetPlan,
-        amount: finalAmount,
-        currency: "USD",
-        charge_id: params.chargeId || null,
-        invoice_id: params.invoiceId || null,
-        provider_customer_id: params.customerId || null,
-        provider_subscription_id: params.subscriptionId || null,
-        verified_at: eventTime,
-      })
-      .eq("checkout_id", checkoutId);
-  } else {
-    // Insert standalone transaction record (e.g. from subscription invoice)
-    await serviceClient
-      .from("payment_transactions")
-      .insert({
-        business_id: targetBusinessId,
-        subscription_id: finalSubscriptionId,
-        provider: "bachs",
-        reference: txRef,
-        checkout_id: checkoutId,
-        charge_id: params.chargeId || null,
-        invoice_id: params.invoiceId || null,
-        provider_customer_id: params.customerId || null,
-        provider_subscription_id: params.subscriptionId || null,
-        plan: targetPlan,
-        amount: finalAmount,
-        currency: "USD",
-        status: "success",
-        verified_at: eventTime,
-      });
+    if (matchedTransaction) {
+      await serviceClient
+        .from("payment_transactions")
+        .update({
+          status: "success",
+          plan: targetPlan,
+          amount: finalAmount,
+          currency: "USD",
+          charge_id: params.chargeId || matchedTransaction.charge_id || null,
+          invoice_id: params.invoiceId || matchedTransaction.invoice_id || null,
+          provider_customer_id: params.customerId || matchedTransaction.provider_customer_id || null,
+          provider_subscription_id: params.subscriptionId || matchedTransaction.provider_subscription_id || null,
+          verified_at: eventTime,
+        })
+        .eq("id", matchedTransaction.id);
+    } else if (checkoutId) {
+      await serviceClient
+        .from("payment_transactions")
+        .update({
+          status: "success",
+          plan: targetPlan,
+          amount: finalAmount,
+          currency: "USD",
+          charge_id: params.chargeId || null,
+          invoice_id: params.invoiceId || null,
+          provider_customer_id: params.customerId || null,
+          provider_subscription_id: params.subscriptionId || null,
+          verified_at: eventTime,
+        })
+        .eq("checkout_id", checkoutId);
+    } else {
+      // Insert standalone transaction record (e.g. from subscription invoice)
+      await serviceClient
+        .from("payment_transactions")
+        .insert({
+          business_id: targetBusinessId,
+          subscription_id: finalSubscriptionId,
+          provider: "bachs",
+          reference: txRef,
+          checkout_id: checkoutId,
+          charge_id: params.chargeId || null,
+          invoice_id: params.invoiceId || null,
+          provider_customer_id: params.customerId || null,
+          provider_subscription_id: params.subscriptionId || null,
+          plan: targetPlan,
+          amount: finalAmount,
+          currency: "USD",
+          status: "success",
+          verified_at: eventTime,
+        });
+    }
+  } catch (txErr) {
+    console.warn("[activateSubscriptionPlan] Non-fatal: payment_transactions sync warning:", txErr);
   }
 
   // 7. Revalidate Next.js cache so dashboard immediately reflects Growth plan

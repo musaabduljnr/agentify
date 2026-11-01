@@ -51,6 +51,7 @@ export interface CreateBachsCheckoutParams {
   plan: "starter" | "growth";
   successUrl: string;
   cancelUrl: string;
+  reference?: string;
 }
 
 /**
@@ -74,10 +75,13 @@ export async function createBachsCheckoutSession(params: CreateBachsCheckoutPara
       product_cart: [{ product_id: params.productId, quantity: 1 }],
       customer: customerPayload,
       billing_currency: "USD",
+      reference: params.reference || undefined,
       metadata: {
         user_id: params.userId,
         business_id: params.businessId,
         plan: params.plan,
+        product_id: params.productId,
+        reference: params.reference || "",
       },
       success_url: params.successUrl,
       cancel_url: params.cancelUrl,
@@ -90,6 +94,14 @@ export async function createBachsCheckoutSession(params: CreateBachsCheckoutPara
     checkoutUrl: session.checkout_url,
     status: session.status,
   };
+}
+
+/**
+ * Retrieves a checkout session by ID from Bachs.
+ */
+export async function getBachsCheckoutSession(checkoutId: string) {
+  const bachs = await getBachsClient();
+  return bachs.checkoutSessions.get(checkoutId);
 }
 
 /**

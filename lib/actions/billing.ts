@@ -14,6 +14,7 @@ import {
   getBillingPlatformSettings,
   getEffectivePlanConfigs,
 } from "@/lib/billing/platform";
+import { activateSubscriptionPlan } from "@/lib/billing/upgrade";
 import { revalidatePath } from "next/cache";
 
 async function getCurrentBusiness() {
@@ -39,13 +40,46 @@ export async function getBillingData() {
     if (!business) return null;
 
     const supabase = await createClient();
-    const [planData, usage, billingSettings, effectivePlans, assistantsRes] = await Promise.all([
+    const [initialPlanData, usage, billingSettings, effectivePlans, assistantsRes] = await Promise.all([
       getCurrentPlan(business.id),
       getUsageSummary(business.id),
       getBillingPlatformSettings(),
       getEffectivePlanConfigs(),
       supabase.from("assistants").select("id", { count: "exact", head: true }).eq("business_id", business.id),
     ]);
+
+    let planData = initialPlanData;
+
+    // Self-healing: If the subscription is still on Starter, check if a successful
+    // Growth transaction exists in payment_transactions. If so, immediately activate Growth.
+    if (planData && planData.planId === "starter") {
+      const serviceClient = createServiceClient();
+      const { data: growthTx } = await serviceClient
+        .from("payment_transactions")
+        .select("*")
+        .eq("business_id", business.id)
+        .eq("status", "success")
+        .eq("plan", "growth")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (growthTx) {
+        console.log(`[getBillingData] Self-healing activated: business ${business.id} has verified Growth transaction (${growthTx.checkout_id || growthTx.id}). Upgrading...`);
+        const healResult = await activateSubscriptionPlan({
+          businessId: business.id,
+          plan: "growth",
+          checkoutId: growthTx.checkout_id,
+          amount: Number(growthTx.amount) || 10,
+          reference: growthTx.reference,
+          sourceEvent: "self_healing_billing_load",
+        });
+
+        if (healResult.success) {
+          planData = await getCurrentPlan(business.id);
+        }
+      }
+    }
 
     if (!planData) return null;
 
