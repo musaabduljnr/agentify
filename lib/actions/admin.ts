@@ -372,7 +372,7 @@ export async function updateAdminBillingSettings(input: {
 
     const config = {
       name: plan.name.trim() || plan.id.replace("_", " "),
-      price_ngn: normalizeLimit(plan.price_ngn),
+      price_usd: normalizeLimit(plan.price_usd),
       messages: normalizeLimit(plan.messages),
       daily_messages: normalizeLimit(plan.daily_messages),
       knowledge_sources: normalizeLimit(plan.knowledge_sources),
@@ -380,8 +380,7 @@ export async function updateAdminBillingSettings(input: {
       widgets: normalizeLimit(plan.widgets),
       embeddings: normalizeLimit(plan.embeddings),
       features: plan.features.map((feature) => feature.trim()).filter(Boolean),
-      paystack_plan_code: plan.paystack_plan_code?.trim() || null,
-      flutterwave_plan_id: plan.flutterwave_plan_id?.trim() || null,
+      bachs_product_id: plan.bachs_product_id?.trim() || null,
       contact_sales: Boolean(plan.contact_sales),
     };
 

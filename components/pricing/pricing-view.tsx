@@ -497,13 +497,13 @@ export function PricingView({
                   <th className="py-4 px-6 text-white font-extrabold text-center w-1/5">
                     Starter
                     <span className="block text-[10px] font-normal text-slate-400 mt-0.5">
-                      {currency === "USD" ? "$2/mo" : "₦3,200/mo"}
+                      $2/mo
                     </span>
                   </th>
                   <th className="py-4 px-6 text-indigo-400 font-extrabold text-center w-1/5 bg-indigo-500/[0.04]">
                     Growth
                     <span className="block text-[10px] font-normal text-indigo-300/80 mt-0.5">
-                      {currency === "USD" ? "$10/mo" : "₦16,000/mo"}
+                      $10/mo
                     </span>
                   </th>
                   <th className="py-4 px-6 text-white font-extrabold text-center w-1/5">

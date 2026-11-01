@@ -522,12 +522,11 @@ export default async function BillingPage({
 
           {/* SECTION F: Billing Profile Information */}
           <BillingInfoForm
-            initialData={{
+            business={{
               name: business?.name,
               contact_email: business?.contact_email,
               phone: business?.phone,
               address: business?.address,
-              country: business?.country,
             }}
           />
 

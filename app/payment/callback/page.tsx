@@ -32,7 +32,7 @@ function CallbackContent() {
         
         if (!isMounted) return;
 
-        if (result.success) {
+        if ("isSuccess" in result && result.isSuccess) {
           setStatus("success");
           setPlan(result.plan || "Paid");
           setMessage("Your subscription has been upgraded successfully!");
@@ -43,7 +43,7 @@ function CallbackContent() {
           }, 3000);
         } else {
           setStatus("error");
-          setMessage(result.error || "Failed to verify transaction payment.");
+          setMessage(("error" in result && result.error) || "Failed to verify transaction payment.");
         }
       } catch (err: any) {
         if (!isMounted) return;

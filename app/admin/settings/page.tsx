@@ -9,10 +9,10 @@ import {
 } from "@/lib/actions/admin";
 import type { BillingPlatformSettings, EditablePlanConfig } from "@/lib/billing/platform";
 
-type LimitKey = "price_ngn" | "messages" | "knowledge_sources" | "leads" | "widgets" | "embeddings";
+type LimitKey = "price_usd" | "messages" | "knowledge_sources" | "leads" | "widgets" | "embeddings";
 
 const LIMIT_FIELDS: { key: LimitKey; label: string; allowUnlimited?: boolean }[] = [
-  { key: "price_ngn", label: "Price" },
+  { key: "price_usd", label: "Price (USD)" },
   { key: "messages", label: "Messages", allowUnlimited: true },
   { key: "knowledge_sources", label: "Knowledge", allowUnlimited: true },
   { key: "leads", label: "Leads", allowUnlimited: true },
@@ -28,9 +28,9 @@ function parseNumber(value: string): number | null {
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<BillingPlatformSettings>({
-    currency: "NGN",
-    currency_symbol: "₦",
-    default_payment_provider: "paystack",
+    currency: "USD",
+    currency_symbol: "$",
+    default_payment_provider: "bachs",
   });
   const [plans, setPlans] = useState<EditablePlanConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -176,8 +176,7 @@ export default function AdminSettingsPage() {
               }
               className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 font-semibold text-slate-200 outline-none focus:border-indigo-500"
             >
-              <option value="paystack">Paystack</option>
-              <option value="flutterwave">Flutterwave</option>
+              <option value="bachs">Bachs</option>
               <option value="manual">Manual</option>
             </select>
           </label>
@@ -234,21 +233,12 @@ export default function AdminSettingsPage() {
 
             <div className="mt-5 grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
               <label className="space-y-2">
-                <span className="block font-bold text-slate-400">Paystack Plan Code</span>
+                <span className="block font-bold text-slate-400">Bachs Product ID</span>
                 <input
-                  value={plan.paystack_plan_code || ""}
-                  onChange={(e) => updatePlan(plan.id, { paystack_plan_code: e.target.value })}
+                  value={plan.bachs_product_id || ""}
+                  onChange={(e) => updatePlan(plan.id, { bachs_product_id: e.target.value })}
                   className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 font-semibold text-slate-200 outline-none focus:border-indigo-500"
-                  placeholder="PLN_xxx or blank"
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="block font-bold text-slate-400">Flutterwave Plan ID</span>
-                <input
-                  value={plan.flutterwave_plan_id || ""}
-                  onChange={(e) => updatePlan(plan.id, { flutterwave_plan_id: e.target.value })}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 font-semibold text-slate-200 outline-none focus:border-indigo-500"
-                  placeholder="Optional"
+                  placeholder="prod_xxx or blank"
                 />
               </label>
             </div>

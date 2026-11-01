@@ -3,7 +3,6 @@ import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { PricingView } from "@/components/pricing/pricing-view";
 import { createClient } from "@/utils/supabase/server";
-import { getBillingPlatformSettings } from "@/lib/billing/platform";
 
 export const metadata: Metadata = {
   title: "Pricing & Plans — Agentify",
@@ -45,13 +44,6 @@ export default async function PricingPage() {
     }
   }
 
-  const billingSettings = await getBillingPlatformSettings().catch(() => ({
-    currency: "USD",
-  }));
-
-  const defaultCurrency =
-    (billingSettings.currency || "USD").toUpperCase() === "NGN" ? "NGN" : "USD";
-
   return (
     <div className="min-h-screen bg-[#07080c] flex flex-col justify-between">
       <Navbar />
@@ -59,7 +51,6 @@ export default async function PricingPage() {
         <PricingView
           user={user ? { id: user.id, email: user.email } : null}
           subscription={subscription}
-          defaultCurrency={defaultCurrency}
         />
       </main>
       <Footer />

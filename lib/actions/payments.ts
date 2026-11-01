@@ -101,7 +101,7 @@ export async function createCheckoutSession(
     const cancelUrl = `${appBaseUrl}/dashboard/billing?status=cancelled`;
 
     // 5. Initialize Bachs checkout session
-    const customerId = subscription.bachs_customer_id || subscription.provider_customer_id;
+    const customerId = (subscription as any).bachs_customer_id || subscription.provider_customer_id;
     const checkoutRes = await createBachsCheckoutSession({
       productId,
       customerEmail: user.email || business.contact_email || "billing@agentify.co",
@@ -183,7 +183,7 @@ export async function createPortalSession() {
       .eq("business_id", business.id)
       .maybeSingle();
 
-    const customerId = subscription?.bachs_customer_id || subscription?.provider_customer_id;
+    const customerId = (subscription as any)?.bachs_customer_id || (subscription as any)?.provider_customer_id;
     if (!customerId) {
       return { error: "No active billing customer found. Please subscribe to a plan first." };
     }
@@ -225,6 +225,7 @@ export async function verifyPaymentReference(reference: string) {
       plan: transaction.plan,
       isPending: transaction.status === "pending",
       isSuccess: transaction.status === "success",
+      success: transaction.status === "success",
     };
   } catch (error: any) {
     logErrorSync(error, "payment-reference-check");

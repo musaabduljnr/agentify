@@ -64,7 +64,7 @@ export async function createBachsCheckoutSession(params: CreateBachsCheckoutPara
     ? { customer_id: params.customerId }
     : {
         email: params.customerEmail,
-        name: params.customerName || undefined,
+        name: params.customerName || "",
       };
 
   const idempotencyKey = `checkout-${params.businessId}-${params.plan}-${Date.now()}`;

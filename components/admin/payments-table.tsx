@@ -45,7 +45,7 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
     setAlertMessage(null);
     try {
       const result = await verifyPaymentReference(reference);
-      if (result.success) {
+      if ("isSuccess" in result && result.isSuccess) {
         setAlertMessage({
           type: "success",
           text: `Transaction ${reference} verified successfully! Status: UPGRADED`,
@@ -56,7 +56,7 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
           prev.map((tx) => (tx.reference === reference ? { ...tx, status: "success" } : tx))
         );
       } else {
-        throw new Error(result.error || "Failed to verify transaction.");
+        throw new Error(("error" in result && result.error) || "Failed to verify transaction.");
       }
     } catch (err: any) {
       setAlertMessage({
