@@ -21,14 +21,16 @@ export async function POST() {
 
 export async function GET() {
   try {
+    const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const result = await createPortalSession();
     if (result.error || !result.url) {
-      return NextResponse.redirect(new URL("/dashboard/billing?error=portal_failed", process.env.APP_URL || "http://localhost:3000"));
+      return NextResponse.redirect(new URL("/dashboard/billing?error=portal_failed", baseUrl));
     }
 
     return NextResponse.redirect(result.url, 303);
   } catch (error) {
     logErrorSync(error, "billing-portal-route-get");
-    return NextResponse.redirect(new URL("/dashboard/billing?error=portal_failed", process.env.APP_URL || "http://localhost:3000"));
+    const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    return NextResponse.redirect(new URL("/dashboard/billing?error=portal_failed", baseUrl));
   }
 }
