@@ -100,11 +100,34 @@ CREATE INDEX IF NOT EXISTS idx_webhook_events_provider_status
 -- -------------------------------------------------------------------------
 -- 4. Update platform_settings for USD & Bachs
 -- -------------------------------------------------------------------------
-INSERT INTO public.platform_settings (key, value, description)
+INSERT INTO public.platform_settings (key, value, updated_at)
+VALUES (
+  'billing',
+  '{"currency": "USD", "currency_symbol": "$", "default_payment_provider": "bachs"}'::jsonb,
+  now()
+)
+ON CONFLICT (key) DO UPDATE
+SET value = jsonb_set(
+  jsonb_set(
+    jsonb_set(
+      COALESCE(public.platform_settings.value, '{}'::jsonb),
+      '{currency}',
+      '"USD"'
+    ),
+    '{currency_symbol}',
+    '"$"'
+  ),
+  '{default_payment_provider}',
+  '"bachs"'
+),
+updated_at = now();
+
+-- Also set billing_platform_settings alias key for compatibility
+INSERT INTO public.platform_settings (key, value, updated_at)
 VALUES (
   'billing_platform_settings',
   '{"currency": "USD", "currency_symbol": "$", "default_payment_provider": "bachs"}'::jsonb,
-  'Global platform billing settings configured for Bachs USD-only billing'
+  now()
 )
 ON CONFLICT (key) DO UPDATE
 SET value = jsonb_set(
