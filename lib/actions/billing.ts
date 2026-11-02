@@ -6,6 +6,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
+import { getCurrentBusiness } from "@/lib/queries/business";
 import { getBusinessSubscription, getCurrentPlan, getRemainingUsage } from "@/lib/billing/subscription";
 import { getUsageSummary } from "@/lib/billing/usage";
 import { PLAN_ORDER } from "@/lib/billing/plans";
@@ -18,20 +19,6 @@ import { getBachsCheckoutSession } from "@/lib/payments/bachs";
 import { reconcileCheckoutSession } from "@/lib/actions/payments";
 import { logErrorSync } from "@/lib/monitoring/log-error";
 import { revalidatePath } from "next/cache";
-
-async function getCurrentBusiness() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: business } = await supabase
-    .from("businesses")
-    .select("id, name, contact_email, phone, address, website_url")
-    .eq("owner_id", user.id)
-    .single();
-
-  return business;
-}
 
 /**
  * Get full billing data for the dashboard billing page.
