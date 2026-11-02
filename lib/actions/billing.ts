@@ -8,14 +8,15 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { getBusinessSubscription, getCurrentPlan, getRemainingUsage } from "@/lib/billing/subscription";
 import { getUsageSummary } from "@/lib/billing/usage";
-import { type PlanId, PLAN_ORDER } from "@/lib/billing/plans";
+import { PLAN_ORDER } from "@/lib/billing/plans";
 import {
   formatCurrencyAmount,
   getBillingPlatformSettings,
   getEffectivePlanConfigs,
 } from "@/lib/billing/platform";
-import { activateSubscriptionPlan } from "@/lib/billing/upgrade";
 import { getBachsCheckoutSession } from "@/lib/payments/bachs";
+import { reconcileCheckoutSession } from "@/lib/actions/payments";
+import { logErrorSync } from "@/lib/monitoring/log-error";
 import { revalidatePath } from "next/cache";
 
 async function getCurrentBusiness() {
@@ -50,85 +51,47 @@ export async function getBillingData() {
     ]);
 
     let planData = initialPlanData;
+    const serviceClient = createServiceClient();
+    const { data: latestCheckout, error: checkoutQueryError } = await serviceClient
+      .from("payment_transactions")
+      .select("id, plan, checkout_id, status, failure_reason")
+      .eq("business_id", business.id)
+      .eq("provider", "bachs")
+      .in("status", ["pending", "abandoned", "failed"])
+      .not("checkout_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    // Self-healing & Auto-Reconciliation:
-    // Guarantees that any verified payment activates the subscription immediately,
-    // healing Starter subscriptions stuck in pending and upgrading Growth payments.
-    if (planData && business?.id) {
-      const serviceClient = createServiceClient();
-      const currentSub = planData.subscription;
+    if (checkoutQueryError) {
+      throw new Error(`Failed to load the latest Bachs checkout: ${checkoutQueryError.message}`);
+    }
 
-      // 1. Check for any verified successful transaction in payment_transactions
-      const { data: latestSuccessTx } = await serviceClient
-        .from("payment_transactions")
-        .select("*")
-        .eq("business_id", business.id)
-        .eq("status", "success")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (latestSuccessTx) {
-        const txPlan = (latestSuccessTx.plan as PlanId) || "starter";
-        const isCurrentlyPending = currentSub.status !== "active";
-        const needsGrowthUpgrade = txPlan === "growth" && currentSub.plan !== "growth";
-
-        if (isCurrentlyPending || needsGrowthUpgrade) {
-          console.log(`[getBillingData] Self-healing activated: business ${business.id} has verified ${txPlan} transaction (${latestSuccessTx.checkout_id || latestSuccessTx.id}). Activating...`);
-          const healResult = await activateSubscriptionPlan({
-            businessId: business.id,
-            plan: txPlan,
-            checkoutId: latestSuccessTx.checkout_id,
-            amount: Number(latestSuccessTx.amount) || (txPlan === "growth" ? 10 : 2),
-            reference: latestSuccessTx.reference,
-            sourceEvent: "self_healing_success_tx",
-          });
-
-          if (healResult.success) {
+    let checkoutState: "none" | "open" | "processing" | "expired" | "failed" = "none";
+    if (latestCheckout?.checkout_id) {
+      try {
+        const session = await getBachsCheckoutSession(latestCheckout.checkout_id);
+        if (session.status === "completed" && session.payment_status === "paid") {
+          const reconciliation = await reconcileCheckoutSession(latestCheckout.checkout_id);
+          if ("isSuccess" in reconciliation && reconciliation.isSuccess) {
             planData = await getCurrentPlan(business.id);
+          } else {
+            checkoutState = "processing";
           }
+        } else if (session.status === "open") {
+          checkoutState = "open";
+        } else if (session.status === "expired") {
+          checkoutState = "expired";
+        } else if (session.payment_status === "no_payment_required") {
+          checkoutState = "failed";
+        } else {
+          checkoutState = "processing";
         }
-      }
-
-      // 2. If subscription is STILL pending, check if a pending checkout session exists and verify directly with Bachs API
-      if (planData && planData.subscription.status === "pending") {
-        const { data: pendingTx } = await serviceClient
-          .from("payment_transactions")
-          .select("*")
-          .eq("business_id", business.id)
-          .eq("status", "pending")
-          .not("checkout_id", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (pendingTx?.checkout_id) {
-          try {
-            const session = await getBachsCheckoutSession(pendingTx.checkout_id);
-            const isPaid =
-              session?.payment_status === "paid" ||
-              session?.payment_status === "succeeded" ||
-              session?.status === "completed";
-
-            if (isPaid) {
-              console.log(`[getBillingData] Pending checkout ${pendingTx.checkout_id} verified as paid via Bachs API. Activating plan...`);
-              const healResult = await activateSubscriptionPlan({
-                businessId: business.id,
-                plan: (pendingTx.plan as PlanId) || "starter",
-                checkoutId: pendingTx.checkout_id,
-                amount: Number(session?.amount) || Number(pendingTx.amount) || 2,
-                reference: pendingTx.reference,
-                sourceEvent: "self_healing_bachs_api_check",
-              });
-
-              if (healResult.success) {
-                planData = await getCurrentPlan(business.id);
-              }
-            }
-          } catch (apiErr) {
-            console.warn("[getBillingData] Could not verify pending checkout with Bachs:", apiErr);
-          }
-        }
+      } catch (error) {
+        logErrorSync(error, "billing-checkout-reconciliation", {
+          businessId: business.id,
+        });
+        checkoutState = "processing";
       }
     }
 
@@ -171,6 +134,11 @@ export async function getBillingData() {
         reset_date: subscription.reset_date,
         cancel_at_period_end: subscription.cancel_at_period_end,
         metadata: subscription.metadata || {},
+      },
+      checkout: {
+        state: checkoutState,
+        plan: latestCheckout?.plan || null,
+        failureReason: latestCheckout?.failure_reason || null,
       },
       currentPlan: {
         id: planId,

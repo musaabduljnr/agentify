@@ -1,13 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createCheckoutSession, verifyPaymentReference } from "@/lib/actions/payments";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
-import {
-  initializePaystackTransaction,
-  verifyPaystackTransaction,
-  verifyPaystackWebhookSignature,
-} from "@/lib/payments/paystack";
-import crypto from "crypto";
+import { createBachsCheckoutSession } from "@/lib/payments/bachs";
+import { getEffectivePlanConfig } from "@/lib/billing/platform";
+
+const fixtures = vi.hoisted(() => ({
+  user: { id: "user-1", email: "user@example.com", user_metadata: { name: "Test User" } },
+  business: {
+    id: "biz-1",
+    owner_id: "user-1",
+    name: "Test Business",
+    contact_email: "billing@example.com",
+  },
+  subscription: {
+    id: "sub-row-1",
+    business_id: "biz-1",
+    plan: "starter",
+    status: "pending",
+    provider_customer_id: null,
+    bachs_customer_id: null,
+  },
+  transaction: {
+    id: "tx-1",
+    business_id: "biz-1",
+    reference: "ref-1",
+    plan: "growth",
+    status: "success",
+  },
+  insertedTransaction: null as Record<string, unknown> | null,
+  createCheckout: vi.fn(),
+}));
 
 vi.mock("@/utils/supabase/server", () => ({
   createClient: vi.fn(),
@@ -17,298 +40,164 @@ vi.mock("@/utils/supabase/service", () => ({
   createServiceClient: vi.fn(),
 }));
 
-vi.mock("@/lib/payments/paystack", () => ({
-  initializePaystackTransaction: vi.fn(),
-  verifyPaystackTransaction: vi.fn(),
-  verifyPaystackWebhookSignature: vi.fn(),
-  PaystackProviderError: class PaystackProviderError extends Error {
-    constructor(msg: string) {
-      super(msg);
-      this.name = "PaystackProviderError";
-    }
-  },
+vi.mock("@/lib/payments/bachs", () => ({
+  createBachsCheckoutSession: fixtures.createCheckout,
+  createBachsCustomerPortalSession: vi.fn(),
+  getBachsCheckoutSession: vi.fn(),
+  BachsApiError: class BachsApiError extends Error {},
 }));
 
-vi.mock("@/lib/email/send-email", () => ({
-  sendTransactionalEmail: vi.fn().mockResolvedValue({ success: true }),
+vi.mock("@/lib/billing/platform", () => ({
+  getEffectivePlanConfig: vi.fn(async (plan: "starter" | "growth") => ({
+    name: plan === "growth" ? "Growth" : "Starter",
+    price_usd: plan === "growth" ? 10 : 2,
+    amount_decimal: plan === "growth" ? "10.00" : "2.00",
+    bachs_product_id: plan === "growth" ? "prod-growth" : "prod-starter",
+  })),
+}));
+
+vi.mock("@/lib/billing/upgrade", () => ({
+  activateSubscriptionPlan: vi.fn(),
+}));
+
+vi.mock("@/lib/monitoring/log-error", () => ({
+  getUserFriendlyError: vi.fn(() => "Payment could not be completed."),
+  logErrorSync: vi.fn(),
+}));
+
+vi.mock("@/lib/config/platform-config", () => ({
+  getConfig: vi.fn(async (_category: string, key: string) =>
+    key === "enable_payments" ? "true" : "https://agentify.app"
+  ),
 }));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock("@/lib/config/platform-config", () => ({
-  getConfig: vi.fn().mockResolvedValue("https://agentify.app"),
-  getSecretWithEnvFallback: vi.fn().mockResolvedValue("sk_test_mock_key"),
-}));
+function createServerClient(user: typeof fixtures.user | null = fixtures.user) {
+  return {
+    auth: { getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }) },
+    from: vi.fn((table: string) => {
+      const data = table === "businesses" ? fixtures.business : fixtures.subscription;
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        maybeSingle: vi.fn(async () => ({ data, error: null })),
+      };
+      return query;
+    }),
+  };
+}
 
-describe("Payments & Subscription Management", () => {
-  const mockUser = { id: "user-123", email: "user@example.com" };
-  const mockBusiness = { id: "biz-123", owner_id: "user-123", name: "Test Biz", contact_email: "biz@test.com" };
-  const mockSub = { id: "sub-123", business_id: "biz-123", plan: "starter", status: "pending" };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe("createCheckoutSession", () => {
-    it("should return error if user is unauthorized", async () => {
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
-        },
-      } as any);
-
-      const result = await createCheckoutSession("starter");
-      expect(result).toEqual({ error: "Unauthorized" });
-    });
-
-    it("should return error if business does not exist", async () => {
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-        },
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          maybeSingle: vi.fn().mockResolvedValue({ data: null }),
-        }),
-      } as any);
-
-      const result = await createCheckoutSession("starter");
-      expect(result.error).toContain("No business found");
-    });
-
-    it("should initialize transaction with NGN currency and price by default", async () => {
-      const mockInsert = vi.fn().mockResolvedValue({ error: null });
-
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-        },
-        from: vi.fn((table: string) => ({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          maybeSingle: vi.fn().mockImplementation(() => {
-            if (table === "businesses") return Promise.resolve({ data: mockBusiness });
-            if (table === "subscriptions") return Promise.resolve({ data: mockSub });
-            return Promise.resolve({ data: null });
-          }),
+function createServiceClientMock() {
+  return {
+    from: vi.fn((table: string) => {
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        not: vi.fn(() => query),
+        order: vi.fn(() => query),
+        limit: vi.fn(() => query),
+        maybeSingle: vi.fn(async () => ({
+          data: table === "payment_transactions" ? null : null,
+          error: null,
         })),
-      } as any);
-
-      vi.mocked(createServiceClient).mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          insert: mockInsert,
-        }),
-      } as any);
-
-      vi.mocked(initializePaystackTransaction).mockResolvedValueOnce({
-        authorizationUrl: "https://checkout.paystack.com/test-auth-url",
-        accessCode: "access-code-123",
-        reference: "agentify_biz-123_123456",
-      });
-
-      const result = await createCheckoutSession("starter");
-
-      expect(result).toEqual({ checkoutUrl: "https://checkout.paystack.com/test-auth-url" });
-      expect(initializePaystackTransaction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          amount: 3200,
-          currency: "NGN",
-          businessId: "biz-123",
-        })
-      );
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          business_id: "biz-123",
-          plan: "starter",
-          amount: 3200,
-          currency: "NGN",
-          status: "pending",
-        })
-      );
-    });
-  });
-
-  describe("verifyPaymentReference", () => {
-    it("should reject when user does not own business", async () => {
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: { id: "intruder-user" } } }),
-        },
-      } as any);
-
-      vi.mocked(createServiceClient).mockReturnValue({
-        from: vi.fn((table: string) => ({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({
-            data: { id: "biz-123", owner_id: "user-123" }, // different owner!
-          }),
-          maybeSingle: vi.fn().mockResolvedValue({
-            data: {
-              id: "tx-123",
-              business_id: "biz-123",
-              reference: "ref-123",
-              provider: "paystack",
-              plan: "starter",
-              amount: 3200,
-              status: "pending",
-            },
-          }),
-        })),
-      } as any);
-
-      const result = await verifyPaymentReference("ref-123");
-      expect(result).toEqual({ error: "Unauthorized to verify this transaction." });
-    });
-
-    it("should return early if transaction was already verified as success", async () => {
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-        },
-      } as any);
-
-      vi.mocked(createServiceClient).mockReturnValue({
-        from: vi.fn((table: string) => ({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          single: vi.fn().mockResolvedValue({ data: mockBusiness }),
-          maybeSingle: vi.fn().mockResolvedValue({
-            data: {
-              id: "tx-123",
-              business_id: "biz-123",
-              reference: "ref-123",
-              status: "success",
-              plan: "growth",
-            },
-          }),
-        })),
-      } as any);
-
-      const result = await verifyPaymentReference("ref-123");
-      expect(result).toEqual({ success: true, plan: "growth" });
-      expect(verifyPaystackTransaction).not.toHaveBeenCalled();
-    });
-
-    it("should reject if amount or reference from Paystack does not match transaction", async () => {
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-        },
-      } as any);
-
-      const mockUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      });
-
-      vi.mocked(createServiceClient).mockReturnValue({
-        from: vi.fn((table: string) => ({
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          update: mockUpdate,
-          single: vi.fn().mockResolvedValue({ data: mockBusiness }),
-          maybeSingle: vi.fn().mockResolvedValue({
-            data: {
-              id: "tx-123",
-              business_id: "biz-123",
-              reference: "ref-123",
-              provider: "paystack",
-              plan: "starter",
-              amount: 3200, // 3200 NGN -> expected 320,000 kobo
-              status: "pending",
-            },
-          }),
-        })),
-      } as any);
-
-      vi.mocked(verifyPaystackTransaction).mockResolvedValueOnce({
-        status: "success",
-        reference: "ref-123",
-        amount: 10000, // Tampered amount (100 NGN instead of 3,200 NGN)
-      } as any);
-
-      const result = await verifyPaymentReference("ref-123");
-      expect(result.error).toContain("Payment verification failed");
-    });
-
-    it("should upgrade subscription on valid verification", async () => {
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({ data: { user: mockUser } }),
-        },
-      } as any);
-
-      const mockUpdate = vi.fn((updateData: any) => ({
-        eq: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            select: vi.fn().mockReturnValue({
-              maybeSingle: vi.fn().mockResolvedValue({ data: { id: "tx-123" } }),
-            }),
-          }),
-        }),
-      }));
-
-      const mockSubUpdate = vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      });
-
-      vi.mocked(createServiceClient).mockReturnValue({
-        from: vi.fn((table: string) => {
-          if (table === "subscriptions") {
-            return { update: mockSubUpdate };
-          }
+        insert: vi.fn((payload: Record<string, unknown>) => {
+          fixtures.insertedTransaction = payload;
           return {
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            update: mockUpdate,
-            single: vi.fn().mockResolvedValue({ data: mockBusiness }),
-            maybeSingle: vi.fn().mockResolvedValue({
-              data: {
-                id: "tx-123",
-                business_id: "biz-123",
-                reference: "ref-123",
-                provider: "paystack",
-                plan: "growth",
-                amount: 16000,
-                status: "pending",
-              },
-            }),
+            select: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: { id: "tx-pending" }, error: null }),
+            })),
           };
         }),
-      } as any);
+        update: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValue({ error: null }),
+        })),
+      };
+      return query;
+    }),
+  };
+}
 
-      vi.mocked(verifyPaystackTransaction).mockResolvedValueOnce({
-        status: "success",
-        reference: "ref-123",
-        amount: 1600000, // 16,000 NGN * 100
-        customer: { customer_code: "CUS_123" },
-        subscription: "SUB_code_456",
-      } as any);
-
-      const result = await verifyPaymentReference("ref-123");
-      expect(result).toEqual({ success: true, plan: "growth" });
-      expect(mockSubUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          plan: "growth",
-          status: "active",
-          provider_reference: "ref-123",
-        })
-      );
+describe("Bachs payments", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fixtures.insertedTransaction = null;
+    vi.mocked(createClient).mockResolvedValue(createServerClient() as never);
+    vi.mocked(createServiceClient).mockReturnValue(createServiceClientMock() as never);
+    fixtures.createCheckout.mockImplementation(async (params: Record<string, unknown>) => {
+      expect(fixtures.insertedTransaction).toMatchObject({
+        business_id: "biz-1",
+        plan: params.plan,
+        currency: "USD",
+        status: "pending",
+      });
+      return {
+        checkoutId: "chk-1",
+        checkoutUrl: "https://checkout.bachs.example/chk-1",
+        status: "open",
+      };
     });
   });
 
-  describe("Paystack Webhook Verification", () => {
-    it("should verify SHA512 signature against payload correctly", () => {
-      const secret = "sk_test_secret_key_123";
-      const payload = JSON.stringify({ event: "charge.success", data: { reference: "ref_1" } });
-      const signature = crypto.createHmac("sha512", secret).update(payload).digest("hex");
+  it("persists a USD pending transaction before creating the Bachs checkout", async () => {
+    const result = await createCheckoutSession("growth");
 
-      // Test HMAC matching logic
-      const calculatedSignature = crypto.createHmac("sha512", secret).update(payload).digest("hex");
-      expect(signature).toBe(calculatedSignature);
+    expect(result).toEqual({ checkoutUrl: "https://checkout.bachs.example/chk-1" });
+    expect(getEffectivePlanConfig).toHaveBeenCalledWith("growth");
+    expect(fixtures.insertedTransaction).toMatchObject({
+      business_id: "biz-1",
+      plan: "growth",
+      amount: 10,
+      billing_amount: 10,
+      currency: "USD",
+      status: "pending",
+      raw_response: expect.objectContaining({
+        business_id: "biz-1",
+        user_id: "user-1",
+        product_id: "prod-growth",
+      }),
+    });
+    expect(fixtures.createCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productId: "prod-growth",
+        businessId: "biz-1",
+        userId: "user-1",
+        plan: "growth",
+      })
+    );
+  });
+
+  it("does not create a checkout for an unauthenticated user", async () => {
+    vi.mocked(createClient).mockResolvedValue(createServerClient(null) as never);
+
+    const result = await createCheckoutSession("starter");
+
+    expect(result).toMatchObject({ error: expect.stringContaining("Unauthorized") });
+    expect(fixtures.createCheckout).not.toHaveBeenCalled();
+  });
+
+  it("returns payment status only for the authenticated business's reference", async () => {
+    vi.mocked(createServiceClient).mockReturnValue({
+      from: vi.fn(() => {
+        const query = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          maybeSingle: vi.fn(async () => ({ data: fixtures.transaction, error: null })),
+        };
+        return query;
+      }),
+    } as never);
+
+    const result = await verifyPaymentReference("ref-1");
+
+    expect(result).toEqual({
+      status: "success",
+      plan: "growth",
+      isPending: false,
+      isSuccess: true,
+      success: true,
     });
   });
 });

@@ -68,7 +68,7 @@ export async function createBachsCheckoutSession(params: CreateBachsCheckoutPara
         name: params.customerName || "",
       };
 
-  const idempotencyKey = `checkout-${params.businessId}-${params.plan}-${Date.now()}`;
+  const idempotencyKey = `checkout-${params.reference || `${params.businessId}-${params.plan}-${Date.now()}`}`;
 
   const session = await bachs.checkoutSessions.create(
     {
@@ -148,7 +148,7 @@ export function verifyBachsWebhookEvent(
   secret: string
 ) {
   try {
-    return webhooks.constructEvent(rawBody, headers as any, secret);
+    return webhooks.constructEvent(rawBody, headers, secret);
   } catch (err) {
     if (err instanceof BachsWebhookError) {
       throw new Error(`Invalid Bachs webhook signature: ${err.message}`);

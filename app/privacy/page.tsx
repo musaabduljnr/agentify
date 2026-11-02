@@ -44,7 +44,7 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc pl-6 text-slate-600 text-sm space-y-3 mb-6">
               <li>
-                <strong className="text-slate-900">Account Details:</strong> Personal identifiers such as name, email, billing address, and transaction histories when checking out through Paystack.
+                <strong className="text-slate-900">Account Details:</strong> Personal identifiers such as name, email, billing address, and transaction histories when checking out through Bachs.
               </li>
               <li>
                 <strong className="text-slate-900">Knowledge Base Materials:</strong> Website URLs, documents, FAQs, and files you explicitly submit to train your custom AI assistant.
@@ -69,7 +69,7 @@ export default function PrivacyPage() {
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">4. Sharing of Data</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              We do not sell, rent, or trade your organization data, lead lists, or chat histories to third parties. We share data only with authorized processors necessary for SaaS delivery: cloud hosting databases, email networks (e.g. Resend), and local payments services (e.g. Paystack).
+              We do not sell, rent, or trade your organization data, lead lists, or chat histories to third parties. We share data only with authorized processors necessary for SaaS delivery, including cloud hosting databases, email networks (e.g. Resend), and payment processing (Bachs).
             </p>
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">5. Security Standards</h2>

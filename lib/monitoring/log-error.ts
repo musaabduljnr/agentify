@@ -9,7 +9,7 @@
  */
 
 export interface LogErrorOptions {
-  /** Identifies the module/function that errored (e.g. "widget-chat", "paystack-webhook") */
+  /** Identifies the module/function that errored (e.g. "widget-chat", "bachs-webhook") */
   source: string;
   /** Human-readable error message */
   message: string;
@@ -81,7 +81,6 @@ export function getUserFriendlyError(source: string): string {
     "ai-provider": "The AI service is currently unavailable. Please try again shortly.",
     "embedding-generation": "Knowledge processing failed. Please try again.",
     "email-send": "We couldn't send the email. Please try again later.",
-    "paystack-webhook": "Payment verification failed. Please contact support.",
     "payment-checkout": "Payment processing failed. Please try again or contact support.",
     "file-upload": "File upload failed. Please check the file and try again.",
     "widget-config": "Widget configuration could not be loaded.",

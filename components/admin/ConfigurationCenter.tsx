@@ -7,13 +7,11 @@ import {
   deletePlatformConfig,
   testResendConfig,
   testSmtpConfig,
-  testPaystackConfig,
   testFlutterwaveConfig,
 } from "@/lib/actions/admin-config";
 import {
   SlidersHorizontal,
   Mail,
-  CreditCard,
   Cpu,
   ToggleLeft,
   ShieldAlert,
@@ -248,8 +246,6 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
           return;
         }
         res = await testSmtpConfig(testEmailAddress);
-      } else if (category === "paystack") {
-        res = await testPaystackConfig();
       } else if (category === "flutterwave") {
         res = await testFlutterwaveConfig();
       }
@@ -269,7 +265,6 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
     { id: "email", name: "Email", icon: <Mail className="w-4 h-4" /> },
     { id: "smtp", name: "SMTP Settings", icon: <Server className="w-4 h-4" /> },
     { id: "resend", name: "Resend Mails", icon: <Send className="w-4 h-4" /> },
-    { id: "paystack", name: "Paystack", icon: <CreditCard className="w-4 h-4" /> },
     { id: "flutterwave", name: "Flutterwave", icon: <Network className="w-4 h-4" /> },
     { id: "ai", name: "AI Providers", icon: <Cpu className="w-4 h-4" /> },
     { id: "feature_flags", name: "Feature Flags", icon: <ToggleLeft className="w-4 h-4" /> },
@@ -359,7 +354,7 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
                 "default_payment_provider",
                 "Default Payment Provider",
                 "Standard provider selected for subscriptions.",
-                ["paystack", "flutterwave", "manual"]
+                ["bachs", "manual"]
               )}
               {renderSelect(
                 "platform",
@@ -464,39 +459,6 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
                     <Send className="w-3.5 h-3.5 text-indigo-400" />
                   )}
                   Dispatch Test Resend Email
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* ==================== TAB: PAYSTACK ==================== */}
-          {activeTab === "paystack" && (
-            <div className="space-y-6">
-              {renderSecretInput("paystack", "secret_key", "Paystack Secret Key", "Sensitive transaction verification API key.")}
-              {renderPlainInput("paystack", "public_key", "Paystack Public Key", "API key safe to expose to browser.")}
-              {renderSecretInput("paystack", "webhook_secret", "Paystack Webhook Secret", "Used to verify authentic Paystack event signature hooks.")}
-              {renderPlainInput("paystack", "starter_plan_code", "Starter Plan Code", "Subscription plan code.")}
-              {renderPlainInput("paystack", "growth_plan_code", "Growth Plan Code", "Subscription plan code.")}
-              {renderBooleanToggle(
-                "paystack",
-                "test_mode",
-                "Paystack Test Mode",
-                "Toggles payment processing flow environment to staging/sandboxed transactions."
-              )}
-
-              <div className="pt-4 border-t border-slate-900 flex justify-end">
-                <Button
-                  onClick={() => runTest("paystack")}
-                  disabled={testingKey !== null}
-                  variant="outline"
-                  className="rounded-xl h-10 border-slate-800 hover:bg-slate-900 text-xs font-bold text-slate-300 flex items-center gap-2"
-                >
-                  {testingKey === "paystack" ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3.5 h-3.5 text-indigo-400" />
-                  )}
-                  Verify Paystack Connection
                 </Button>
               </div>
             </div>

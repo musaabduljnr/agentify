@@ -44,7 +44,7 @@ This guide provides the exact production deployment and configuration steps for 
 2. Select your production project.
 3. In the left navigation, click on **SQL Editor** (icon: `>_`).
 4. Click **+ New Query**.
-5. Copy the entire contents of `supabase/migrations/20261031000000_bachs_billing_migration.sql` from the repository and paste it into the editor.
+5. Apply all SQL migrations in `supabase/migrations/` in timestamp order, including `20261102150000_harden_bachs_billing.sql`. Prefer the repository's Supabase migration workflow so the migration ledger stays current.
 6. Click the green **Run** button (or press `Ctrl+Enter` / `Cmd+Enter`).
 7. Confirm the response reads: `Success. No rows returned`.
 
@@ -135,11 +135,14 @@ BACHS_GROWTH_PRODUCT_ID=prod_growth_def456uvw
    ```
    *(Replace `your-domain.com` with your production domain or Vercel production URL, e.g., `https://agentify.vercel.app/api/webhooks/bachs`)*.
 4. Select the events to listen for:
-   - ✅ `checkout.session.completed`
-   - ✅ `subscription.created`
-   - ✅ `subscription.updated`
-   - ✅ `subscription.canceled`
-   - ✅ `invoice.payment_succeeded`
+   - ✅ `checkout.completed`
+   - ✅ `checkout.expired`
+   - ✅ `collection.succeeded`
+   - ✅ `collection.failed`
+   - ✅ `customer.subscription.created`
+   - ✅ `customer.subscription.updated`
+   - ✅ `customer.subscription.deleted`
+   - ✅ `invoice.paid`
    - ✅ `invoice.payment_failed`
 5. Copy the generated **Webhook Signing Secret**.
 6. Ensure this secret matches the `BACHS_WEBHOOK_SECRET` set in Vercel in Phase 4.
@@ -174,7 +177,8 @@ To apply the new environment variables to all running serverless functions:
   - Click **Upgrade** on a plan.
   - Verify redirection to the secure **Bachs Hosted Checkout** page in USD.
   - Complete a test payment.
-  - Verify redirect back to `/dashboard/billing?status=success`.
+  - Verify redirect back to `/dashboard/billing?checkout_id=...`.
+  - Verify the plan activates only after the provider reports `payment_status = paid`.
 
 #### Test 3: Webhook Verification
 - Open your Supabase Dashboard:

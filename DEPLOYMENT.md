@@ -1,6 +1,6 @@
 # Agentify Production Deployment
 
-This guide prepares Agentify for production deployment on Vercel with Supabase, Gemini, optional OpenRouter fallback, Paystack, Resend, and the embeddable widget.
+This guide prepares Agentify for production deployment on Vercel with Supabase, Gemini, optional OpenRouter fallback, Bachs billing, Resend, and the embeddable widget.
 
 Replace `https://yourdomain.com` with the final production domain before deploying.
 
@@ -15,11 +15,11 @@ Set these in Vercel under Project Settings -> Environment Variables for the Prod
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public | Supabase anon key. Safe for browser use with RLS enabled. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server only | Never expose client-side. Used by server routes and actions. |
 | `GEMINI_API_KEY` | Server only | Gemini provider key. |
-| `PAYSTACK_SECRET_KEY` | Server only | Paystack secret key for transaction initialize/verify. |
-| `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Public | Paystack public key. Safe for browser use. |
-| `PAYSTACK_WEBHOOK_SECRET` | Server only | Webhook signing secret used for HMAC verification. If Paystack only provides one secret, use the Paystack secret key value here too. |
-| `PAYSTACK_STARTER_PLAN_CODE` | Server only | Paystack plan code for the Starter subscription. |
-| `PAYSTACK_GROWTH_PLAN_CODE` | Server only | Paystack plan code for the Growth subscription. |
+| `BACHS_API_KEY` | Server only | Bachs API key for hosted checkout and customer portal sessions. |
+| `BACHS_WEBHOOK_SECRET` | Server only | Bachs webhook signing secret used to verify the raw request body. |
+| `BACHS_API_URL` | Server only | Optional API base URL; use the documented sandbox URL for testing and production URL for live billing. |
+| `BACHS_STARTER_PRODUCT_ID` | Server only | Bachs recurring USD product ID for Starter. |
+| `BACHS_GROWTH_PRODUCT_ID` | Server only | Bachs recurring USD product ID for Growth. |
 | `RESEND_API_KEY` | Server only | Resend API key for transactional email. |
 | `EMAIL_FROM` | Public email value | Verified sender, for example `Agentify <hello@yourdomain.com>`. |
 | `RESEND_VERIFIED_DOMAIN` | Server only | Optional guardrail. Set to the verified Resend domain, for example `yourdomain.com`, so production sends fail closed if `EMAIL_FROM` uses the wrong domain. |
@@ -41,7 +41,7 @@ Secret safety rules:
 
 - Only variables that intentionally start with `NEXT_PUBLIC_` are bundled for browser use.
 - Do not create `NEXT_PUBLIC_` copies of service role keys, API keys, secret keys, webhook secrets, private tokens, or provider tokens.
-- `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` if used, `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`, and `RESEND_API_KEY` must stay server-only.
+- `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` if used, `BACHS_API_KEY`, `BACHS_WEBHOOK_SECRET`, and `RESEND_API_KEY` must stay server-only.
 - Provider secrets are configured in Vercel, not through the browser admin UI.
 
 ## Vercel Setup
@@ -113,44 +113,15 @@ Storage checks:
 - Confirm bucket size/type limits match `lib/security/file-upload.ts`.
 - Confirm private buckets are not publicly listable unless intentionally public.
 
-## Paystack Setup
+## Bachs Billing Setup
 
-Create production Paystack products/plans:
-
-- Starter plan -> copy the plan code into `PAYSTACK_STARTER_PLAN_CODE`.
-- Growth plan -> copy the plan code into `PAYSTACK_GROWTH_PLAN_CODE`.
-
-Configure callback URL:
+Follow [BACHS_SETUP_GUIDE.md](./BACHS_SETUP_GUIDE.md) to create the Starter and Growth products, configure the Bachs API and webhook secrets, and register:
 
 ```text
-https://yourdomain.com/payment/callback
+https://yourdomain.com/api/webhooks/bachs
 ```
 
-Configure webhook URL:
-
-```text
-https://yourdomain.com/api/webhooks/paystack
-```
-
-Required Paystack webhook events:
-
-- `charge.success`
-- `subscription.create`
-- `subscription.disable`
-- `invoice.payment_failed`
-- `invoice.update`
-
-Webhook security:
-
-- The route reads the raw request body and validates `x-paystack-signature`.
-- Set `PAYSTACK_WEBHOOK_SECRET` to the signing secret. If Paystack signs with the account secret key in your setup, set `PAYSTACK_WEBHOOK_SECRET` to the same value as `PAYSTACK_SECRET_KEY`.
-- Keep `PAYSTACK_SECRET_KEY` and `PAYSTACK_WEBHOOK_SECRET` server-only in Vercel.
-
-Payment verification paths:
-
-- Checkout server action initializes Paystack with callback URL from `NEXT_PUBLIC_APP_URL`.
-- Callback page verifies `reference` or `trxref`.
-- Webhook route independently verifies successful charges and updates subscriptions idempotently.
+The app validates Bachs signatures against the original request body. It activates paid plans only after confirming a paid checkout or successful collection, and reconciles the checkout against the matching Agentify transaction.
 
 ## Resend Setup
 
@@ -236,10 +207,10 @@ Widget:
 
 Billing:
 
-- [ ] Checkout creates a Paystack transaction.
-- [ ] Paystack redirects to `https://yourdomain.com/payment/callback`.
-- [ ] Callback verifies `reference` or `trxref`.
-- [ ] Paystack webhook receives `charge.success`.
+- [ ] Checkout creates a pending USD Bachs transaction before creating the provider session.
+- [ ] Bachs redirects to `/dashboard/billing` with the checkout ID.
+- [ ] A provider-confirmed payment updates the matching subscription.
+- [ ] Bachs webhook receives and processes the expected checkout/collection events.
 - [ ] Duplicate webhook delivery is idempotent.
 - [ ] Subscription changes to the selected paid plan.
 
@@ -258,5 +229,5 @@ Security:
 - [ ] Supabase RLS is enabled and tested with anon/authenticated users.
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` is only used in server routes/actions.
 - [ ] Admin routes require server-side admin validation.
-- [ ] Paystack webhook rejects missing or invalid signatures.
+- [ ] Bachs webhook rejects missing or invalid signatures.
 - [ ] Vercel deployment logs do not print provider secrets.

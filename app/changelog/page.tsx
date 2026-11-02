@@ -94,10 +94,6 @@ const updates = [
         title: "Resend Email Template Integration",
         detail: "Elegant transactional mail systems powering signup welcome guides, lead capturing digests, and subscription invoices."
       },
-      {
-        title: "Paystack Payment Gateway",
-        detail: "Secure local subscription engine allowing starter and growth checkouts via card, bank transfer, or USSD codes."
-      }
     ]
   }
 ];

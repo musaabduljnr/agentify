@@ -1,19 +1,19 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import {
   createBachsCheckoutSession,
   createBachsCustomerPortalSession,
-  getBachsSubscription,
   getBachsCheckoutSession,
   BachsApiError,
 } from "@/lib/payments/bachs";
-import { type PlanId } from "@/lib/billing/plans";
+import { PLAN_CONFIG } from "@/lib/billing/plans";
 import {
   getEffectivePlanConfig,
 } from "@/lib/billing/platform";
-import { activateSubscriptionPlan, resolvePlanFromProductId } from "@/lib/billing/upgrade";
+import { activateSubscriptionPlan } from "@/lib/billing/upgrade";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { getConfig } from "@/lib/config/platform-config";
@@ -44,7 +44,13 @@ async function getAppBaseUrl(): Promise<string> {
 export async function createCheckoutSession(
   plan: "starter" | "growth"
 ) {
+  let transactionId: string | null = null;
+
   try {
+    if (plan !== "starter" && plan !== "growth") {
+      return { error: "Only Starter and Growth subscriptions are available for checkout." };
+    }
+
     // 0. Check feature flag
     const paymentsEnabled = await getConfig("feature_flags", "enable_payments");
     if (paymentsEnabled === "false") {
@@ -70,14 +76,75 @@ export async function createCheckoutSession(
     }
 
     // 3. Get current subscription
-    const { data: subscription } = await supabase
+    const { data: subscription, error: subscriptionError } = await supabase
       .from("subscriptions")
       .select("*")
       .eq("business_id", business.id)
       .maybeSingle();
 
+    if (subscriptionError) {
+      throw new Error(`Failed to load the current subscription: ${subscriptionError.message}`);
+    }
     if (!subscription) {
       return { error: "No subscription record found. Please contact support." };
+    }
+
+    const serviceClient = createServiceClient();
+    const { data: existingPendingTransaction, error: pendingTransactionError } =
+      await serviceClient
+        .from("payment_transactions")
+        .select("id, plan, checkout_id, checkout_url, status")
+        .eq("business_id", business.id)
+        .eq("provider", "bachs")
+        .eq("status", "pending")
+        .not("checkout_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (pendingTransactionError) {
+      throw new Error(`Failed to load pending checkout: ${pendingTransactionError.message}`);
+    }
+
+    if (existingPendingTransaction?.checkout_id) {
+      if (existingPendingTransaction.plan !== plan) {
+        return {
+          error: "A checkout for another plan is already open. Complete or allow it to expire before starting a new checkout.",
+        };
+      }
+
+      const currentSession = await getBachsCheckoutSession(existingPendingTransaction.checkout_id);
+      if (currentSession.status === "open" && existingPendingTransaction.checkout_url) {
+        return { checkoutUrl: existingPendingTransaction.checkout_url };
+      }
+
+      if (currentSession.payment_status === "paid") {
+        return { error: "Your payment is processing. Refresh billing in a moment; do not pay again." };
+      }
+
+      const { error: expireError } = await serviceClient
+        .from("payment_transactions")
+        .update({
+          status: "abandoned",
+          failure_reason: "The previous checkout is no longer open.",
+        })
+        .eq("id", existingPendingTransaction.id)
+        .eq("status", "pending");
+
+      if (expireError) {
+        throw new Error(`Failed to close the previous checkout: ${expireError.message}`);
+      }
+    }
+
+    const currentPlanOrder = { starter: 0, growth: 1 } as const;
+    if (
+      subscription.status === "active" &&
+      currentPlanOrder[plan] <=
+        (subscription.plan === "growth" ? currentPlanOrder.growth : currentPlanOrder.starter)
+    ) {
+      return {
+        error: "Your current plan already includes this subscription level. Use billing management to change your plan.",
+      };
     }
 
     // 4. Resolve trusted plan config and product ID
@@ -98,6 +165,15 @@ export async function createCheckoutSession(
       };
     }
 
+    const expectedAmount = PLAN_CONFIG[plan].amount_decimal;
+    if (
+      !expectedAmount ||
+      Number(planConfig.price_usd) !== Number(expectedAmount) ||
+      planConfig.amount_decimal !== expectedAmount
+    ) {
+      throw new Error(`The configured ${plan} price does not match the fixed USD subscription price.`);
+    }
+
     const appBaseUrl = await getAppBaseUrl();
     // Bachs automatically appends ?checkout_id=chk_xxx to the success URL.
     // Providing a clean base URL ensures standard `?checkout_id=...` parameter format.
@@ -105,9 +181,39 @@ export async function createCheckoutSession(
     const cancelUrl = `${appBaseUrl}/dashboard/billing?status=cancelled`;
 
     // 5. Generate durable reference and initialize Bachs checkout session
-    const businessIdShort = business.id.substring(0, 8);
-    const reference = `agentify_${businessIdShort}_${Date.now()}`;
+    const reference = `agentify_${randomUUID().replace(/-/g, "")}`;
     const customerId = (subscription as any).bachs_customer_id || subscription.provider_customer_id;
+    const amount = Number(expectedAmount);
+
+    const { data: transaction, error: transactionError } = await serviceClient
+      .from("payment_transactions")
+      .insert({
+        business_id: business.id,
+        subscription_id: subscription.id,
+        provider: "bachs",
+        reference,
+        plan,
+        amount,
+        billing_amount: amount,
+        currency: "USD",
+        status: "pending",
+        raw_response: {
+          reference,
+          user_id: user.id,
+          business_id: business.id,
+          plan,
+          product_id: productId,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (transactionError || !transaction) {
+      throw new Error(
+        `Failed to persist the pending checkout before contacting Bachs: ${transactionError?.message || "No transaction row returned."}`
+      );
+    }
+    transactionId = transaction.id;
 
     const checkoutRes = await createBachsCheckoutSession({
       productId,
@@ -122,22 +228,10 @@ export async function createCheckoutSession(
       cancelUrl,
     });
 
-    // 6. Record pending transaction using service client
-    const serviceClient = createServiceClient();
-    const amountNumber = plan === "starter" ? 2 : 10;
-
-    const { error: insertError } = await serviceClient
+    const { error: updateError } = await serviceClient
       .from("payment_transactions")
-      .insert({
-        business_id: business.id,
-        subscription_id: subscription.id,
-        provider: "bachs",
-        reference,
+      .update({
         checkout_id: checkoutRes.checkoutId,
-        plan,
-        amount: amountNumber,
-        currency: "USD",
-        status: "pending",
         checkout_url: checkoutRes.checkoutUrl,
         raw_response: {
           checkout_id: checkoutRes.checkoutId,
@@ -148,15 +242,33 @@ export async function createCheckoutSession(
           business_id: business.id,
           plan,
         },
-      });
+      })
+      .eq("id", transaction.id);
 
-    if (insertError) {
-      logErrorSync(insertError, "bachs-checkout", { businessId: business.id, userId: user.id });
-      return { error: "Failed to record checkout session." };
+    if (updateError) {
+      logErrorSync(updateError, "bachs-checkout-record-update", {
+        businessId: business.id,
+        userId: user.id,
+      });
+      throw new Error("Bachs created the checkout, but Agentify could not save its checkout ID.");
     }
 
     return { checkoutUrl: checkoutRes.checkoutUrl };
   } catch (error: any) {
+    if (transactionId) {
+      const { error: statusError } = await createServiceClient()
+        .from("payment_transactions")
+        .update({
+          status: "failed",
+          failure_reason: error instanceof Error ? error.message : "Checkout initialization failed.",
+        })
+        .eq("id", transactionId)
+        .eq("status", "pending");
+
+      if (statusError) {
+        logErrorSync(statusError, "bachs-checkout-failure-record", { metadata: { transactionId } });
+      }
+    }
     logErrorSync(error, "bachs-checkout");
     if (error instanceof BachsApiError) {
       return { error: `Checkout initialization failed: ${error.message} (${error.errorCode})` };
@@ -219,15 +331,26 @@ export async function verifyPaymentReference(reference: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: "Unauthorized" };
 
+    const { data: business, error: businessError } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+    if (businessError) throw businessError;
+    if (!business) return { error: "Business not found." };
+
     const serviceClient = createServiceClient();
-    const { data: transaction } = await serviceClient
+    const { data: transaction, error } = await serviceClient
       .from("payment_transactions")
-      .select("*")
+      .select("status, plan")
+      .eq("business_id", business.id)
       .eq("reference", reference)
       .maybeSingle();
 
+    if (error) throw error;
     if (!transaction) {
-      return { error: "Transaction not found." };
+      return { error: "Transaction not found or not owned by this account." };
     }
 
     return {
@@ -275,10 +398,8 @@ export async function getPaymentHistory() {
 }
 
 /**
- * Verifies a Bachs checkout session directly via the Bachs API and synchronizes the subscription.
- * Serves as an immediate reconciliation check when the user returns to the dashboard,
- * ensuring verified payments upgrade the plan with 0ms user-visible delay even before
- * or concurrent with webhook delivery.
+ * Reconciles only a checkout created for the authenticated business. A paid state
+ * returned by Bachs is provider evidence; URL parameters alone never grant access.
  */
 export async function reconcileCheckoutSession(checkoutId: string) {
   try {
@@ -290,17 +411,45 @@ export async function reconcileCheckoutSession(checkoutId: string) {
       return { isSuccess: false, message: "Invalid session ID." };
     }
 
+    const { data: business, error: businessError } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
+
+    if (businessError) throw businessError;
+    if (!business) return { error: "Business not found." };
+
+    const serviceClient = createServiceClient();
+    const { data: transaction, error: transactionError } = await serviceClient
+      .from("payment_transactions")
+      .select("id, plan, status")
+      .eq("provider", "bachs")
+      .eq("business_id", business.id)
+      .eq("checkout_id", checkoutId)
+      .maybeSingle();
+
+    if (transactionError) throw transactionError;
+    if (!transaction) {
+      return { error: "This checkout does not belong to your business." };
+    }
+
     const session = await getBachsCheckoutSession(checkoutId);
     if (!session) {
       return { isSuccess: false, message: "Session not found." };
     }
 
-    const isPaid =
-      session.payment_status === "paid" ||
-      session.payment_status === "succeeded" ||
-      session.status === "completed";
+    if (session.status === "expired") {
+      const { error } = await serviceClient
+        .from("payment_transactions")
+        .update({
+          status: "abandoned",
+          failure_reason: "Checkout expired. A late successful collection may still complete.",
+        })
+        .eq("id", transaction.id)
+        .eq("status", "pending");
+      if (error) throw error;
 
-    if (!isPaid) {
       return {
         isSuccess: false,
         status: session.status,
@@ -308,42 +457,74 @@ export async function reconcileCheckoutSession(checkoutId: string) {
       };
     }
 
-    const metadata = (session.metadata as Record<string, any>) || {};
-    const customerId =
-      (session.customer as any)?.id ||
-      (session.customer as any)?.customer_id ||
-      (typeof session.customer === "string" ? session.customer : null);
-    const subscriptionId =
-      typeof (session as any).subscription === "string"
-        ? (session as any).subscription
-        : ((session as any).subscription?.id || null);
-    const productId = (session as any).product_cart?.[0]?.product_id || null;
-    let plan = metadata.plan;
-    if (!plan && productId) {
-      plan = await resolvePlanFromProductId(productId);
+    if (session.status !== "completed" || session.payment_status !== "paid") {
+      return {
+        isSuccess: false,
+        isPending: true,
+        status: session.status,
+        paymentStatus: session.payment_status,
+        message: "Payment is still being confirmed. You do not need to start another checkout.",
+      };
     }
-    if (!plan && session.amount) {
-      const amt = Number(session.amount);
-      if (amt >= 9.0) plan = "growth";
-      else plan = "starter";
-    }
-    if (!plan) plan = "starter";
+
+    const metadata =
+      session.metadata && typeof session.metadata === "object"
+        ? (session.metadata as Record<string, unknown>)
+        : {};
+    const customer =
+      session.customer && typeof session.customer === "object"
+        ? (session.customer as Record<string, unknown>)
+        : {};
+    const subscription =
+      session.subscription && typeof session.subscription === "object"
+        ? (session.subscription as Record<string, unknown>)
+        : {};
+    const productCart = Array.isArray(session.product_cart) ? session.product_cart : [];
+    const firstProduct =
+      productCart[0] && typeof productCart[0] === "object"
+        ? (productCart[0] as Record<string, unknown>)
+        : {};
+    const completedAt =
+      typeof session.completed_at === "string"
+        ? session.completed_at
+        : new Date().toISOString();
 
     const result = await activateSubscriptionPlan({
-      businessId: metadata.business_id || null,
-      userId: metadata.user_id || user.id,
-      plan,
-      productId,
+      eventId: null,
+      eventTimestamp: completedAt,
       checkoutId,
-      customerId,
-      subscriptionId,
-      amount: Number(session.amount) || (plan === "growth" ? 10.0 : 2.0),
-      reference: (session.reference as string) || null,
-      sourceEvent: "client_reconciliation",
+      reference: typeof session.reference === "string" ? session.reference : null,
+      productId:
+        typeof firstProduct.product_id === "string"
+          ? firstProduct.product_id
+          : typeof metadata.product_id === "string"
+            ? metadata.product_id
+            : null,
+      customerId:
+        typeof customer.customer_id === "string"
+          ? customer.customer_id
+          : typeof customer.id === "string"
+            ? customer.id
+            : null,
+      subscriptionId:
+        typeof subscription.subscription_id === "string"
+          ? subscription.subscription_id
+          : typeof subscription.id === "string"
+            ? subscription.id
+            : null,
+      chargeId:
+        session.charge && typeof session.charge === "object" &&
+        typeof (session.charge as Record<string, unknown>).id === "string"
+          ? (session.charge as Record<string, string>).id
+          : null,
+      amount: typeof session.amount === "string" ? session.amount : "",
+      currency: typeof session.currency === "string" ? session.currency : "",
+      metadata,
+      sourceEvent: "checkout_reconciliation",
     });
 
     return {
-      isSuccess: result.success,
+      isSuccess: true,
       plan: result.plan,
       status: "active",
     };
@@ -352,4 +533,3 @@ export async function reconcileCheckoutSession(checkoutId: string) {
     return { error: error.message || "Failed to reconcile checkout session." };
   }
 }
-

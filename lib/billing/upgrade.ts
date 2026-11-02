@@ -1,13 +1,107 @@
 import "server-only";
 
 import { createServiceClient } from "@/utils/supabase/service";
-import { type PlanId, PLAN_ORDER } from "@/lib/billing/plans";
-import { getEffectivePlanLimits, getEffectivePlanConfigs } from "@/lib/billing/platform";
+import { PLAN_CONFIG, type PlanId } from "@/lib/billing/plans";
+import { getEffectivePlanConfig, getEffectivePlanLimits } from "@/lib/billing/platform";
 import { logErrorSync } from "@/lib/monitoring/log-error";
 import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
 import { getConfig } from "@/lib/config/platform-config";
 import { revalidatePath } from "next/cache";
+
+type CheckoutTransaction = {
+  id: string;
+  business_id: string;
+  plan: string;
+  provider: string;
+  status: string;
+  checkout_id: string | null;
+  reference: string;
+  raw_response: Record<string, unknown> | null;
+};
+
+export interface ActivatePlanParams {
+  eventId: string | null;
+  eventTimestamp: string;
+  checkoutId?: string | null;
+  reference?: string | null;
+  productId?: string | null;
+  customerId?: string | null;
+  subscriptionId?: string | null;
+  chargeId?: string | null;
+  amount: string;
+  currency: string;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  metadata?: Record<string, unknown>;
+  sourceEvent: "collection.succeeded" | "checkout.completed" | "checkout_reconciliation";
+}
+
+export interface ActivatePlanResult {
+  success: true;
+  businessId: string;
+  plan: "starter" | "growth";
+  subscriptionId: string | null;
+  duplicate: boolean;
+}
+
+function isPaidPlan(plan: string): plan is "starter" | "growth" {
+  return plan === "starter" || plan === "growth";
+}
+
+export async function resolvePlanFromProductId(
+  productId?: string | null
+): Promise<"starter" | "growth" | null> {
+  if (!productId) return null;
+
+  const [starter, growth] = await Promise.all([
+    getEffectivePlanConfig("starter"),
+    getEffectivePlanConfig("growth"),
+  ]);
+  const starterProductId =
+    starter.bachs_product_id || process.env.BACHS_STARTER_PRODUCT_ID?.trim() || null;
+  const growthProductId =
+    growth.bachs_product_id || process.env.BACHS_GROWTH_PRODUCT_ID?.trim() || null;
+
+  if (productId === starterProductId) return "starter";
+  if (productId === growthProductId) return "growth";
+  return null;
+}
+
+async function findCheckoutTransaction(
+  checkoutId?: string | null,
+  reference?: string | null
+): Promise<CheckoutTransaction | null> {
+  const supabase = createServiceClient();
+  const columns = "id, business_id, plan, provider, status, checkout_id, reference, raw_response";
+
+  if (checkoutId) {
+    const { data, error } = await supabase
+      .from("payment_transactions")
+      .select(columns)
+      .eq("provider", "bachs")
+      .eq("checkout_id", checkoutId)
+      .maybeSingle();
+
+    if (error) throw new Error(`Failed to find Bachs checkout transaction: ${error.message}`);
+    if (!data || (reference && data.reference !== reference)) return null;
+    return data as CheckoutTransaction;
+  }
+
+  if (reference) {
+    const { data, error } = await supabase
+      .from("payment_transactions")
+      .select(columns)
+      .eq("provider", "bachs")
+      .eq("reference", reference)
+      .maybeSingle();
+
+    if (error) throw new Error(`Failed to find Bachs payment reference: ${error.message}`);
+    if (data) return data as CheckoutTransaction;
+  }
+
+  return null;
+}
 
 async function getAppBaseUrl(): Promise<string> {
   const dbUrl = await getConfig("platform", "app_url");
@@ -15,413 +109,180 @@ async function getAppBaseUrl(): Promise<string> {
     dbUrl ||
     process.env.APP_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "") ||
     "https://agentify.app";
 
   return configuredUrl.trim().replace(/\/+$/, "");
 }
 
-/**
- * Maps a Bachs Product ID to an Agentify PlanId ("starter" | "growth").
- */
-export async function resolvePlanFromProductId(productId?: string | null): Promise<PlanId | null> {
-  if (!productId) return null;
-  const cleanId = productId.trim();
-
-  // 1. Check environment variables
-  if (process.env.BACHS_GROWTH_PRODUCT_ID && cleanId === process.env.BACHS_GROWTH_PRODUCT_ID.trim()) {
-    return "growth";
-  }
-  if (process.env.BACHS_STARTER_PRODUCT_ID && cleanId === process.env.BACHS_STARTER_PRODUCT_ID.trim()) {
-    return "starter";
-  }
-
-  // 2. Check effective plan configs (database overrides)
-  try {
-    const configs = await getEffectivePlanConfigs();
-    if (configs.growth?.bachs_product_id === cleanId) return "growth";
-    if (configs.starter?.bachs_product_id === cleanId) return "starter";
-  } catch (err) {
-    console.warn("[resolvePlanFromProductId] Could not check effective configs:", err);
-  }
-
-  return null;
-}
-
-export interface ActivatePlanParams {
-  businessId?: string | null;
-  userId?: string | null;
-  plan?: string | null;
-  customerId?: string | null;
-  subscriptionId?: string | null;
-  productId?: string | null;
-  amount?: number | null;
-  currency?: string | null;
-  periodStart?: string | null;
-  periodEnd?: string | null;
-  checkoutId?: string | null;
-  chargeId?: string | null;
-  invoiceId?: string | null;
-  reference?: string | null;
-  eventTimestamp?: string | null;
-  sourceEvent: string;
-}
-
-export interface ActivatePlanResult {
-  success: boolean;
-  businessId: string;
-  plan: PlanId;
-  subscriptionId: string;
-  isUpgraded: boolean;
-  error?: string;
-}
-
-/**
- * Authoritative, atomic, and idempotent subscription upgrade/activation engine.
- * Guarantees that confirmed payments upgrade the user's plan to Growth (or Starter),
- * applies correct quotas immediately, records payment transactions, and revalidates dashboard cache.
- */
 export async function activateSubscriptionPlan(
   params: ActivatePlanParams
 ): Promise<ActivatePlanResult> {
-  const serviceClient = createServiceClient();
-  const eventTime = params.eventTimestamp || new Date().toISOString();
-
-  // 1. Resolve Target Business ID
-  let targetBusinessId = params.businessId || null;
-
-  // Resolve via userId
-  if (!targetBusinessId && params.userId) {
-    const { data: bus } = await serviceClient
-      .from("businesses")
-      .select("id")
-      .eq("owner_id", params.userId)
-      .maybeSingle();
-    targetBusinessId = bus?.id || null;
+  const eventTime = new Date(params.eventTimestamp);
+  if (!Number.isFinite(eventTime.getTime())) {
+    throw new Error("Bachs event has an invalid creation timestamp.");
   }
 
-  // Resolve via checkoutId in payment_transactions
-  let matchedTransaction: any = null;
-  if (params.checkoutId) {
-    const { data: tx } = await serviceClient
-      .from("payment_transactions")
-      .select("*")
-      .eq("checkout_id", params.checkoutId)
-      .maybeSingle();
-    if (tx) {
-      matchedTransaction = tx;
-      if (!targetBusinessId) targetBusinessId = tx.business_id;
-    }
+  if (params.currency !== "USD") {
+    throw new Error("Bachs payment currency does not match the USD subscription.");
   }
 
-  // Resolve via reference in payment_transactions
-  if (!targetBusinessId && params.reference) {
-    const { data: tx } = await serviceClient
-      .from("payment_transactions")
-      .select("*")
-      .eq("reference", params.reference)
-      .maybeSingle();
-    if (tx) {
-      matchedTransaction = tx;
-      targetBusinessId = tx.business_id;
-    }
+  const transaction = await findCheckoutTransaction(params.checkoutId, params.reference);
+  if (!transaction) {
+    throw new Error("No Agentify checkout transaction matches the Bachs payment.");
   }
 
-  // Resolve via customerId in subscriptions
-  if (!targetBusinessId && params.customerId) {
-    const { data: sub } = await serviceClient
-      .from("subscriptions")
-      .select("business_id")
-      .or(`bachs_customer_id.eq.${params.customerId},provider_customer_id.eq.${params.customerId}`)
-      .maybeSingle();
-    if (sub) targetBusinessId = sub.business_id;
+  if (!isPaidPlan(transaction.plan) || transaction.provider !== "bachs") {
+    throw new Error("The matching transaction does not identify a supported Bachs plan.");
   }
 
-  // Resolve via subscriptionId in subscriptions
-  if (!targetBusinessId && params.subscriptionId) {
-    const { data: sub } = await serviceClient
-      .from("subscriptions")
-      .select("business_id")
-      .or(`bachs_subscription_id.eq.${params.subscriptionId},provider_subscription_id.eq.${params.subscriptionId}`)
-      .maybeSingle();
-    if (sub) targetBusinessId = sub.business_id;
+  const expectedAmount = PLAN_CONFIG[transaction.plan].amount_decimal;
+  if (expectedAmount === null || Number(params.amount) !== Number(expectedAmount)) {
+    throw new Error("Bachs payment amount does not match the selected USD plan.");
   }
 
-  if (!targetBusinessId) {
-    const errMsg = `[activateSubscriptionPlan] Could not resolve business for checkout=${params.checkoutId}, customer=${params.customerId}, sub=${params.subscriptionId}`;
-    logErrorSync(new Error(errMsg), "activate-plan-no-business", {
-      businessId: params.businessId || undefined,
-      metadata: params as unknown as Record<string, unknown>,
-    });
-    return {
-      success: false,
-      businessId: "",
-      plan: "starter",
-      subscriptionId: "",
-      isUpgraded: false,
-      error: errMsg,
-    };
+  const rawResponse = transaction.raw_response || {};
+  const storedProductId =
+    typeof rawResponse.product_id === "string" ? rawResponse.product_id : null;
+  const configuredPlan = await getEffectivePlanConfig(transaction.plan);
+  const configuredProductId =
+    configuredPlan.bachs_product_id ||
+    process.env[
+      transaction.plan === "starter"
+        ? "BACHS_STARTER_PRODUCT_ID"
+        : "BACHS_GROWTH_PRODUCT_ID"
+    ]?.trim() ||
+    null;
+
+  if (
+    !storedProductId ||
+    !configuredProductId ||
+    storedProductId !== configuredProductId ||
+    (params.productId && params.productId !== storedProductId)
+  ) {
+    throw new Error("Bachs product does not match the product recorded for this checkout.");
   }
 
-  // 2. Resolve Target Plan
-  let targetPlan: PlanId = "starter";
-
-  if (params.plan && (params.plan === "starter" || params.plan === "growth" || params.plan === "enterprise")) {
-    targetPlan = params.plan as PlanId;
-  } else if (params.productId) {
-    const mappedPlan = await resolvePlanFromProductId(params.productId);
-    if (mappedPlan) targetPlan = mappedPlan;
+  if (
+    params.metadata?.plan !== undefined &&
+    params.metadata.plan !== transaction.plan
+  ) {
+    throw new Error("Bachs checkout metadata does not match the recorded plan.");
   }
 
-  // Fallback to plan from matched pending transaction
-  if (targetPlan === "starter" && matchedTransaction?.plan) {
-    targetPlan = matchedTransaction.plan as PlanId;
+  const businessMetadataId =
+    typeof params.metadata?.business_id === "string"
+      ? params.metadata.business_id
+      : null;
+  if (businessMetadataId && businessMetadataId !== transaction.business_id) {
+    throw new Error("Bachs checkout metadata does not match the recorded business.");
   }
 
-  // Fallback based on amount ($10 => growth, $2 => starter)
-  // Bachs may send amount in minor units (cents): 1000 = $10, 200 = $2
-  if (targetPlan === "starter" && params.amount) {
-    const normalizedAmount = params.amount > 100 ? params.amount / 100 : params.amount;
-    if (normalizedAmount >= 9.0) {
-      targetPlan = "growth";
-    }
-  }
-
-  // 3. Fetch current subscription to check out-of-order events
-  const { data: currentSub } = await serviceClient
-    .from("subscriptions")
-    .select("*")
-    .eq("business_id", targetBusinessId)
+  const supabase = createServiceClient();
+  const { data: business, error: businessError } = await supabase
+    .from("businesses")
+    .select("id, owner_id, name, contact_email")
+    .eq("id", transaction.business_id)
     .maybeSingle();
 
-  const previousPlan = currentSub?.plan || null;
+  if (businessError) {
+    throw new Error(`Failed to verify checkout business ownership: ${businessError.message}`);
+  }
+  if (!business) throw new Error("The business associated with this checkout no longer exists.");
 
-  if (currentSub) {
-    // If incoming event is an older event (older than currentSub.updated_at by > 30s)
-    // and current plan is already higher than or equal to incoming plan, do not regress.
-    const currentPlanIndex = PLAN_ORDER.indexOf(currentSub.plan as PlanId);
-    const targetPlanIndex = PLAN_ORDER.indexOf(targetPlan);
-
-    // Guard: Never let an incoming payment/webhook event downgrade a higher active plan (e.g. Growth -> Starter).
-    // Downgrades only happen via explicit cancellation or scheduled downgrade at period end.
-    const isExplicitDowngradeEvent =
-      params.sourceEvent === "customer.subscription.deleted" ||
-      params.sourceEvent === "subscription.canceled" ||
-      params.sourceEvent === "admin_downgrade";
-
-    if (currentPlanIndex > targetPlanIndex && !isExplicitDowngradeEvent && currentSub.status === "active") {
-      console.log(
-        `[activateSubscriptionPlan] Retaining active higher plan '${currentSub.plan}' over incoming '${targetPlan}' for business ${targetBusinessId}`
-      );
-      targetPlan = currentSub.plan as PlanId;
-    } else if (
-      currentSub.updated_at &&
-      Date.parse(currentSub.updated_at) > Date.parse(eventTime) + 30000 &&
-      currentPlanIndex >= targetPlanIndex
-    ) {
-      console.log(
-        `[activateSubscriptionPlan] Ignoring out-of-order event for ${targetBusinessId}. Current plan ${currentSub.plan} is newer than ${targetPlan}`
-      );
-      return {
-        success: true,
-        businessId: targetBusinessId,
-        plan: currentSub.plan as PlanId,
-        subscriptionId: currentSub.id,
-        isUpgraded: false,
-      };
-    }
+  const recordedUserId =
+    typeof rawResponse.user_id === "string" ? rawResponse.user_id : null;
+  const metadataUserId =
+    typeof params.metadata?.user_id === "string" ? params.metadata.user_id : null;
+  if (
+    !recordedUserId ||
+    recordedUserId !== business.owner_id ||
+    (metadataUserId && metadataUserId !== business.owner_id)
+  ) {
+    throw new Error("Bachs checkout identity does not match the business owner.");
   }
 
-  // 4. Resolve limits for target plan
-  const planLimits = await getEffectivePlanLimits(targetPlan);
+  const limits = await getEffectivePlanLimits(transaction.plan);
+  const periodStart = params.periodStart || eventTime.toISOString();
+  const periodEnd = params.periodEnd || (() => {
+    const date = new Date(periodStart);
+    date.setUTCMonth(date.getUTCMonth() + 1);
+    return date.toISOString();
+  })();
 
-  // Calculate billing period dates
-  const periodStart = params.periodStart || new Date().toISOString();
-  let periodEnd = params.periodEnd;
-  if (!periodEnd) {
-    const d = new Date(periodStart);
-    d.setMonth(d.getMonth() + 1);
-    periodEnd = d.toISOString();
+  const { data, error } = await supabase.rpc("apply_bachs_checkout_payment", {
+    p_event_id: params.eventId,
+    p_transaction_id: transaction.id,
+    p_product_id: storedProductId,
+    p_customer_id: params.customerId || null,
+    p_subscription_id: params.subscriptionId || null,
+    p_amount: Number(params.amount),
+    p_currency: params.currency,
+    p_period_start: periodStart,
+    p_period_end: periodEnd,
+    p_event_created_at: eventTime.toISOString(),
+    p_charge_id: params.chargeId || null,
+    p_limits: limits,
+  });
+
+  if (error) {
+    logErrorSync(error, "bachs-atomic-subscription-activation", {
+      businessId: transaction.business_id,
+      metadata: { eventId: params.eventId, sourceEvent: params.sourceEvent },
+    });
+    throw new Error(`Failed to apply verified Bachs payment: ${error.message}`);
   }
 
-  const finalAmount =
-    params.amount !== undefined && params.amount !== null
-      ? params.amount
-      : targetPlan === "growth"
-      ? 10.0
-      : 2.0;
+  if (!data || typeof data !== "object") {
+    throw new Error("Bachs payment update returned no subscription result.");
+  }
 
-  // 5. Update or Create subscription record atomically
-  const subUpdatePayload: Record<string, any> = {
-    plan: targetPlan,
-    status: "active",
-    payment_provider: "bachs",
-    provider: "bachs",
-    billing_currency: "USD",
-    billing_amount: finalAmount,
-    current_period_start: periodStart,
-    current_period_end: periodEnd,
-    reset_date: periodEnd,
-    canceled_at: null,
-    cancel_at_period_end: false,
-    ...planLimits,
-    updated_at: eventTime,
+  const result = data as {
+    plan?: "starter" | "growth";
+    subscription_id?: string | null;
+    duplicate?: boolean;
   };
+  const activePlan = result.plan || transaction.plan;
 
-  if (params.customerId) {
-    subUpdatePayload.bachs_customer_id = params.customerId;
-    subUpdatePayload.provider_customer_id = params.customerId;
-  }
-  if (params.subscriptionId) {
-    subUpdatePayload.bachs_subscription_id = params.subscriptionId;
-    subUpdatePayload.provider_subscription_id = params.subscriptionId;
-  }
-  if (params.productId) {
-    subUpdatePayload.bachs_product_id = params.productId;
-  }
-
-  let finalSubscriptionId = currentSub?.id;
-
-  if (currentSub) {
-    const { error: updateSubErr } = await serviceClient
-      .from("subscriptions")
-      .update(subUpdatePayload)
-      .eq("id", currentSub.id);
-
-    if (updateSubErr) {
-      logErrorSync(updateSubErr, "activate-plan-update-sub-failed", {
-        businessId: targetBusinessId,
-        metadata: subUpdatePayload,
-      });
-      throw new Error(`Failed to update subscription: ${updateSubErr.message}`);
-    }
-  } else {
-    // Insert new subscription record
-    const { data: newSub, error: insertSubErr } = await serviceClient
-      .from("subscriptions")
-      .insert({
-        business_id: targetBusinessId,
-        current_usage: 0,
-        ...subUpdatePayload,
-      })
-      .select("id")
-      .single();
-
-    if (insertSubErr) {
-      logErrorSync(insertSubErr, "activate-plan-insert-sub-failed", {
-        businessId: targetBusinessId,
-        metadata: subUpdatePayload,
-      });
-      throw new Error(`Failed to insert subscription: ${insertSubErr.message}`);
-    }
-    finalSubscriptionId = newSub.id;
-  }
-
-  // 6. Update or record successful payment transaction (non-fatal if table update fails)
-  try {
-    const txRef = params.reference || matchedTransaction?.reference || `tx_${targetBusinessId.substring(0, 8)}_${Date.now()}`;
-    const checkoutId = params.checkoutId || matchedTransaction?.checkout_id || null;
-
-    if (matchedTransaction) {
-      await serviceClient
-        .from("payment_transactions")
-        .update({
-          status: "success",
-          plan: targetPlan,
-          amount: finalAmount,
-          currency: "USD",
-          charge_id: params.chargeId || matchedTransaction.charge_id || null,
-          invoice_id: params.invoiceId || matchedTransaction.invoice_id || null,
-          provider_customer_id: params.customerId || matchedTransaction.provider_customer_id || null,
-          provider_subscription_id: params.subscriptionId || matchedTransaction.provider_subscription_id || null,
-          verified_at: eventTime,
-        })
-        .eq("id", matchedTransaction.id);
-    } else if (checkoutId) {
-      await serviceClient
-        .from("payment_transactions")
-        .update({
-          status: "success",
-          plan: targetPlan,
-          amount: finalAmount,
-          currency: "USD",
-          charge_id: params.chargeId || null,
-          invoice_id: params.invoiceId || null,
-          provider_customer_id: params.customerId || null,
-          provider_subscription_id: params.subscriptionId || null,
-          verified_at: eventTime,
-        })
-        .eq("checkout_id", checkoutId);
-    } else {
-      // Insert standalone transaction record (e.g. from subscription invoice)
-      await serviceClient
-        .from("payment_transactions")
-        .insert({
-          business_id: targetBusinessId,
-          subscription_id: finalSubscriptionId,
-          provider: "bachs",
-          reference: txRef,
-          checkout_id: checkoutId,
-          charge_id: params.chargeId || null,
-          invoice_id: params.invoiceId || null,
-          provider_customer_id: params.customerId || null,
-          provider_subscription_id: params.subscriptionId || null,
-          plan: targetPlan,
-          amount: finalAmount,
-          currency: "USD",
-          status: "success",
-          verified_at: eventTime,
-        });
-    }
-  } catch (txErr) {
-    console.warn("[activateSubscriptionPlan] Non-fatal: payment_transactions sync warning:", txErr);
-  }
-
-  // 7. Revalidate Next.js cache so dashboard immediately reflects Growth plan
   try {
     revalidatePath("/dashboard", "layout");
     revalidatePath("/dashboard/billing");
     revalidatePath("/");
-  } catch (revalErr) {
-    console.warn("[activateSubscriptionPlan] Path revalidation error:", revalErr);
+  } catch (error) {
+    logErrorSync(error, "bachs-subscription-cache-revalidation", {
+      businessId: transaction.business_id,
+    });
   }
 
-  // 8. Send transactional confirmation email
-  try {
-    const { data: business } = await serviceClient
-      .from("businesses")
-      .select("name, contact_email")
-      .eq("id", targetBusinessId)
-      .maybeSingle();
-
-    if (business?.contact_email) {
+  if (!result.duplicate && business.contact_email) {
+    try {
       const appUrl = await getAppBaseUrl();
       await sendTransactionalEmail({
-        businessId: targetBusinessId,
+        businessId: transaction.business_id,
         to: business.contact_email,
-        subject: `Your Agentify ${targetPlan === "growth" ? "Growth" : "Starter"} subscription is active`,
+        subject: `Your Agentify ${activePlan === "growth" ? "Growth" : "Starter"} subscription is active`,
         templateName: "payment-success-email",
         react: PaymentSuccessEmail({
           businessName: business.name || "there",
-          plan: targetPlan.charAt(0).toUpperCase() + targetPlan.slice(1),
-          amount: `$${Number(finalAmount).toFixed(2)} USD`,
+          plan: activePlan === "growth" ? "Growth" : "Starter",
+          amount: `$${Number(params.amount).toFixed(2)} USD`,
           billingUrl: `${appUrl}/dashboard/billing`,
         }),
       });
+    } catch (error) {
+      logErrorSync(error, "bachs-subscription-confirmation-email", {
+        businessId: transaction.business_id,
+      });
     }
-  } catch (emailErr) {
-    console.error("[activateSubscriptionPlan] Failed to send confirmation email:", emailErr);
   }
-
-  console.log(
-    `[activateSubscriptionPlan] Successfully activated ${targetPlan} for business ${targetBusinessId} (source: ${params.sourceEvent})`
-  );
 
   return {
     success: true,
-    businessId: targetBusinessId,
-    plan: targetPlan,
-    subscriptionId: finalSubscriptionId || "",
-    isUpgraded: previousPlan !== targetPlan,
+    businessId: transaction.business_id,
+    plan: activePlan,
+    subscriptionId: result.subscription_id || null,
+    duplicate: Boolean(result.duplicate),
   };
 }

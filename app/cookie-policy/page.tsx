@@ -104,7 +104,7 @@ export default function CookiePolicyPage() {
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">3. Third Party Services</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              When processing subscriptions or embedding interactive components, authorized third-party processors place cookies under strict safety guidelines. Paystack sets necessary security and fraud cookies to verify card transactions. Resend leverages tokens to format clean welcome mails. We never let marketing pixels crawl your visitor logs or scrape training sets.
+              When processing subscriptions or embedding interactive components, authorized third-party processors may use cookies under strict safety guidelines. Bachs may use security and fraud-prevention cookies during hosted checkout. Resend leverages tokens to format clean welcome mails. We never let marketing pixels crawl your visitor logs or scrape training sets.
             </p>
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">4. Disabling Cookies</h2>

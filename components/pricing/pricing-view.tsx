@@ -596,7 +596,7 @@ export function PricingView({
           </div>
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-indigo-400" />
-            <span>PCI-DSS Compliant via Paystack</span>
+            <span>Secure hosted checkout</span>
           </div>
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-indigo-400" />

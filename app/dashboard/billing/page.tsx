@@ -98,6 +98,11 @@ function StatusBadge({ status }: { status: string }) {
       class: "bg-amber-50 text-amber-700 border-amber-200",
       icon: Clock,
     },
+    pending_payment: {
+      label: "Pending Payment",
+      class: "bg-amber-50 text-amber-700 border-amber-200",
+      icon: Clock,
+    },
     past_due: {
       label: "Past Due",
       class: "bg-red-50 text-red-700 border-red-200",
@@ -161,7 +166,7 @@ export default async function BillingPage({
     checkoutId = resolvedParams.session_id;
   }
 
-  // Resilient fallback: parse malformed URLs like `?status=success?checkout_id=chk_xxx`
+  // Recover the checkout ID if a redirect URL is malformed.
   if (!checkoutId && typeof resolvedParams.status === "string" && resolvedParams.status.includes("checkout_id=")) {
     const match = resolvedParams.status.match(/checkout_id=([a-zA-Z0-9_\-]+)/);
     if (match?.[1]) {
@@ -169,20 +174,14 @@ export default async function BillingPage({
     }
   }
 
-  // If user returns from a checkout session, reconcile immediately with Bachs API
+  let checkoutReconciliation: Awaited<ReturnType<typeof reconcileCheckoutSession>> | null = null;
   if (checkoutId) {
     try {
-      await reconcileCheckoutSession(checkoutId);
+      checkoutReconciliation = await reconcileCheckoutSession(checkoutId);
     } catch (e) {
       console.warn("[BillingPage] Checkout reconciliation warning:", e);
     }
   }
-
-  const isSuccessRedirect =
-    Boolean(checkoutId) ||
-    resolvedParams.status === "success" ||
-    resolvedParams.checkout === "completed" ||
-    (typeof resolvedParams.status === "string" && resolvedParams.status.startsWith("success"));
 
   const [billingData, warnings, history] = await Promise.all([
     getBillingData(),
@@ -209,8 +208,22 @@ export default async function BillingPage({
 
   const { subscription, currentPlan, billingSettings, usage, plans, business } = billingData;
 
+  const isSuccessRedirect =
+    Boolean(
+      checkoutId &&
+        checkoutReconciliation &&
+        "isSuccess" in checkoutReconciliation &&
+        checkoutReconciliation.isSuccess &&
+        "plan" in checkoutReconciliation &&
+        checkoutReconciliation.plan === subscription.plan &&
+        subscription.status === "active"
+    );
+  const isProcessingReturn =
+    Boolean(checkoutId) &&
+    !isSuccessRedirect &&
+    billingData.checkout.state === "processing";
   const isActive = subscription.status === "active";
-  const isPending = subscription.status === "pending";
+  const isPending = billingData.checkout.state === "open";
   const isPastDue = subscription.status === "past_due";
   const hasBachsCustomer = Boolean(subscription.bachs_customer_id);
 
@@ -276,6 +289,18 @@ export default async function BillingPage({
         </div>
       )}
 
+      {isProcessingReturn && (
+        <div className="p-5 bg-blue-50 border border-blue-200 rounded-3xl flex items-start gap-4 shadow-sm">
+          <Clock className="w-6 h-6 text-blue-600 shrink-0 mt-0.5 animate-pulse" />
+          <div>
+            <h4 className="text-sm font-bold text-blue-950">Payment confirmation is processing</h4>
+            <p className="text-xs text-blue-800 mt-0.5 leading-relaxed">
+              Bachs is confirming your checkout. Your plan will update after verification; please do not pay again.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Failed Payment Warning Banner */}
       {isPastDue && (
         <div className="p-6 bg-red-50 border border-red-200 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
@@ -317,6 +342,38 @@ export default async function BillingPage({
               className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-11 px-6 shadow-md"
             />
           </div>
+        </div>
+      )}
+
+      {billingData.checkout.state === "failed" && (
+        <div className="p-5 bg-red-50 border border-red-200 rounded-3xl flex items-start gap-4 shadow-sm">
+          <AlertCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-bold text-red-950">Checkout could not be completed</h4>
+            <p className="text-xs text-red-800 mt-0.5 leading-relaxed">
+              {billingData.checkout.failureReason ||
+                "Bachs did not collect payment for this checkout. Please start a new checkout or contact support."}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {billingData.checkout.state === "expired" && (
+        <div className="p-5 bg-amber-50 border border-amber-200 rounded-3xl flex items-start gap-4 shadow-sm">
+          <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-bold text-amber-950">Checkout expired</h4>
+            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+              No payment was confirmed for this checkout. You can start a new checkout when you are ready.
+            </p>
+          </div>
+          {!isActive && (
+            <UpgradeButton
+              planId={subscription.plan === "growth" ? "growth" : "starter"}
+              label={`Pay ${subscription.plan === "growth" ? "$10.00" : "$2.00"} USD`}
+              className="ml-auto bg-amber-600 hover:bg-amber-700 text-white font-bold h-11 px-6 shadow-md"
+            />
+          )}
         </div>
       )}
 

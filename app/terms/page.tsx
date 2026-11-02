@@ -48,7 +48,7 @@ export default function TermsPage() {
               Agentify operates subscription packages (Starter, Growth, Enterprise).
             </p>
             <ul className="list-disc pl-6 text-slate-600 text-sm space-y-3 mb-6">
-              <li>Payments are processed securely via card, bank transfer, or USSD using our merchant gateway integration (Paystack).</li>
+              <li>Paid subscriptions are processed securely in USD through Bachs hosted checkout.</li>
               <li>Charges occur monthly based on the active tier. You can upgrade, downgrade, or cancel your renewal at any time directly through the Billing dashboard.</li>
               <li>Subscriptions are subject to monthly message or assistant quotas. Excess allocations require tier upgrades.</li>
               <li>Refunds are reviewed individually. Cancelled subscriptions remain active until the close of the current billing timeline.</li>

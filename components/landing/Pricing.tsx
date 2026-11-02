@@ -11,7 +11,6 @@ const planMeta: Record<"starter" | "growth" | "enterprise", {
   badge?: string;
   tagline: string;
   usdPrice: string;
-  ngnPrice: string;
   period: string;
   buttonText: string;
   href: string;
@@ -25,7 +24,6 @@ const planMeta: Record<"starter" | "growth" | "enterprise", {
   starter: {
     tagline: "Perfect for individuals, creators, and small stores launching AI customer engagement.",
     usdPrice: "$2",
-    ngnPrice: "₦3,200",
     period: "/month",
     buttonText: "Get Started with Starter",
     href: "/signup?plan=starter",
@@ -40,7 +38,6 @@ const planMeta: Record<"starter" | "growth" | "enterprise", {
     badge: "Most Popular",
     tagline: "Ideal for growing businesses that require multi-agent capacity and brand control.",
     usdPrice: "$10",
-    ngnPrice: "₦16,000",
     period: "/month",
     buttonText: "Scale with Growth",
     href: "/signup?plan=growth",
@@ -55,7 +52,6 @@ const planMeta: Record<"starter" | "growth" | "enterprise", {
     badge: "Custom Scale",
     tagline: "Tailored volume, dedicated architecture, custom SLA, and hands-on onboarding.",
     usdPrice: "Custom",
-    ngnPrice: "Tailored",
     period: "",
     buttonText: "Contact Enterprise Sales",
     href: "mailto:sales@agentify.app?subject=Agentify%20Enterprise%20Plan%20Inquiry",
@@ -83,7 +79,7 @@ const faqs = [
   },
   {
     question: "What payment methods do you accept?",
-    answer: "We accept all major debit cards, credit cards, bank transfers, and USSD via our secure payment gateway (Paystack), supporting both NGN and USD transactions.",
+    answer: "Paid plans are billed in USD through Bachs hosted checkout.",
   },
 ];
 
@@ -159,11 +155,6 @@ export async function Pricing() {
                       {meta.period && (
                         <span className="text-sm font-medium text-slate-400">
                           {meta.period}
-                        </span>
-                      )}
-                      {meta.ngnPrice && (
-                        <span className="text-xs font-semibold text-indigo-300/80 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
-                          {meta.ngnPrice}/mo
                         </span>
                       )}
                     </div>

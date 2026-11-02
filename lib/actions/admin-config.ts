@@ -339,39 +339,6 @@ export async function testSmtpConfig(toEmail: string) {
 }
 
 /**
- * Tests Paystack integration credentials by sending a connectivity request.
- */
-export async function testPaystackConfig() {
-  const admin = await requireAdmin();
-
-  const secretKey = await getSecretWithEnvFallback("paystack", "secret_key", "PAYSTACK_SECRET_KEY");
-  if (!secretKey || secretKey.includes("placeholder")) {
-    throw new Error("Paystack Secret Key is not configured.");
-  }
-
-  // Send request to Paystack's verify endpoint or list customers (minimum response payload)
-  const response = await fetch("https://api.paystack.co/customer", {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${secretKey}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || (data.status === false)) {
-    throw new Error(data.message || "Failed to establish a successful connection to Paystack.");
-  }
-
-  await writeAuditLog(admin.id, "test_paystack_config", "paystack", "secret_key", {
-    success: true,
-  });
-
-  return { success: true };
-}
-
-/**
  * Tests Flutterwave integration credentials by sending a connectivity request.
  */
 export async function testFlutterwaveConfig() {

@@ -197,7 +197,7 @@ export default function BlogPage() {
               <div className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
                 <h4 className="font-bold text-slate-900 mb-4 text-sm uppercase tracking-wider">Search Keywords</h4>
                 <div className="flex flex-wrap gap-2">
-                  {["#PromptGrounding", "#SupabaseVector", "#PaystackIntegration", "#WidgetStyling", "#LeadScrapers", "#AISupport", "#AgencyHacks", "#TikTokLaunch"].map(tag => (
+                  {["#PromptGrounding", "#SupabaseVector", "#WidgetStyling", "#LeadScrapers", "#AISupport", "#AgencyHacks", "#TikTokLaunch"].map(tag => (
                     <span key={tag} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-500 hover:border-indigo-200 hover:text-indigo-600 cursor-default transition-all">
                       {tag}
                     </span>

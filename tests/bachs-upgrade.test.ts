@@ -1,239 +1,182 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { activateSubscriptionPlan, resolvePlanFromProductId } from "@/lib/billing/upgrade";
+import { getEffectivePlanConfig, getEffectivePlanLimits } from "@/lib/billing/platform";
 import { createServiceClient } from "@/utils/supabase/service";
+
+const fixtures = vi.hoisted(() => ({
+  transaction: {
+    id: "tx-growth",
+    business_id: "biz-456",
+    plan: "growth",
+    provider: "bachs",
+    status: "pending",
+    checkout_id: "chk-growth",
+    reference: "agentify-growth-reference",
+    raw_response: {
+      product_id: "prod-growth",
+      user_id: "usr-123",
+      business_id: "biz-456",
+      plan: "growth",
+    },
+  },
+  business: {
+    id: "biz-456",
+    owner_id: "usr-123",
+    name: "Test Corp",
+    contact_email: null,
+  },
+  rpc: vi.fn(),
+}));
 
 vi.mock("@/utils/supabase/service", () => ({
   createServiceClient: vi.fn(),
+}));
+
+vi.mock("@/lib/billing/platform", () => ({
+  getEffectivePlanConfig: vi.fn(async (plan: "starter" | "growth") => ({
+    name: plan === "growth" ? "Growth" : "Starter",
+    price_usd: plan === "growth" ? 10 : 2,
+    amount_decimal: plan === "growth" ? "10.00" : "2.00",
+    bachs_product_id: plan === "growth" ? "prod-growth" : "prod-starter",
+  })),
+  getEffectivePlanLimits: vi.fn(async (plan: "starter" | "growth") => ({
+    message_limit: plan === "growth" ? 1500 : 200,
+    knowledge_limit: plan === "growth" ? 100 : 25,
+    lead_limit: plan === "growth" ? 500 : 50,
+    widget_limit: plan === "growth" ? 3 : 1,
+    embedding_limit: plan === "growth" ? 30000 : 5000,
+    daily_message_limit: plan === "growth" ? 500 : 100,
+    team_member_limit: plan === "growth" ? 5 : 1,
+  })),
 }));
 
 vi.mock("@/lib/email/send-email", () => ({
   sendTransactionalEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-vi.mock("next/cache", () => ({
-  revalidatePath: vi.fn(),
-}));
-
 vi.mock("@/lib/config/platform-config", () => ({
   getConfig: vi.fn().mockResolvedValue("https://agentify.app"),
 }));
 
-describe("Bachs Subscription Upgrade Engine", () => {
-  const mockBusinessId = "biz-456";
-  const mockUserId = "usr-123";
-  const mockCheckoutId = "cs_test_growth_789";
-  const mockCustomerId = "cust_bachs_999";
-  const mockSubscriptionId = "sub_bachs_888";
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
 
-  let mockSubscriptionsTable: Record<string, any>;
-  let mockTransactionsTable: Record<string, any>;
+function createMockServiceClient() {
+  return {
+    from: vi.fn((table: string) => {
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        maybeSingle: vi.fn(async () => ({
+          data: table === "payment_transactions" ? fixtures.transaction : fixtures.business,
+          error: null,
+        })),
+      };
+      return query;
+    }),
+    rpc: fixtures.rpc,
+  };
+}
 
+describe("Bachs subscription activation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.BACHS_GROWTH_PRODUCT_ID = "prod_growth_test";
-    process.env.BACHS_STARTER_PRODUCT_ID = "prod_starter_test";
-
-    // Initial state: user is on Starter plan
-    mockSubscriptionsTable = {
-      id: "sub-record-1",
-      business_id: mockBusinessId,
-      plan: "starter",
-      status: "pending",
-      payment_provider: "bachs",
-      message_limit: 200,
-      knowledge_limit: 25,
-      lead_limit: 50,
-      widget_limit: 1,
-      embedding_limit: 5000,
-      updated_at: "2026-11-01T10:00:00.000Z",
-    };
-
-    mockTransactionsTable = {
-      id: "tx-1",
-      business_id: mockBusinessId,
-      checkout_id: mockCheckoutId,
+    fixtures.transaction.plan = "growth";
+    fixtures.transaction.checkout_id = "chk-growth";
+    fixtures.transaction.reference = "agentify-growth-reference";
+    fixtures.transaction.raw_response = {
+      product_id: "prod-growth",
+      user_id: "usr-123",
+      business_id: "biz-456",
       plan: "growth",
-      amount: 10,
-      currency: "USD",
-      status: "pending",
     };
-
-    const mockSupabase = {
-      from: vi.fn((table: string) => {
-        if (table === "subscriptions") {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn((col: string, val: string) => ({
-                maybeSingle: vi.fn().mockResolvedValue({ data: mockSubscriptionsTable, error: null }),
-              })),
-              or: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({ data: mockSubscriptionsTable, error: null }),
-              })),
-            })),
-            update: vi.fn((updates: any) => ({
-              eq: vi.fn((col: string, val: string) => {
-                Object.assign(mockSubscriptionsTable, updates);
-                return Promise.resolve({ data: mockSubscriptionsTable, error: null });
-              }),
-            })),
-            insert: vi.fn((data: any) => {
-              mockSubscriptionsTable = { id: "sub-new", ...data };
-              return {
-                select: vi.fn(() => ({
-                  single: vi.fn().mockResolvedValue({ data: mockSubscriptionsTable, error: null }),
-                })),
-              };
-            }),
-          };
-        }
-
-        if (table === "payment_transactions") {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn((col: string, val: string) => ({
-                maybeSingle: vi.fn().mockResolvedValue({ data: mockTransactionsTable, error: null }),
-              })),
-            })),
-            update: vi.fn((updates: any) => ({
-              eq: vi.fn((col: string, val: string) => {
-                Object.assign(mockTransactionsTable, updates);
-                return Promise.resolve({ data: mockTransactionsTable, error: null });
-              }),
-            })),
-            insert: vi.fn((data: any) => Promise.resolve({ data, error: null })),
-          };
-        }
-
-        if (table === "businesses") {
-          return {
-            select: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                maybeSingle: vi.fn().mockResolvedValue({
-                  data: { id: mockBusinessId, name: "Test Corp", contact_email: "test@corp.com" },
-                  error: null,
-                }),
-              })),
-            })),
-          };
-        }
-
-        return {
-          select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis(),
-          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-        };
-      }),
-    };
-
-    vi.mocked(createServiceClient).mockReturnValue(mockSupabase as any);
-  });
-
-  it("should resolve plan from product ID correctly", async () => {
-    expect(await resolvePlanFromProductId("prod_growth_test")).toBe("growth");
-    expect(await resolvePlanFromProductId("prod_starter_test")).toBe("starter");
-    expect(await resolvePlanFromProductId("unknown_prod")).toBe(null);
-  });
-
-  it("should upgrade a Starter user to Growth plan with verified quotas", async () => {
-    const result = await activateSubscriptionPlan({
-      businessId: mockBusinessId,
-      userId: mockUserId,
-      plan: "growth",
-      customerId: mockCustomerId,
-      subscriptionId: mockSubscriptionId,
-      checkoutId: mockCheckoutId,
-      amount: 10,
-      sourceEvent: "collection.succeeded",
+    fixtures.business.owner_id = "usr-123";
+    fixtures.rpc.mockResolvedValue({
+      data: { plan: "growth", subscription_id: "sub-row-1", duplicate: false },
+      error: null,
     });
-
-    expect(result.success).toBe(true);
-    expect(result.plan).toBe("growth");
-    expect(result.isUpgraded).toBe(true);
-
-    // Verify subscription was upgraded to growth
-    expect(mockSubscriptionsTable.plan).toBe("growth");
-    expect(mockSubscriptionsTable.status).toBe("active");
-    expect(mockSubscriptionsTable.bachs_customer_id).toBe(mockCustomerId);
-    expect(mockSubscriptionsTable.bachs_subscription_id).toBe(mockSubscriptionId);
-    expect(mockSubscriptionsTable.billing_amount).toBe(10);
-    expect(mockSubscriptionsTable.billing_currency).toBe("USD");
-
-    // Verify Growth limits were applied immediately (1500 messages, 3 widgets, 100 knowledge sources)
-    expect(mockSubscriptionsTable.message_limit).toBe(1500);
-    expect(mockSubscriptionsTable.widget_limit).toBe(3);
-    expect(mockSubscriptionsTable.knowledge_limit).toBe(100);
-
-    // Verify transaction status changed to success
-    expect(mockTransactionsTable.status).toBe("success");
-    expect(mockTransactionsTable.plan).toBe("growth");
+    vi.mocked(createServiceClient).mockReturnValue(createMockServiceClient() as never);
   });
 
-  it("should handle collection.succeeded arriving before checkout.completed cleanly", async () => {
-    // 1. collection.succeeded arrives first
-    const firstResult = await activateSubscriptionPlan({
-      checkoutId: mockCheckoutId,
-      chargeId: "ch_test_123",
-      amount: 10,
-      customerId: mockCustomerId,
-      subscriptionId: mockSubscriptionId,
+  it("resolves plans only from configured Bachs products", async () => {
+    expect(await resolvePlanFromProductId("prod-growth")).toBe("growth");
+    expect(await resolvePlanFromProductId("prod-starter")).toBe("starter");
+    expect(await resolvePlanFromProductId("unknown-product")).toBeNull();
+  });
+
+  it("activates only a matching, paid Growth checkout through the atomic RPC", async () => {
+    const result = await activateSubscriptionPlan({
+      eventId: "evt-1",
       eventTimestamp: "2026-11-01T11:00:00.000Z",
+      checkoutId: "chk-growth",
+      reference: "agentify-growth-reference",
+      productId: "prod-growth",
+      customerId: "cus-1",
+      subscriptionId: "sub-1",
+      amount: "10.00",
+      currency: "USD",
       sourceEvent: "collection.succeeded",
     });
 
-    expect(firstResult.success).toBe(true);
-    expect(firstResult.plan).toBe("growth");
-    expect(mockSubscriptionsTable.plan).toBe("growth");
-    expect(mockSubscriptionsTable.status).toBe("active");
-
-    // 2. checkout.completed arrives second
-    const secondResult = await activateSubscriptionPlan({
-      businessId: mockBusinessId,
-      checkoutId: mockCheckoutId,
+    expect(result).toEqual({
+      success: true,
+      businessId: "biz-456",
       plan: "growth",
-      customerId: mockCustomerId,
-      subscriptionId: mockSubscriptionId,
-      amount: 10,
-      eventTimestamp: "2026-11-01T11:00:01.000Z",
-      sourceEvent: "checkout.completed",
+      subscriptionId: "sub-row-1",
+      duplicate: false,
     });
-
-    expect(secondResult.success).toBe(true);
-    expect(secondResult.plan).toBe("growth");
-    expect(mockSubscriptionsTable.plan).toBe("growth");
+    expect(fixtures.rpc).toHaveBeenCalledWith(
+      "apply_bachs_checkout_payment",
+      expect.objectContaining({
+        p_event_id: "evt-1",
+        p_transaction_id: "tx-growth",
+        p_product_id: "prod-growth",
+        p_amount: 10,
+        p_currency: "USD",
+        p_limits: expect.objectContaining({ widget_limit: 3, message_limit: 1500 }),
+      })
+    );
+    expect(getEffectivePlanLimits).toHaveBeenCalledWith("growth");
   });
 
-  it("should not allow an older Starter event to downgrade an active Growth subscription", async () => {
-    // Current state is Growth at 11:05
-    mockSubscriptionsTable.plan = "growth";
-    mockSubscriptionsTable.status = "active";
-    mockSubscriptionsTable.updated_at = "2026-11-01T11:05:00.000Z";
+  it("rejects a checkout ID paired with another transaction reference", async () => {
+    await expect(
+      activateSubscriptionPlan({
+        eventId: "evt-mismatch",
+        eventTimestamp: "2026-11-01T11:00:00.000Z",
+        checkoutId: "chk-growth",
+        reference: "wrong-reference",
+        amount: "10.00",
+        currency: "USD",
+        sourceEvent: "checkout.completed",
+      })
+    ).rejects.toThrow("No Agentify checkout transaction matches");
 
-    // Delayed old event from 10:55 arrived saying starter
-    const result = await activateSubscriptionPlan({
-      businessId: mockBusinessId,
-      plan: "starter",
-      amount: 2,
-      eventTimestamp: "2026-11-01T10:55:00.000Z",
-      sourceEvent: "customer.subscription.updated",
-    });
-
-    expect(result.success).toBe(true);
-    // Should preserve Growth and NOT regress to Starter
-    expect(result.plan).toBe("growth");
-    expect(mockSubscriptionsTable.plan).toBe("growth");
+    expect(fixtures.rpc).not.toHaveBeenCalled();
   });
 
-  it("should resolve plan to Growth when checkoutId matches a growth transaction", async () => {
-    // Event doesn't explicitly pass plan, but transaction has plan = growth
-    const result = await activateSubscriptionPlan({
-      checkoutId: mockCheckoutId,
-      amount: 10,
-      customerId: mockCustomerId,
-      sourceEvent: "collection.succeeded",
-    });
+  it("rejects mismatched amount, product, or business owner before activation", async () => {
+    const validParams = {
+      eventId: "evt-2",
+      eventTimestamp: "2026-11-01T11:00:00.000Z",
+      checkoutId: "chk-growth",
+      reference: "agentify-growth-reference",
+      productId: "prod-growth",
+      amount: "10.00",
+      currency: "USD",
+      sourceEvent: "checkout.completed" as const,
+    };
 
-    expect(result.success).toBe(true);
-    expect(result.plan).toBe("growth");
-    expect(mockSubscriptionsTable.plan).toBe("growth");
+    await expect(
+      activateSubscriptionPlan({ ...validParams, amount: "2.00" })
+    ).rejects.toThrow("amount does not match");
+    await expect(
+      activateSubscriptionPlan({ ...validParams, productId: "prod-starter" })
+    ).rejects.toThrow("product does not match");
+
+    fixtures.business.owner_id = "different-user";
+    await expect(activateSubscriptionPlan(validParams)).rejects.toThrow("business owner");
+    expect(fixtures.rpc).not.toHaveBeenCalled();
   });
 });

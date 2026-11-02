@@ -77,6 +77,13 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
 
     return matchesSearch && matchesPlan && matchesStatus && matchesProvider;
   });
+  const providers = Array.from(
+    new Set(
+      subscriptions
+        .map((subscription) => subscription.payment_provider || "manual")
+        .filter(Boolean)
+    )
+  ) as string[];
 
   const triggerToast = (type: "success" | "error", msg: string) => {
     if (type === "success") {
@@ -314,9 +321,11 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
             className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 font-semibold focus:outline-none focus:border-indigo-500"
           >
             <option value="all">All Providers</option>
-            <option value="manual">Manual</option>
-            <option value="paystack">Paystack</option>
-            <option value="flutterwave">Flutterwave</option>
+            {providers.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider}
+              </option>
+            ))}
           </select>
         </div>
       </div>

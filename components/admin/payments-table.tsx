@@ -1,17 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { verifyPaymentReference } from "@/lib/actions/payments";
 import {
   Search,
-  CreditCard,
-  RefreshCw,
   Eye,
   Calendar,
   X,
-  Loader2,
   Code,
-  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,13 +15,11 @@ interface PaymentsTableProps {
 }
 
 export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
-  const [payments, setPayments] = useState(initialPayments);
+  const payments = initialPayments;
   const [searchTerm, setSearchTerm] = useState("");
   const [providerFilter, setProviderFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [loadingRef, setLoadingRef] = useState<string | null>(null);
   const [selectedResponse, setSelectedResponse] = useState<any | null>(null);
-  const [alertMessage, setAlertMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Search & Filter Logic
   const filtered = payments.filter((tx) => {
@@ -39,34 +32,9 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
 
     return matchesSearch && matchesProvider && matchesStatus;
   });
-
-  const handleReverify = async (reference: string) => {
-    setLoadingRef(reference);
-    setAlertMessage(null);
-    try {
-      const result = await verifyPaymentReference(reference);
-      if ("isSuccess" in result && result.isSuccess) {
-        setAlertMessage({
-          type: "success",
-          text: `Transaction ${reference} verified successfully! Status: UPGRADED`,
-        });
-
-        // Update local state
-        setPayments((prev) =>
-          prev.map((tx) => (tx.reference === reference ? { ...tx, status: "success" } : tx))
-        );
-      } else {
-        throw new Error(("error" in result && result.error) || "Failed to verify transaction.");
-      }
-    } catch (err: any) {
-      setAlertMessage({
-        type: "error",
-        text: err.message || "An unexpected error occurred during reverification.",
-      });
-    } finally {
-      setLoadingRef(null);
-    }
-  };
+  const providers = Array.from(
+    new Set(payments.map((payment) => payment.provider).filter(Boolean))
+  ) as string[];
 
   return (
     <div className="space-y-6">
@@ -91,8 +59,11 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
             className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-300 font-semibold focus:outline-none focus:border-indigo-500"
           >
             <option value="all">All Providers</option>
-            <option value="paystack">Paystack</option>
-            <option value="flutterwave">Flutterwave</option>
+            {providers.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider}
+              </option>
+            ))}
           </select>
 
           {/* Status Filter */}
@@ -108,18 +79,6 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
           </select>
         </div>
       </div>
-
-      {alertMessage && (
-        <div
-          className={`p-4 border rounded-2xl text-xs font-semibold ${
-            alertMessage.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-              : "bg-red-500/10 border-red-500/20 text-red-400"
-          }`}
-        >
-          {alertMessage.text}
-        </div>
-      )}
 
       {/* Main Ledger Table Panel */}
       <div className="bg-slate-950 border border-slate-800 rounded-3xl overflow-hidden">
@@ -161,7 +120,9 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
                         {tx.plan}
                       </td>
                       <td className="py-4 px-6 font-black text-white text-sm whitespace-nowrap">
-                        ₦{tx.amount.toLocaleString()}
+                        {tx.currency === "USD"
+                          ? `$${Number(tx.billing_amount ?? tx.amount).toFixed(2)} USD`
+                          : `₦${tx.amount.toLocaleString()}`}
                       </td>
                       <td className="py-4 px-6 whitespace-nowrap">
                         <span
@@ -193,24 +154,6 @@ export function PaymentsTable({ initialPayments }: PaymentsTableProps) {
                           <Eye className="w-3.5 h-3.5" />
                         </Button>
 
-                        {/* Reverify trigger button */}
-                        {tx.status === "pending" && (
-                          <Button
-                            onClick={() => handleReverify(tx.reference)}
-                            disabled={loadingRef === tx.reference}
-                            variant="ghost"
-                            className="rounded-xl h-9 text-[10px] font-bold uppercase tracking-wider border border-indigo-500/20 text-indigo-400 hover:border-indigo-500/40 hover:bg-slate-900"
-                          >
-                            {loadingRef === tx.reference ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <>
-                                <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                                Verify
-                              </>
-                            )}
-                          </Button>
-                        )}
                       </td>
                     </tr>
                   );

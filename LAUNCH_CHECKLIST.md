@@ -1,6 +1,6 @@
 # Agentify Launch Checklist
 
-Use this after the production deployment is live. Test with a real production domain, real Supabase project, real Resend sender, and Paystack test or live mode as appropriate.
+Use this after the production deployment is live. Test with a real production domain, real Supabase project, real Resend sender, and Bachs sandbox credentials before enabling live payments.
 
 ## Core Auth
 
@@ -39,11 +39,12 @@ Use this after the production deployment is live. Test with a real production do
 
 ## Payments
 
-- [ ] Paystack checkout opens
-- [ ] Payment callback verifies `reference` or `trxref`
-- [ ] Paystack webhook rejects invalid signatures
-- [ ] Payment verification
-- [ ] Subscription updates idempotently
+- [ ] Bachs hosted checkout opens in USD
+- [ ] An open checkout is reused instead of creating a duplicate
+- [ ] Bachs webhook rejects invalid signatures
+- [ ] A completed checkout with `no_payment_required` does not activate a paid plan
+- [ ] A provider-confirmed payment activates the matching plan and limits
+- [ ] Duplicate and out-of-order Bachs events are handled idempotently
 
 ## Supabase
 
