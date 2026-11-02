@@ -106,10 +106,12 @@ export async function POST(request: Request) {
           (typeof charge.customer === "string" ? charge.customer : null);
         const reference = charge.reference || null;
 
-        // Bachs may send amount in minor units (cents). Normalise to dollars.
-        // $10 = 1000 cents. If amount > 100, assume it's in cents.
+        // Bachs sends decimal amounts (e.g. "2.00", "10.00"). If sent in minor cents (e.g. 1000 without decimal), normalize.
         const rawAmount = Number(charge.amount) || 0;
-        const amount = rawAmount > 100 ? rawAmount / 100 : rawAmount || null;
+        const amount =
+          rawAmount >= 100 && !String(charge.amount).includes(".")
+            ? rawAmount / 100
+            : rawAmount || null;
 
         // Look up metadata from the pending transaction to get the correct plan.
         // The charge payload often lacks plan/productId — the pending transaction has it.

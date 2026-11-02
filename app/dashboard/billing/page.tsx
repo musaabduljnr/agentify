@@ -149,24 +149,40 @@ export default async function BillingPage({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const resolvedParams = searchParams ? await searchParams : {};
-  const showSuccess = resolvedParams.status === "success";
+  
   // Bachs appends `checkout_id` to the redirect URL (not `session_id` which is a Stripe convention).
-  // We also fall back to `session_id` in case the SDK behaviour changes.
-  const checkoutId =
-    (typeof resolvedParams.checkout_id === "string" ? resolvedParams.checkout_id : undefined) ||
-    (typeof resolvedParams.session_id === "string" &&
+  let checkoutId: string | undefined = undefined;
+  if (typeof resolvedParams.checkout_id === "string") {
+    checkoutId = resolvedParams.checkout_id;
+  } else if (
+    typeof resolvedParams.session_id === "string" &&
     !resolvedParams.session_id.includes("{CHECKOUT_SESSION_ID}")
-      ? resolvedParams.session_id
-      : undefined);
+  ) {
+    checkoutId = resolvedParams.session_id;
+  }
 
-  // If user returns from a successful checkout, reconcile immediately with Bachs API
-  if (showSuccess && checkoutId) {
+  // Resilient fallback: parse malformed URLs like `?status=success?checkout_id=chk_xxx`
+  if (!checkoutId && typeof resolvedParams.status === "string" && resolvedParams.status.includes("checkout_id=")) {
+    const match = resolvedParams.status.match(/checkout_id=([a-zA-Z0-9_\-]+)/);
+    if (match?.[1]) {
+      checkoutId = match[1];
+    }
+  }
+
+  // If user returns from a checkout session, reconcile immediately with Bachs API
+  if (checkoutId) {
     try {
       await reconcileCheckoutSession(checkoutId);
     } catch (e) {
       console.warn("[BillingPage] Checkout reconciliation warning:", e);
     }
   }
+
+  const isSuccessRedirect =
+    Boolean(checkoutId) ||
+    resolvedParams.status === "success" ||
+    resolvedParams.checkout === "completed" ||
+    (typeof resolvedParams.status === "string" && resolvedParams.status.startsWith("success"));
 
   const [billingData, warnings, history] = await Promise.all([
     getBillingData(),
@@ -248,7 +264,7 @@ export default async function BillingPage({
       </div>
 
       {/* Payment Success Toast Banner */}
-      {showSuccess && (
+      {isSuccessRedirect && (
         <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-3xl flex items-start gap-4 shadow-sm animate-in fade-in">
           <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
           <div>

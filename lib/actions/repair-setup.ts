@@ -59,6 +59,10 @@ export async function repairCurrentBusinessSetup() {
         business_id: businessId,
         plan: "starter",
         status: "pending",
+        payment_provider: "bachs",
+        provider: "bachs",
+        billing_currency: "USD",
+        billing_amount: 2.00,
         message_limit: 200,
         current_usage: 0,
       });

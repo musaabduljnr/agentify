@@ -13,7 +13,7 @@ import { type PlanId } from "@/lib/billing/plans";
 import {
   getEffectivePlanConfig,
 } from "@/lib/billing/platform";
-import { activateSubscriptionPlan } from "@/lib/billing/upgrade";
+import { activateSubscriptionPlan, resolvePlanFromProductId } from "@/lib/billing/upgrade";
 import { revalidatePath } from "next/cache";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { getConfig } from "@/lib/config/platform-config";
@@ -100,8 +100,8 @@ export async function createCheckoutSession(
 
     const appBaseUrl = await getAppBaseUrl();
     // Bachs automatically appends ?checkout_id=chk_xxx to the success URL.
-    // Do NOT use {CHECKOUT_SESSION_ID} - that is a Stripe-only convention and Bachs will NOT substitute it.
-    const successUrl = `${appBaseUrl}/dashboard/billing?status=success`;
+    // Providing a clean base URL ensures standard `?checkout_id=...` parameter format.
+    const successUrl = `${appBaseUrl}/dashboard/billing`;
     const cancelUrl = `${appBaseUrl}/dashboard/billing?status=cancelled`;
 
     // 5. Generate durable reference and initialize Bachs checkout session
@@ -318,7 +318,16 @@ export async function reconcileCheckoutSession(checkoutId: string) {
         ? (session as any).subscription
         : ((session as any).subscription?.id || null);
     const productId = (session as any).product_cart?.[0]?.product_id || null;
-    const plan = metadata.plan || (productId === process.env.BACHS_GROWTH_PRODUCT_ID ? "growth" : "starter");
+    let plan = metadata.plan;
+    if (!plan && productId) {
+      plan = await resolvePlanFromProductId(productId);
+    }
+    if (!plan && session.amount) {
+      const amt = Number(session.amount);
+      if (amt >= 9.0) plan = "growth";
+      else plan = "starter";
+    }
+    if (!plan) plan = "starter";
 
     const result = await activateSubscriptionPlan({
       businessId: metadata.business_id || null,

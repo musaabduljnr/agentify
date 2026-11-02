@@ -728,6 +728,10 @@ export async function claimDemoAssistant(slug: string, userId: string) {
         business_id: demo.placeholder_business_id,
         plan: "starter",
         status: "pending",
+        payment_provider: "bachs",
+        provider: "bachs",
+        billing_currency: "USD",
+        billing_amount: 2.00,
         message_limit: 200,
         current_usage: 0,
       });
@@ -737,6 +741,10 @@ export async function claimDemoAssistant(slug: string, userId: string) {
         .update({
           plan: "starter",
           status: "pending",
+          payment_provider: "bachs",
+          provider: "bachs",
+          billing_currency: "USD",
+          billing_amount: 2.00,
         })
         .eq("business_id", demo.placeholder_business_id);
     }
