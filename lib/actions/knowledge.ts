@@ -8,8 +8,15 @@ import type { KnowledgeSource } from "@/lib/types";
 import { scrapeUrl } from "@/lib/scraper/scrape-url";
 import { crawlWebsite } from "@/lib/scraper/crawl-website";
 import { generateEmbedding } from "@/lib/vertex/embeddings";
-import { chunkText, estimateTokens } from "@/lib/embeddings/chunker";
-import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
+import { chunkText } from "@/lib/embeddings/chunker";
+import { generateEmbeddingsForSourceInternal } from "@/lib/embeddings/generate-source";
+import {
+  completeUsageQuota,
+  getQuotaDenialMessage,
+  releaseUsageQuota,
+  reserveUsageQuota,
+} from "@/lib/billing/usage";
+import { requireBusinessEntitlement } from "@/lib/billing/entitlements";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { validateFileUpload } from "@/lib/security/file-upload";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
@@ -105,10 +112,11 @@ export async function createWebsiteSource(formData: {
   const business = await getCurrentBusiness();
   const supabase = await createClient();
 
-  // Check knowledge source limit
-  const limitCheck = await checkUsageLimit(business.id, "knowledge_source");
-  if (!limitCheck.allowed) {
-    return { error: "You've reached your knowledge source limit for this plan. Please upgrade to add more." };
+  const { reservation, reason } = await reserveUsageQuota(business.id, "knowledge_source", 1, {
+    type: "website",
+  });
+  if (!reservation) {
+    return { error: getQuotaDenialMessage(reason, "knowledge source") };
   }
 
   const { data, error } = await supabase.from("knowledge_sources").insert({
@@ -123,8 +131,11 @@ export async function createWebsiteSource(formData: {
     crawl_status: "not_started",
   }).select("id").single();
 
-  if (error || !data) return { error: error?.message || "Failed to create knowledge source." };
-  await incrementUsage(business.id, "knowledge_source", 1, { type: "website", title: parsed.data.title });
+  if (error || !data) {
+    await releaseUsageQuota(reservation);
+    return { error: error?.message || "Failed to create knowledge source." };
+  }
+  await completeUsageQuota(reservation);
   revalidatePath("/dashboard/knowledge");
   return { success: true, id: data.id };
 }
@@ -136,10 +147,11 @@ export async function createFaqSource(formData: { question: string; answer: stri
   const business = await getCurrentBusiness();
   const supabase = await createClient();
 
-  // Check knowledge source limit
-  const limitCheck = await checkUsageLimit(business.id, "knowledge_source");
-  if (!limitCheck.allowed) {
-    return { error: "You've reached your knowledge source limit for this plan. Please upgrade to add more." };
+  const { reservation, reason } = await reserveUsageQuota(business.id, "knowledge_source", 1, {
+    type: "faq",
+  });
+  if (!reservation) {
+    return { error: getQuotaDenialMessage(reason, "knowledge source") };
   }
 
   const content = `Question: ${parsed.data.question}\nAnswer: ${parsed.data.answer}`;
@@ -152,8 +164,11 @@ export async function createFaqSource(formData: { question: string; answer: stri
     status: "trained",
   });
 
-  if (error) return { error: error.message };
-  await incrementUsage(business.id, "knowledge_source", 1, { type: "faq", title: parsed.data.question });
+  if (error) {
+    await releaseUsageQuota(reservation);
+    return { error: error.message };
+  }
+  await completeUsageQuota(reservation);
   revalidatePath("/dashboard/knowledge");
   return { success: true };
 }
@@ -165,10 +180,11 @@ export async function createManualSource(formData: { title: string; content: str
   const business = await getCurrentBusiness();
   const supabase = await createClient();
 
-  // Check knowledge source limit
-  const limitCheck = await checkUsageLimit(business.id, "knowledge_source");
-  if (!limitCheck.allowed) {
-    return { error: "You've reached your knowledge source limit for this plan. Please upgrade to add more." };
+  const { reservation, reason } = await reserveUsageQuota(business.id, "knowledge_source", 1, {
+    type: "manual",
+  });
+  if (!reservation) {
+    return { error: getQuotaDenialMessage(reason, "knowledge source") };
   }
 
   const { error } = await supabase.from("knowledge_sources").insert({
@@ -179,8 +195,11 @@ export async function createManualSource(formData: { title: string; content: str
     status: "trained",
   });
 
-  if (error) return { error: error.message };
-  await incrementUsage(business.id, "knowledge_source", 1, { type: "manual", title: parsed.data.title });
+  if (error) {
+    await releaseUsageQuota(reservation);
+    return { error: error.message };
+  }
+  await completeUsageQuota(reservation);
   revalidatePath("/dashboard/knowledge");
   return { success: true };
 }
@@ -192,6 +211,7 @@ export async function getSignedUploadUrlAction(formData: {
 }) {
   try {
     const business = await getCurrentBusiness();
+    await requireBusinessEntitlement(business.id, "canAddKnowledge");
     
     const fileValidation = validateFileUpload(formData.fileName, formData.fileType, formData.fileSize);
     if (!fileValidation.valid) {
@@ -245,10 +265,11 @@ export async function createDocumentSource(formData: {
     return { error: fileValidation.error || "Invalid file upload." };
   }
 
-  // Check knowledge source limit
-  const limitCheck = await checkUsageLimit(business.id, "knowledge_source");
-  if (!limitCheck.allowed) {
-    return { error: "You've reached your knowledge source limit for this plan. Please upgrade to add more." };
+  const { reservation, reason } = await reserveUsageQuota(business.id, "knowledge_source", 1, {
+    type: "document",
+  });
+  if (!reservation) {
+    return { error: getQuotaDenialMessage(reason, "knowledge source") };
   }
 
   const { error } = await supabase.from("knowledge_sources").insert({
@@ -264,8 +285,11 @@ export async function createDocumentSource(formData: {
     status: "pending",
   });
 
-  if (error) return { error: error.message };
-  await incrementUsage(business.id, "knowledge_source", 1, { type: "document", title: parsed.data.title });
+  if (error) {
+    await releaseUsageQuota(reservation);
+    return { error: error.message };
+  }
+  await completeUsageQuota(reservation);
   revalidatePath("/dashboard/knowledge");
   return { success: true };
 }
@@ -318,6 +342,7 @@ export async function deleteKnowledgeSource(id: string) {
 
 export async function processWebsiteSource(sourceId: string) {
   const business = await getCurrentBusiness();
+  await requireBusinessEntitlement(business.id, "canAddKnowledge");
   const supabase = await createClient();
 
   // 1. Fetch the source and verify ownership
@@ -423,6 +448,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
 }) {
   try {
     const business = await getCurrentBusiness();
+    await requireBusinessEntitlement(business.id, "canAddKnowledge");
     const supabase = await createClient();
 
     // 1. Fetch the source and verify ownership
@@ -547,6 +573,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
 
 export async function processDocumentSource(sourceId: string) {
   const business = await getCurrentBusiness();
+  await requireBusinessEntitlement(business.id, "canAddKnowledge");
   const supabase = await createClient();
 
   // 1. Fetch the source and verify ownership
@@ -627,76 +654,6 @@ export async function processDocumentSource(sourceId: string) {
 
 // ── Vector Embeddings ────────────────────────────────────────────────────
 
-export async function generateEmbeddingsForSourceInternal(sourceId: string, businessId: string) {
-  const supabase = createServiceClient();
-  
-  // 1. Fetch source
-  const { data: source, error: fetchError } = await supabase
-    .from("knowledge_sources")
-    .select("*")
-    .eq("id", sourceId)
-    .single();
-
-  if (fetchError || !source) return { error: "Knowledge source not found." };
-  if (!source.content) return { error: "Source has no content to embed." };
-
-  const chunks = chunkText(source.content);
-  if (chunks.length === 0) {
-    const updatedMetadata = {
-      ...(source.metadata || {}),
-      embedded: false,
-      chunk_count: 0,
-      embedding_error: "No usable text chunks were found. Add more source content or reprocess the website.",
-    };
-
-    await supabase
-      .from("knowledge_sources")
-      .update({ metadata: updatedMetadata })
-      .eq("id", sourceId);
-
-    return { error: "No usable text was found to embed." };
-  }
-
-  // 2. Delete existing chunks
-  await supabase.from("knowledge_chunks").delete().eq("source_id", sourceId);
-  
-  // 3. Generate embeddings and insert
-  for (let i = 0; i < chunks.length; i++) {
-    const content = chunks[i];
-    const embedding = await generateEmbedding(content, businessId, "embeddings_generation");
-    
-    const { error: insertError } = await supabase.from("knowledge_chunks").insert({
-      business_id: businessId,
-      source_id: sourceId,
-      content: content,
-      embedding: embedding,
-      chunk_index: i,
-      token_estimate: estimateTokens(content),
-      metadata: {
-        source_type: source.type,
-        source_title: source.title
-      }
-    });
-
-    if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
-  }
-
-  // 4. Update source metadata
-  const updatedMetadata = {
-    ...(source.metadata || {}),
-    embedded: true,
-    embedded_at: new Date().toISOString(),
-    chunk_count: chunks.length
-  };
-
-  await supabase
-    .from("knowledge_sources")
-    .update({ metadata: updatedMetadata })
-    .eq("id", sourceId);
-
-  return { success: true, chunkCount: chunks.length };
-}
-
 export async function generateEmbeddingsForSource(sourceId: string) {
   try {
     const business = await getCurrentBusiness();
@@ -725,23 +682,21 @@ export async function generateEmbeddingsForSource(sourceId: string) {
       return { error: "No usable text was found to embed. Add more content or reprocess this source." };
     }
 
-    const embeddingCheck = await checkUsageLimit(business.id, "embedding");
-    if (!embeddingCheck.allowed) {
-      return { error: "You've reached your embedding limit for this plan. Please upgrade to generate more embeddings." };
-    }
-    if (embeddingCheck.remaining < chunks.length) {
-      return { error: `You need ${chunks.length} embeddings but only have ${embeddingCheck.remaining} remaining. Please upgrade your plan.` };
+    const { reservation, reason } = await reserveUsageQuota(business.id, "embedding", chunks.length, {
+      source_id: sourceId,
+    });
+    if (!reservation) {
+      return { error: getQuotaDenialMessage(reason, `${chunks.length} embeddings`) };
     }
 
     // Call internal generator
     const result = await generateEmbeddingsForSourceInternal(sourceId, business.id);
-    if (result.error) return { error: result.error };
+    if (result.error) {
+      await releaseUsageQuota(reservation);
+      return { error: result.error };
+    }
 
-    // 4. Increment embedding usage by chunk count
-    await incrementUsage(business.id, "embedding", chunks.length, {
-      source_id: sourceId,
-      source_title: source.title,
-    });
+    await completeUsageQuota(reservation);
 
     revalidatePath("/dashboard/knowledge");
     return { success: true, chunkCount: chunks.length };
@@ -753,6 +708,10 @@ export async function generateEmbeddingsForSource(sourceId: string) {
 
 export async function searchKnowledge(query: string, businessId: string) {
   try {
+    const business = await getCurrentBusiness();
+    if (business.id !== businessId) throw new Error("Unauthorized");
+    await requireBusinessEntitlement(business.id, "canUseAi");
+
     // Generate query embedding
     const queryEmbedding = await generateEmbedding(query, businessId, "playground");
 

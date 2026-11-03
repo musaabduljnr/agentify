@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST, MAX_DEMO_AI_REPLIES } from "@/app/api/demo/chat/route";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { createServiceClient } from "@/utils/supabase/service";
-import { runBusinessChat } from "@/lib/actions/chat";
+import { runBusinessChat } from "@/lib/actions/chat/run-business-chat";
 import { retrieveBusinessContext } from "@/lib/ai/rag/retrieve-context";
 import { runResponseQualityChecks } from "@/lib/ai/evaluation/quality-checks";
 import { sendDashboardTestMessage } from "@/lib/actions/chat";
@@ -33,6 +33,10 @@ vi.mock("@/lib/actions/chat", async (importOriginal) => {
     runBusinessChat: vi.fn(),
   };
 });
+
+vi.mock("@/lib/actions/chat/run-business-chat", () => ({
+  runBusinessChat: vi.fn(),
+}));
 
 function createMockSupabase(overrides?: {
   demoResult?: any;

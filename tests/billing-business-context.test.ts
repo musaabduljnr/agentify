@@ -13,6 +13,7 @@ const fixtures = vi.hoisted(() => ({
   getCurrentBusiness: vi.fn(),
   getCurrentPlan: vi.fn(),
   getUsageSummary: vi.fn(),
+  transactionColumns: "",
 }));
 
 vi.mock("@/lib/queries/business", () => ({
@@ -53,7 +54,10 @@ vi.mock("@/utils/supabase/service", () => ({
   createServiceClient: vi.fn(() => ({
     from: vi.fn(() => {
       const query = {
-        select: vi.fn(() => query),
+        select: vi.fn((columns: string) => {
+          fixtures.transactionColumns = columns;
+          return query;
+        }),
         eq: vi.fn(() => query),
         in: vi.fn(() => query),
         not: vi.fn(() => query),
@@ -81,6 +85,7 @@ vi.mock("@/lib/monitoring/log-error", () => ({
 describe("billing business context", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fixtures.transactionColumns = "";
     fixtures.getCurrentBusiness.mockResolvedValue(fixtures.business);
     fixtures.getCurrentPlan.mockResolvedValue({
       subscription: {
@@ -113,6 +118,8 @@ describe("billing business context", () => {
     expect(fixtures.getCurrentBusiness).toHaveBeenCalledOnce();
     expect(fixtures.getCurrentPlan).toHaveBeenCalledWith(fixtures.business.id);
     expect(fixtures.getUsageSummary).toHaveBeenCalledWith(fixtures.business.id);
+    expect(fixtures.transactionColumns).toBe("id, plan, checkout_id, status");
+    expect(fixtures.transactionColumns).not.toContain("failure_reason");
     expect(data).not.toBeNull();
     expect(data?.business.id).toBe(fixtures.business.id);
   });

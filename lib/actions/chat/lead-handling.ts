@@ -4,7 +4,11 @@ import {
   extractLeadInfo, 
   detectConversationIntent 
 } from "@/lib/ai/lead-detection";
-import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
+import {
+  completeUsageQuota,
+  releaseUsageQuota,
+  reserveUsageQuota,
+} from "@/lib/billing/usage";
 import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { NewLeadEmail } from "@/lib/email/templates/new-lead-email";
 import { BookingRequestEmail } from "@/lib/email/templates/booking-request-email";
@@ -143,12 +147,15 @@ export async function processLeadHandling({
       if (existingLead) {
         await supabase.from("leads").update(leadUpdate).eq("id", existingLead.id);
       } else {
-        const leadCheck = await checkUsageLimit(businessId, "lead");
-        if (!leadCheck.allowed) {
+        const { reservation } = await reserveUsageQuota(businessId, "lead", 1, {
+          conversation_id: conversationId,
+        });
+        if (!reservation) {
           metadata.lead_limit_reached = true;
         } else {
           const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
           if (!leadInsertError) {
+            await completeUsageQuota(reservation);
             await sendTransactionalEmail({
               businessId,
               subject: "New lead captured by Agentify",
@@ -163,7 +170,8 @@ export async function processLeadHandling({
                 conversationUrl,
               }),
             });
-            await incrementUsage(businessId, "lead", 1, { conversation_id: conversationId });
+          } else {
+            await releaseUsageQuota(reservation);
           }
         }
       }

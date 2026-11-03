@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { POST } from "@/app/api/widget/chat/route";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { createServiceClient } from "@/utils/supabase/service";
-import { runBusinessChat } from "@/lib/actions/chat";
+import { runBusinessChat } from "@/lib/actions/chat/run-business-chat";
 
 vi.mock("@/lib/security/rate-limit", () => ({
   rateLimit: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock("@/utils/supabase/service", () => ({
   createServiceClient: vi.fn(),
 }));
 
-vi.mock("@/lib/actions/chat", () => ({
+vi.mock("@/lib/actions/chat/run-business-chat", () => ({
   runBusinessChat: vi.fn(),
 }));
 

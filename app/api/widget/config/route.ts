@@ -5,6 +5,7 @@ import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { z } from "zod";
 import { getConfig } from "@/lib/config/platform-config";
+import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
 
 const widgetConfigQuerySchema = z.object({
   businessId: z.string().uuid(),
@@ -55,6 +56,10 @@ export async function GET(req: NextRequest) {
       return jsonWithCors({ error: "Invalid widget config request." }, { status: 400 });
     }
     const { businessId } = parsed.data;
+    const entitlements = await resolveBusinessEntitlements(businessId);
+    if (!entitlements.active) {
+      return jsonWithCors({ error: "An active subscription is required to use this widget." }, { status: 403 });
+    }
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const rl = await rateLimit(`${ip}:${businessId}`, "widget_config");

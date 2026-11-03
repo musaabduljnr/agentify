@@ -58,6 +58,22 @@ vi.mock("@/lib/billing/usage", () => ({
   verifyAIUsageLimits: vi.fn().mockResolvedValue({ allowed: true }),
   checkUsageLimit: vi.fn().mockResolvedValue({ allowed: true, used: 0, limit: 100, remaining: 100 }),
   incrementUsage: vi.fn().mockResolvedValue(undefined),
+  reserveUsageQuota: vi.fn().mockResolvedValue({ reservation: { operationId: "op-1", businessId: "biz-123" } }),
+  completeUsageQuota: vi.fn().mockResolvedValue(undefined),
+  releaseUsageQuota: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/billing/entitlements", () => ({
+  requireBusinessEntitlement: vi.fn().mockResolvedValue({ active: true }),
+}));
+
+vi.mock("@/lib/actions/chat/run-business-chat", () => ({
+  runBusinessChat: vi.fn().mockResolvedValue({
+    success: true,
+    conversationId: "conv-123",
+    reply: "Playground response",
+    assistantMessage: { retrieved_chunks: ["chunk-1"] },
+  }),
 }));
 
 vi.mock("@/lib/ai/rag/retrieve-context", () => ({

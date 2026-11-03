@@ -8,7 +8,12 @@ import { z } from "zod";
 import { getCurrentBusiness } from "@/lib/queries/business";
 import { getUserBusinessRole, BusinessRole } from "@/lib/team/permissions";
 import { sendTeamInvitationEmail } from "@/lib/email/send-email";
-import { getEffectivePlanLimits } from "@/lib/billing/platform";
+import { requireBusinessEntitlement } from "@/lib/billing/entitlements";
+import {
+  completeUsageQuota,
+  releaseUsageQuota,
+  reserveUsageQuota,
+} from "@/lib/billing/usage";
 
 // Helper to normalize error messages
 function getErrorMessage(err: unknown): string {
@@ -127,6 +132,7 @@ export async function inviteTeamMember(email: string, role: string) {
     if (!["owner", "admin"].includes(ctx.role)) {
       return { error: "Only owners and admins can invite team members." };
     }
+    await requireBusinessEntitlement(ctx.business.id, "canUseTeamFeatures");
 
     const input = inviteSchema.parse({ email, role });
     const normalizedEmail = input.email.trim().toLowerCase();
@@ -151,38 +157,11 @@ export async function inviteTeamMember(email: string, role: string) {
       return { error: "This user is already an active member of this business." };
     }
 
-    // 2. Check team member limits on active subscriptions
-    const { data: subscription } = await serviceClient
-      .from("subscriptions")
-      .select("plan, team_member_limit")
-      .eq("business_id", ctx.business.id)
-      .maybeSingle();
-
-    let limit = subscription?.team_member_limit;
-    if (limit === null || limit === undefined) {
-      const planLimits = await getEffectivePlanLimits(subscription?.plan || "starter");
-      limit = planLimits.team_member_limit;
-    }
-
-    // Count currently active members
-    const { count: activeCount } = await serviceClient
-      .from("business_members")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", ctx.business.id)
-      .eq("status", "active");
-
-    // Count pending invitations
-    const { count: pendingCount } = await serviceClient
-      .from("team_invitations")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", ctx.business.id)
-      .eq("status", "pending");
-
-    const totalAllocated = (activeCount || 0) + (pendingCount || 0);
-    if (totalAllocated >= limit) {
+    const { reservation } = await reserveUsageQuota(ctx.business.id, "team_member");
+    if (!reservation) {
       return { 
         error: "limit_reached",
-        message: `Your subscription plan limit has been reached (${limit} team members). Please upgrade your plan to invite more team members.`
+        message: "Your subscription plan limit has been reached. Please upgrade your plan to invite more team members."
       };
     }
 
@@ -214,7 +193,11 @@ export async function inviteTeamMember(email: string, role: string) {
         last_sent_at: new Date().toISOString(),
       });
 
-    if (inviteError) throw inviteError;
+    if (inviteError) {
+      await releaseUsageQuota(reservation);
+      throw inviteError;
+    }
+    await completeUsageQuota(reservation);
 
     // 6. Generate Link
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
@@ -333,6 +316,7 @@ export async function revokeTeamInvitation(invitationId: string) {
     if (!["owner", "admin"].includes(ctx.role)) {
       return { error: "Insufficient permissions." };
     }
+    await requireBusinessEntitlement(ctx.business.id, "canUseTeamFeatures");
 
     const input = invitationActionSchema.parse({ invitationId });
     const serviceClient = createServiceClient();
@@ -401,6 +385,7 @@ export async function acceptTeamInvitation(token: string) {
         error: `This invitation was sent to '${invite.email}'. You are currently logged in as '${user.email}'. Please log in with the correct account to accept.`
       };
     }
+    await requireBusinessEntitlement(invite.business_id, "canUseTeamFeatures");
 
     // Ensure email matches or user accepts manually
     // 3. Prevent duplicate active membership
@@ -557,41 +542,15 @@ export async function reactivateTeamMember(memberId: string) {
     if (!["owner", "admin"].includes(ctx.role)) {
       return { error: "Insufficient permissions." };
     }
+    await requireBusinessEntitlement(ctx.business.id, "canUseTeamFeatures");
 
     const input = memberActionSchema.parse({ memberId });
     const serviceClient = createServiceClient();
 
-    // Check plan limit before reactivating
-    const { data: subscription } = await serviceClient
-      .from("subscriptions")
-      .select("plan, team_member_limit")
-      .eq("business_id", ctx.business.id)
-      .maybeSingle();
-
-    let limit = subscription?.team_member_limit;
-    if (limit === null || limit === undefined) {
-      const planLimits = await getEffectivePlanLimits(subscription?.plan || "starter");
-      limit = planLimits.team_member_limit;
-    }
-
-    // Count currently active members
-    const { count: activeCount } = await serviceClient
-      .from("business_members")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", ctx.business.id)
-      .eq("status", "active");
-
-    // Count pending invitations
-    const { count: pendingCount } = await serviceClient
-      .from("team_invitations")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", ctx.business.id)
-      .eq("status", "pending");
-
-    const totalAllocated = (activeCount || 0) + (pendingCount || 0);
-    if (totalAllocated >= limit) {
-      return { 
-        error: `Your subscription plan limit has been reached (${limit} team members). Please upgrade your plan to reactivate this member.`
+    const { reservation } = await reserveUsageQuota(ctx.business.id, "team_member");
+    if (!reservation) {
+      return {
+        error: "Your subscription plan limit has been reached. Please upgrade your plan to reactivate this member."
       };
     }
 
@@ -604,7 +563,11 @@ export async function reactivateTeamMember(memberId: string) {
       .eq("id", input.memberId)
       .eq("business_id", ctx.business.id);
 
-    if (error) throw error;
+    if (error) {
+      await releaseUsageQuota(reservation);
+      throw error;
+    }
+    await completeUsageQuota(reservation);
 
     revalidatePath("/dashboard/settings/team");
     return { success: true };

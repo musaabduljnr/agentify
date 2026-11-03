@@ -1,14 +1,102 @@
-"use server";
+import "server-only";
 
 // ══════════════════════════════════════════════════════════════
 // Usage Tracking (Server-Side Only)
 // ══════════════════════════════════════════════════════════════
 
 import { createServiceClient } from "@/utils/supabase/service";
-import { getEffectivePlanConfig } from "@/lib/billing/platform";
 import { getCachedUsage, setCachedUsage, invalidateUsageCache } from "@/lib/billing/usage-cache";
+import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
 
 export type UsageType = "message" | "embedding" | "lead" | "knowledge_source" | "widget_chat";
+type ReservationType = UsageType | "assistant" | "team_member";
+export type UsageReservation = { operationId: string; businessId: string };
+
+type QuotaReservationResult = {
+  allowed: boolean;
+  reason?: string;
+  used?: number;
+  limit?: number;
+};
+
+export function getQuotaDenialMessage(reason: string | undefined, resource: string): string {
+  if (reason === "no_subscription" || reason === "inactive_subscription" || reason === "expired_period") {
+    return "An active subscription is required to use this feature.";
+  }
+  if (reason === "unknown_plan") {
+    return "Your subscription plan could not be verified. Please contact support.";
+  }
+  if (reason === "lookup_failed") {
+    return "Unable to verify your subscription. Please try again.";
+  }
+  return `You've reached your ${resource} limit for this plan. Please upgrade to continue.`;
+}
+
+export async function reserveUsageQuota(
+  businessId: string,
+  type: ReservationType,
+  amount = 1,
+  metadata: Record<string, unknown> = {}
+): Promise<{ reservation: UsageReservation | null; reason?: string }> {
+  if (!Number.isInteger(amount) || amount < 1) {
+    throw new Error("Quota reservation amount must be a positive integer.");
+  }
+
+  const entitlements = await resolveBusinessEntitlements(businessId);
+  if (!entitlements.active) return { reservation: null, reason: entitlements.reason };
+
+  const operationId = crypto.randomUUID();
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("reserve_subscription_quota", {
+    p_business_id: businessId,
+    p_type: type,
+    p_amount: amount,
+    p_operation_id: operationId,
+    p_metadata: metadata,
+  });
+
+  if (error) {
+    console.error("[Usage] Failed to reserve subscription quota", {
+      businessId,
+      type,
+      amount,
+      error,
+    });
+    throw new Error("Unable to verify subscription capacity. Please try again.");
+  }
+
+  const result = data as QuotaReservationResult;
+  if (!result?.allowed) return { reservation: null, reason: result?.reason || "quota_denied" };
+  return { reservation: { operationId, businessId } };
+}
+
+export async function completeUsageQuota(reservation: UsageReservation): Promise<void> {
+  const { error, data } = await createServiceClient().rpc("finalize_subscription_quota", {
+    p_operation_id: reservation.operationId,
+  });
+  if (error || data !== true) {
+    console.error("[Usage] Failed to finalize subscription quota reservation", {
+      operationId: reservation.operationId,
+      error,
+    });
+    throw new Error("Unable to finalize subscription usage.");
+  }
+  invalidateUsageCache(reservation.businessId);
+}
+
+export async function releaseUsageQuota(reservation: UsageReservation): Promise<void> {
+  const { error } = await createServiceClient().rpc("release_subscription_quota", {
+    p_operation_id: reservation.operationId,
+  });
+  if (error) {
+    console.error("[Usage] Failed to release subscription quota reservation", {
+      operationId: reservation.operationId,
+      error,
+    });
+    throw new Error("Unable to release subscription usage reservation.");
+  }
+  invalidateUsageCache(reservation.businessId);
+}
 
 // Maps usage types to their limit columns on the subscription
 const USAGE_LIMIT_MAP: Record<UsageType, string> = {
@@ -197,11 +285,22 @@ export async function getUsagePercentage(
  */
 export async function verifyAIUsageLimits(businessId: string): Promise<{
   allowed: boolean;
-  reason?: "monthly_limit" | "daily_limit" | "global_free_limit" | "inactive_subscription" | "no_subscription";
+  reason?: string;
   message?: string;
   used?: number;
   limit?: number;
 }> {
+  const entitlements = await resolveBusinessEntitlements(businessId);
+  if (!entitlements.active || !entitlements.canUseAi) {
+    return {
+      allowed: false,
+      reason: entitlements.reason,
+      message: entitlements.reason === "active"
+        ? "AI access is not included in your current plan."
+        : "An active subscription is required to use AI features.",
+    };
+  }
+
   const supabase = createServiceClient();
 
   // 1. Get subscription
@@ -211,7 +310,15 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
     .eq("business_id", businessId)
     .maybeSingle();
 
-  if (subError || !sub) {
+  if (subError) {
+    console.error("[Usage] Failed to verify AI subscription", { businessId, error: subError });
+    return {
+      allowed: false,
+      reason: "lookup_failed",
+      message: "Unable to verify your subscription. Please try again.",
+    };
+  }
+  if (!sub) {
     return {
       allowed: false,
       reason: "no_subscription",
@@ -230,16 +337,20 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
   }
 
   // 3. Check Monthly Message Quota
-  const monthlyLimit = sub.message_limit;
+  const monthlyLimit = entitlements.limits.messages;
   const periodStart = sub.current_period_start || sub.created_at;
 
-  const { data: monthlyLogs } = await supabase
+  const { data: monthlyLogs, error: monthlyError } = await supabase
     .from("usage_logs")
     .select("amount")
     .eq("business_id", businessId)
     .in("type", ["message", "widget_chat"])
     .gte("created_at", periodStart);
 
+  if (monthlyError) {
+    console.error("[Usage] Failed to read monthly AI usage", { businessId, error: monthlyError });
+    return { allowed: false, reason: "lookup_failed", message: "Unable to verify your usage. Please try again." };
+  }
   const monthlyUsed = (monthlyLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
   if (monthlyUsed >= monthlyLimit) {
     return {
@@ -252,22 +363,22 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
   }
 
   // 4. Check Daily Business Cap Limit
-  const plan = sub.plan;
-  const effectivePlan = await getEffectivePlanConfig(plan);
-  
-  // Daily cap limit: metadata override OR plan configuration default
-  const dailyLimit = sub.metadata?.daily_message_limit ?? effectivePlan.daily_messages ?? 999999999;
+  const dailyLimit = entitlements.limits.dailyMessages;
   
   const startOfToday = new Date();
   startOfToday.setUTCHours(0, 0, 0, 0);
 
-  const { data: dailyLogs } = await supabase
+  const { data: dailyLogs, error: dailyError } = await supabase
     .from("usage_logs")
     .select("amount")
     .eq("business_id", businessId)
     .in("type", ["message", "widget_chat"])
     .gte("created_at", startOfToday.toISOString());
 
+  if (dailyError) {
+    console.error("[Usage] Failed to read daily AI usage", { businessId, error: dailyError });
+    return { allowed: false, reason: "lookup_failed", message: "Unable to verify your usage. Please try again." };
+  }
   const dailyUsed = (dailyLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
   if (dailyUsed >= dailyLimit) {
     return {

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { scrapeUrl } from "@/lib/scraper/scrape-url";
 import { crawlWebsite } from "@/lib/scraper/crawl-website";
-import { generateEmbeddingsForSourceInternal } from "@/lib/actions/knowledge";
+import { generateEmbeddingsForSourceInternal } from "@/lib/embeddings/generate-source";
 import { generateEmbedding } from "@/lib/vertex/embeddings";
 import { chunkText, estimateTokens } from "@/lib/embeddings/chunker";
 import { generateGeminiResponse } from "@/lib/vertex/gemini";
@@ -979,5 +979,4 @@ Output ONLY the text of the email. Do not include subject lines, markdown code f
     throw error;
   }
 }
-
 

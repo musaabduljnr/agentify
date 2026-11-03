@@ -1,30 +1,18 @@
 import { createServiceClient } from "@/utils/supabase/service";
-import { checkUsageLimit, incrementUsage } from "@/lib/billing/usage";
+import { checkUsageLimit } from "@/lib/billing/usage";
 import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { UsageWarningEmail } from "@/lib/email/templates/usage-warning-email";
 
 export async function processUsageTracking({
   businessId,
-  conversationId,
-  source,
   usageType,
-  cachedAnswer,
   businessName,
 }: {
   businessId: string;
-  conversationId: string;
-  source: string;
   usageType: "widget_chat" | "message";
-  cachedAnswer: boolean;
   businessName: string;
 }) {
   const supabase = createServiceClient();
-
-  await incrementUsage(businessId, usageType, 1, {
-    conversation_id: conversationId,
-    source,
-    cached: cachedAnswer,
-  });
 
   // Check for 80% usage threshold warning
   const finalCheck = await checkUsageLimit(businessId, usageType);

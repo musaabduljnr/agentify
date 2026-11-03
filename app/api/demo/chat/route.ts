@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { createServiceClient } from "@/utils/supabase/service";
-import { runBusinessChat } from "@/lib/actions/chat";
+import { runBusinessChat } from "@/lib/actions/chat/run-business-chat";
 import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { corsHeaders, jsonWithCors } from "@/lib/http/cors";

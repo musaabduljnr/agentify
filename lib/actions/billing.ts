@@ -41,7 +41,7 @@ export async function getBillingData() {
     const serviceClient = createServiceClient();
     const { data: latestCheckout, error: checkoutQueryError } = await serviceClient
       .from("payment_transactions")
-      .select("id, plan, checkout_id, status, failure_reason")
+      .select("id, plan, checkout_id, status")
       .eq("business_id", business.id)
       .eq("provider", "bachs")
       .in("status", ["pending", "abandoned", "failed"])
@@ -125,7 +125,7 @@ export async function getBillingData() {
       checkout: {
         state: checkoutState,
         plan: latestCheckout?.plan || null,
-        failureReason: latestCheckout?.failure_reason || null,
+        failureReason: null,
       },
       currentPlan: {
         id: planId,

@@ -60,6 +60,8 @@ const updateLimitsSchema = z.object({
     lead_limit: z.number().nullable().optional(),
     widget_limit: z.number().nullable().optional(),
     embedding_limit: z.number().nullable().optional(),
+    daily_message_limit: z.number().nullable().optional(),
+    team_member_limit: z.number().nullable().optional(),
     current_usage: z.number().nullable().optional(),
   }),
   reason: z.string().optional(),
@@ -174,9 +176,6 @@ export async function adminChangeSubscriptionPlan(
   // 2. Resolve default limits for the new plan
   const planLimits = getPlanLimits(input.plan);
   
-  // daily_message_limit is not a column in subscriptions table! It should be saved in metadata.
-  const { daily_message_limit, ...dbPlanLimits } = planLimits;
-
   const now = new Date();
   const periodEnd = new Date();
   periodEnd.setDate(periodEnd.getDate() + 30);
@@ -184,7 +183,7 @@ export async function adminChangeSubscriptionPlan(
   const existingMetadata = currentSub.metadata || {};
   const newMetadata = {
     ...existingMetadata,
-    daily_message_limit,
+    daily_message_limit: planLimits.daily_message_limit,
     last_plan_change_at: now.toISOString(),
     last_plan_change_by: admin.id,
   };
@@ -201,7 +200,7 @@ export async function adminChangeSubscriptionPlan(
       reset_date: periodEnd.toISOString(),
       cancel_at_period_end: false,
       metadata: newMetadata,
-      ...dbPlanLimits,
+      ...planLimits,
       updated_at: now.toISOString(),
     })
     .eq("id", input.subscriptionId);
@@ -334,6 +333,8 @@ export async function adminUpdateSubscriptionLimits(
     "lead_limit",
     "widget_limit",
     "embedding_limit",
+    "daily_message_limit",
+    "team_member_limit",
     "current_usage",
   ] as const;
 

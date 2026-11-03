@@ -1,22 +1,12 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { createServiceClient } from "@/utils/supabase/service";
 import { revalidatePath } from "next/cache";
-import { retrieveBusinessContext } from "@/lib/ai/rag/retrieve-context";
-import { getRecentConversationMessages } from "@/lib/ai/memory/message-history";
-import { summarizeConversationIfNeeded } from "@/lib/ai/memory/conversation-summary";
-import { type FeatureSource } from "@/lib/ai/logs/ai-logs";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireCompleteBusinessSetup } from "@/lib/queries/business";
-import { verifyAIUsageLimits } from "@/lib/billing/usage";
-
-// Import modular sub-handlers
-import { resolveOrCreateConversation } from "./chat/conversation-management";
-import { saveUserMessage, saveAssistantMessage } from "./chat/message-persistence";
-import { processLeadHandling } from "./chat/lead-handling";
-import { getAiResponse } from "./chat/ai-response";
-import { processUsageTracking } from "./chat/usage-tracking";
+import { completeUsageQuota, releaseUsageQuota, reserveUsageQuota } from "@/lib/billing/usage";
+import { requireBusinessEntitlement } from "@/lib/billing/entitlements";
+import { runBusinessChat } from "./chat/run-business-chat";
 
 export async function getCurrentBusiness() {
   const supabase = await createClient();
@@ -57,6 +47,7 @@ export async function updateAssistant(data: {
   try {
     const business = await getCurrentBusiness();
     if (!business) throw new Error("No business found");
+    await requireBusinessEntitlement(business.id, "canCreateAssistant");
 
     const supabase = await createClient();
 
@@ -80,24 +71,10 @@ export async function updateAssistant(data: {
 
       if (error) throw new Error(error.message);
     } else {
-      const { data: sub } = await supabase
-        .from("subscriptions")
-        .select("widget_limit")
-        .eq("business_id", business.id)
-        .maybeSingle();
-
-      const limit = sub?.widget_limit || 1;
-
-      const { count, error: countErr } = await supabase
-        .from("assistants")
-        .select("*", { count: "exact", head: true })
-        .eq("business_id", business.id);
-
-      if (countErr) throw countErr;
-
-      if ((count || 0) >= limit) {
+      const { reservation } = await reserveUsageQuota(business.id, "assistant", 1);
+      if (!reservation) {
         return {
-          error: `You've reached the maximum number of assistants (${limit}) allowed under your current plan. Please upgrade to create more.`
+          error: "You've reached the maximum number of assistants allowed under your current plan. Please upgrade to create more."
         };
       }
 
@@ -108,7 +85,11 @@ export async function updateAssistant(data: {
         welcome_message: data.welcome_message,
       });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        await releaseUsageQuota(reservation);
+        throw new Error(error.message);
+      }
+      await completeUsageQuota(reservation);
     }
 
     revalidatePath("/dashboard/assistant");
@@ -155,217 +136,6 @@ export async function updateBusinessSettings(data: {
   } catch (err: any) {
     return { error: err.message || "Failed to update business settings" };
   }
-}
-
-export async function runBusinessChat({
-  message,
-  businessId,
-  conversationId,
-  visitorId,
-  source = "widget",
-  isDemo = false,
-  demoBusinessId,
-  featureSource,
-}: {
-  message: string;
-  businessId: string;
-  conversationId?: string;
-  visitorId?: string;
-  source?: string;
-  isDemo?: boolean;
-  demoBusinessId?: string;
-  featureSource?: FeatureSource;
-}) {
-  const supabase = createServiceClient();
-  const computedFeatureSource = featureSource || (
-    isDemo 
-      ? "demo_generation" 
-      : (source === "dashboard_test" || source === "playground" ? "playground" : "hosted_chat")
-  );
-
-  // 1. Authorization & Expiry Validation
-  if (isDemo) {
-    if (!demoBusinessId) {
-      throw new Error("Missing demoBusinessId for demo chat session.");
-    }
-    const { data: demo, error: demoErr } = await supabase
-      .from("demo_businesses")
-      .select("*")
-      .eq("id", demoBusinessId)
-      .single();
-
-    if (demoErr || !demo) {
-      throw new Error("Demo assistant not found.");
-    }
-    if (demo.status !== "active") {
-      throw new Error(`This demo assistant is currently ${demo.status}.`);
-    }
-    const isExpired = new Date(demo.expires_at) < new Date();
-    if (isExpired) {
-      await supabase
-        .from("demo_businesses")
-        .update({ status: "expired" })
-        .eq("id", demoBusinessId);
-      throw new Error("This demo assistant has expired.");
-    }
-  } else {
-    const checkResult = await verifyAIUsageLimits(businessId);
-    if (!checkResult.allowed) {
-      return {
-        success: false,
-        conversationId: conversationId || "",
-        reply: checkResult.message || "Usage limit reached.",
-        assistantMessage: null,
-        limitReached: true,
-      };
-    }
-  }
-
-  // 2. Fetch Business & Assistant Details
-  const { data: business, error: bErr } = await supabase
-    .from("businesses")
-    .select("*")
-    .eq("id", businessId)
-    .single();
-  
-  if (bErr || !business) throw new Error("Business not found");
-
-  const { data: assistant, error: aErr } = await supabase
-    .from("assistants")
-    .select("*")
-    .eq("business_id", businessId)
-    .eq("is_active", true)
-    .single();
-
-  if (aErr || !assistant) throw new Error("Assistant not found");
-
-  const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
-
-  // 3. Resolve or Create Conversation (extracted)
-  const { conversationId: currentConversationId, conversation } = await resolveOrCreateConversation({
-    currentConversationId: conversationId,
-    businessId,
-    visitorId,
-    source,
-    isDemo,
-    demoBusinessId,
-    message,
-  });
-
-  // 4. Save User Message (extracted)
-  await saveUserMessage({
-    conversationId: currentConversationId!,
-    businessId,
-    message,
-  });
-
-  // Check manual takeover
-  const isManualTakeover = conversation?.is_manual_takeover || conversation?.metadata?.is_manual_takeover === true;
-  if (isManualTakeover) {
-    await supabase
-      .from("conversations")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", currentConversationId!);
-
-    return {
-      success: true,
-      conversationId: currentConversationId!,
-      reply: null,
-      assistantMessage: null,
-      isManualTakeover: true,
-    };
-  }
-
-  // 5. RAG Context Retrieval
-  const isContinuation = message.toLowerCase().trim() === "continue";
-  let ragQuery = message;
-
-  if (isContinuation && currentConversationId) {
-    const { data: recentMsgs } = await supabase
-      .from("messages")
-      .select("role, content")
-      .eq("conversation_id", currentConversationId)
-      .order("created_at", { ascending: false })
-      .limit(3);
-
-    if (recentMsgs && recentMsgs.length >= 3) {
-      if (recentMsgs[2].role === "user") {
-        ragQuery = recentMsgs[2].content;
-      }
-    }
-  }
-
-  const { chunks, formattedContext, intent } = await retrieveBusinessContext({
-    businessId,
-    query: ragQuery,
-    matchCount: 5,
-    minSimilarity: 0.55,
-    featureSource: computedFeatureSource,
-  });
-
-  // 6. Lead intelligence & Contact Extraction (extracted)
-  const leadResult = await processLeadHandling({
-    message,
-    businessId,
-    conversationId: currentConversationId!,
-    visitorId,
-    source,
-    isDemo,
-    demoBusinessId,
-    businessName: business.name,
-    conversation,
-  });
-
-  // 7. Conversation Summary & Memory History
-  const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId, computedFeatureSource);
-  const history = await getRecentConversationMessages(currentConversationId!, 4);
-
-  // 8. Generate Prompt & Call AI Engine (extracted)
-  const { finalReply, chatResponse, cachedAnswer } = await getAiResponse({
-    message,
-    businessId,
-    conversationId: currentConversationId!,
-    isDemo,
-    business,
-    assistant,
-    formattedContext,
-    metadata: leadResult.metadata,
-    summary,
-    history,
-    computedFeatureSource,
-  });
-
-  // 9. Save Assistant Response (extracted)
-  const savedAssistantMsg = await saveAssistantMessage({
-    conversationId: currentConversationId!,
-    businessId,
-    content: finalReply,
-    chunks,
-    intent,
-    cachedAnswer,
-    chatResponse,
-  });
-
-  // 10. Usage Increments (extracted)
-  if (!isDemo) {
-    await processUsageTracking({
-      businessId,
-      conversationId: currentConversationId!,
-      source,
-      usageType,
-      cachedAnswer,
-      businessName: business.name,
-    });
-  }
-
-  return {
-    success: true,
-    conversationId: currentConversationId!,
-    reply: finalReply,
-    assistantMessage: savedAssistantMsg,
-    intent,
-    latencyMs: chatResponse?.latencyMs || 0,
-  };
 }
 
 export async function sendDashboardTestMessage({
@@ -443,6 +213,7 @@ export async function setActiveAssistant(assistantId: string) {
   try {
     const business = await getCurrentBusiness();
     if (!business) throw new Error("No business found");
+    await requireBusinessEntitlement(business.id, "canCreateAssistant");
 
     const supabase = await createClient();
 
