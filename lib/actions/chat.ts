@@ -4,7 +4,12 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { requireCompleteBusinessSetup } from "@/lib/queries/business";
-import { completeUsageQuota, releaseUsageQuota, reserveUsageQuota } from "@/lib/billing/usage";
+import {
+  completeUsageQuota,
+  getQuotaDenialMessage,
+  releaseUsageQuota,
+  reserveUsageQuota,
+} from "@/lib/billing/usage";
 import { requireBusinessEntitlement } from "@/lib/billing/entitlements";
 import { runBusinessChat } from "./chat/run-business-chat";
 
@@ -416,26 +421,12 @@ export async function createAssistant(data: {
   try {
     const business = await getCurrentBusiness();
     if (!business) throw new Error("No business found");
+    await requireBusinessEntitlement(business.id, "canCreateAssistant");
 
     const supabase = await createClient();
-
-    const { data: sub } = await supabase
-      .from("subscriptions")
-      .select("widget_limit")
-      .eq("business_id", business.id)
-      .maybeSingle();
-
-    const limit = sub?.widget_limit || 1;
-
-    const { count, error: countErr } = await supabase
-      .from("assistants")
-      .select("*", { count: "exact", head: true })
-      .eq("business_id", business.id);
-
-    if (countErr) throw countErr;
-
-    if ((count || 0) >= limit) {
-      return { error: `You've reached the maximum number of assistants (${limit}) allowed under your current plan. Please upgrade to create more.` };
+    const { reservation, reason } = await reserveUsageQuota(business.id, "assistant", 1);
+    if (!reservation) {
+      return { error: getQuotaDenialMessage(reason, "assistant") };
     }
 
     const { data: newAsst, error } = await supabase
@@ -450,7 +441,11 @@ export async function createAssistant(data: {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      await releaseUsageQuota(reservation);
+      throw error;
+    }
+    await completeUsageQuota(reservation);
 
     revalidatePath("/dashboard/assistant");
     return { success: true, assistant: newAsst };

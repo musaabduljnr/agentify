@@ -7,7 +7,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { getCurrentBusiness } from "@/lib/queries/business";
-import { getBusinessSubscription, getCurrentPlan, getRemainingUsage } from "@/lib/billing/subscription";
+import { getCurrentPlan } from "@/lib/billing/subscription";
 import { getUsageSummary } from "@/lib/billing/usage";
 import { PLAN_ORDER } from "@/lib/billing/plans";
 import {
@@ -261,10 +261,6 @@ export async function reactivateSubscription() {
   }
 }
 
-/**
- * Record a downgrade intent — no immediate charge change.
- * The actual downgrade takes effect at the next billing period.
- */
 export async function requestDowngrade(targetPlan: string) {
   try {
     const supabase = await createClient();
@@ -279,24 +275,9 @@ export async function requestDowngrade(targetPlan: string) {
       return { error: "Invalid target plan for downgrade." };
     }
 
-    const serviceClient = createServiceClient();
-    // Record intent in subscription metadata
-    const { error } = await serviceClient
-      .from("subscriptions")
-      .update({
-        cancel_at_period_end: true,
-        metadata: {
-          downgrade_to: targetPlan,
-          downgrade_requested_at: new Date().toISOString(),
-        },
-        updated_at: new Date().toISOString(),
-      })
-      .eq("business_id", business.id);
-
-    if (error) throw error;
-
-    revalidatePath("/dashboard/billing");
-    return { success: true, message: `Your plan will be downgraded to ${targetPlan} at the end of your billing period.` };
+    return {
+      error: "Plan changes must be scheduled through Bachs billing management. Use Manage Billing; no local change was made.",
+    };
   } catch (err: any) {
     console.error("requestDowngrade error:", err);
     return { error: "Failed to request downgrade. Please try again." };
@@ -315,30 +296,9 @@ export async function cancelPendingDowngrade() {
     const business = await getCurrentBusiness();
     if (!business) return { error: "No business found." };
 
-    const serviceClient = createServiceClient();
-    const { data: sub } = await serviceClient
-      .from("subscriptions")
-      .select("metadata")
-      .eq("business_id", business.id)
-      .maybeSingle();
-
-    const cleanMetadata = { ...((sub?.metadata as Record<string, any>) || {}) };
-    delete cleanMetadata.downgrade_to;
-    delete cleanMetadata.downgrade_requested_at;
-
-    const { error } = await serviceClient
-      .from("subscriptions")
-      .update({
-        cancel_at_period_end: false,
-        metadata: cleanMetadata,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("business_id", business.id);
-
-    if (error) throw error;
-
-    revalidatePath("/dashboard/billing");
-    return { success: true, message: "Scheduled downgrade has been cancelled." };
+    return {
+      error: "Scheduled plan changes must be cancelled through Bachs billing management. No local change was made.",
+    };
   } catch (err: any) {
     console.error("cancelPendingDowngrade error:", err);
     return { error: "Failed to cancel scheduled downgrade. Please try again." };

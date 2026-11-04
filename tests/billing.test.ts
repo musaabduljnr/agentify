@@ -8,7 +8,14 @@ vi.mock("@/utils/supabase/service", () => {
   const mockSelect = vi.fn().mockReturnThis();
   const mockEq = vi.fn().mockReturnThis();
   const mockMaybeSingle = vi.fn().mockResolvedValue({
-    data: { id: "sub-123", current_usage: 10, message_limit: 100 },
+    data: {
+      id: "sub-123",
+      plan: "starter",
+      status: "active",
+      current_usage: 10,
+      message_limit: 200,
+      current_period_end: "2099-01-01T00:00:00.000Z",
+    },
     error: null,
   });
   const mockRpc = vi.fn().mockResolvedValue({ error: null });
@@ -96,8 +103,11 @@ describe("Billing Usage Tracking", () => {
       maybeSingle: vi.fn().mockResolvedValue({
         data: {
           id: "sub-123",
-          message_limit: 100,
+          plan: "starter",
+          status: "active",
+          message_limit: 200,
           current_period_start: "2026-06-22T00:00:00Z",
+          current_period_end: "2099-01-01T00:00:00.000Z",
         },
         error: null,
       }),
@@ -114,8 +124,8 @@ describe("Billing Usage Tracking", () => {
     const result = await checkUsageLimit("biz-123", "message");
     expect(result.allowed).toBe(true);
     expect(result.used).toBe(30);
-    expect(result.limit).toBe(100);
-    expect(result.remaining).toBe(70);
+    expect(result.limit).toBe(200);
+    expect(result.remaining).toBe(170);
   });
 
   describe("verifyAIUsageLimits", () => {
@@ -167,6 +177,7 @@ describe("Billing Usage Tracking", () => {
             plan: "starter",
             message_limit: 200,
             current_period_start: "2026-10-01T00:00:00Z",
+            current_period_end: "2099-01-01T00:00:00.000Z",
           },
           error: null,
         }),
@@ -197,6 +208,7 @@ describe("Billing Usage Tracking", () => {
             plan: "starter",
             message_limit: 200,
             current_period_start: "2026-10-01T00:00:00Z",
+            current_period_end: "2099-01-01T00:00:00.000Z",
           },
           error: null,
         }),

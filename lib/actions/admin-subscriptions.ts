@@ -6,6 +6,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getPlanLimits, PlanId } from "@/lib/billing/plans";
 import { invalidateUsageCache } from "@/lib/billing/usage-cache";
+import { hasVerifiedPaymentForCurrentPeriod } from "@/lib/billing/entitlements";
 
 // Audit log helper
 async function writeAuditLog(
@@ -156,77 +157,13 @@ export async function adminChangeSubscriptionPlan(
   plan: PlanId,
   reason?: string
 ) {
-  const admin = await requireAdmin();
-  
-  // Validate input
-  const input = changePlanSchema.parse({ subscriptionId, plan, reason });
-  const supabase = createServiceClient();
-
-  // 1. Fetch current subscription to record old value
-  const { data: currentSub, error: fetchError } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("id", input.subscriptionId)
-    .maybeSingle();
-
-  if (fetchError || !currentSub) {
-    return { error: fetchError?.message || "Subscription not found." };
-  }
-
-  // 2. Resolve default limits for the new plan
-  const planLimits = getPlanLimits(input.plan);
-  
-  const now = new Date();
-  const periodEnd = new Date();
-  periodEnd.setDate(periodEnd.getDate() + 30);
-
-  const existingMetadata = currentSub.metadata || {};
-  const newMetadata = {
-    ...existingMetadata,
-    daily_message_limit: planLimits.daily_message_limit,
-    last_plan_change_at: now.toISOString(),
-    last_plan_change_by: admin.id,
+  await requireAdmin();
+  changePlanSchema.parse({ subscriptionId, plan, reason });
+  return {
+    success: false,
+    subscription: null,
+    error: "Plan changes must be applied by a provider-verified successful payment.",
   };
-
-  // 3. Update subscription safely
-  const { error: updateError } = await supabase
-    .from("subscriptions")
-    .update({
-      plan: input.plan,
-      payment_provider: "manual",
-      provider_reference: "admin_override",
-      current_period_start: now.toISOString(),
-      current_period_end: periodEnd.toISOString(),
-      reset_date: periodEnd.toISOString(),
-      cancel_at_period_end: false,
-      metadata: newMetadata,
-      ...planLimits,
-      updated_at: now.toISOString(),
-    })
-    .eq("id", input.subscriptionId);
-
-  if (updateError) {
-    return { error: updateError.message };
-  }
-
-  // 4. Write audit log
-  await writeAuditLog(admin.id, "subscription_plan_changed", input.subscriptionId, {
-    business_id: currentSub.business_id,
-    subscription_id: input.subscriptionId,
-    old_value: currentSub.plan,
-    new_value: input.plan,
-    reason: input.reason || "Manual admin upgrade/downgrade",
-    admin_id: admin.id,
-  });
-
-  // 5. Invalidate cached usage
-  invalidateUsageCache(currentSub.business_id);
-
-  revalidatePath("/admin/subscriptions");
-  revalidatePath("/dashboard/billing");
-
-  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
-  return { success: true, subscription: updatedSubscription };
 }
 
 /**
@@ -252,6 +189,18 @@ export async function adminChangeSubscriptionStatus(
 
   if (fetchError || !currentSub) {
     return { error: fetchError?.message || "Subscription not found." };
+  }
+
+  if (input.status === "active" && currentSub.status !== "active") {
+    let hasVerifiedPayment: boolean;
+    try {
+      hasVerifiedPayment = await hasVerifiedPaymentForCurrentPeriod(currentSub);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Unable to verify subscription payment." };
+    }
+    if (!hasVerifiedPayment) {
+      return { error: "A verified successful payment for the current billing period is required." };
+    }
   }
 
   // 2. Update status
@@ -326,6 +275,9 @@ export async function adminUpdateSubscriptionLimits(
 
   const oldValues: Record<string, any> = {};
   const newValues: Record<string, any> = {};
+  const officialLimits = ["starter", "growth"].includes(currentSub.plan)
+    ? getPlanLimits(currentSub.plan as PlanId)
+    : null;
 
   const fields = [
     "message_limit",
@@ -339,6 +291,29 @@ export async function adminUpdateSubscriptionLimits(
   ] as const;
 
   for (const field of fields) {
+    const officialField = field === "message_limit"
+      ? "message_limit"
+      : field === "knowledge_limit"
+        ? "knowledge_limit"
+        : field === "lead_limit"
+          ? "lead_limit"
+          : field === "widget_limit"
+            ? "widget_limit"
+          : field === "daily_message_limit"
+            ? "daily_message_limit"
+          : null;
+
+    if (officialLimits && officialField) {
+      updatePayload[field] = officialLimits[officialField];
+      oldValues[field] = currentSub[field];
+      newValues[field] = officialLimits[officialField];
+      continue;
+    }
+
+    if (input.limits.current_usage !== undefined) {
+      return { error: "Usage is derived from completed usage records and cannot be changed manually." };
+    }
+
     if (input.limits[field] !== undefined) {
       updatePayload[field] = input.limits[field];
       oldValues[field] = currentSub[field];
@@ -380,59 +355,11 @@ export async function adminUpdateSubscriptionLimits(
  * Admin action to reset usage counters.
  */
 export async function adminResetSubscriptionUsage(subscriptionId: string, reason?: string) {
-  const admin = await requireAdmin();
-
-  // Validate input
-  const input = resetUsageSchema.parse({ subscriptionId, reason });
-  const supabase = createServiceClient();
-
-  // 1. Fetch current subscription
-  const { data: currentSub, error: fetchError } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("id", input.subscriptionId)
-    .maybeSingle();
-
-  if (fetchError || !currentSub) {
-    return { error: fetchError?.message || "Subscription not found." };
-  }
-
-  // 2. Update reset date (30 days out)
-  const nextResetDate = new Date();
-  nextResetDate.setDate(nextResetDate.getDate() + 30);
-
-  // 3. Perform database update
-  const { error: updateError } = await supabase
-    .from("subscriptions")
-    .update({
-      current_usage: 0,
-      reset_date: nextResetDate.toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.subscriptionId);
-
-  if (updateError) {
-    return { error: updateError.message };
-  }
-
-  // 4. Write audit log
-  await writeAuditLog(admin.id, "subscription_usage_reset", input.subscriptionId, {
-    business_id: currentSub.business_id,
-    subscription_id: input.subscriptionId,
-    old_usage: currentSub.current_usage,
-    new_usage: 0,
-    reason: input.reason || "Manual usage counter reset",
-    admin_id: admin.id,
-  });
-
-  // 5. Invalidate cached usage
-  invalidateUsageCache(currentSub.business_id);
-
-  revalidatePath("/admin/subscriptions");
-  revalidatePath("/dashboard/billing");
-
-  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
-  return { success: true, subscription: updatedSubscription };
+  await requireAdmin();
+  resetUsageSchema.parse({ subscriptionId, reason });
+  return {
+    error: "Usage can only reset at a provider-verified billing-period boundary.",
+  };
 }
 
 /**
@@ -443,65 +370,13 @@ export async function adminExtendSubscriptionPeriod(
   extendByDays: number | string,
   reason?: string
 ) {
-  const admin = await requireAdmin();
-
-  // Validate input
-  const input = extendPeriodSchema.parse({ subscriptionId, extendByDays, reason });
-  const supabase = createServiceClient();
-
-  // 1. Fetch current subscription
-  const { data: currentSub, error: fetchError } = await supabase
-    .from("subscriptions")
-    .select("*")
-    .eq("id", input.subscriptionId)
-    .maybeSingle();
-
-  if (fetchError || !currentSub) {
-    return { error: fetchError?.message || "Subscription not found." };
-  }
-
-  // 2. Compute new period end
-  let newPeriodEnd = new Date(currentSub.current_period_end || new Date());
-  if (typeof input.extendByDays === "number") {
-    newPeriodEnd.setDate(newPeriodEnd.getDate() + input.extendByDays);
-  } else {
-    // Custom ISO Date String
-    newPeriodEnd = new Date(input.extendByDays);
-  }
-
-  // 3. Update subscription
-  const { error: updateError } = await supabase
-    .from("subscriptions")
-    .update({
-      current_period_end: newPeriodEnd.toISOString(),
-      reset_date: newPeriodEnd.toISOString(), // sync reset date with new period end
-      status: "active", // Reactivate if inactive/expired
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", input.subscriptionId);
-
-  if (updateError) {
-    return { error: updateError.message };
-  }
-
-  // 4. Write audit log
-  await writeAuditLog(admin.id, "subscription_period_extended", input.subscriptionId, {
-    business_id: currentSub.business_id,
-    subscription_id: input.subscriptionId,
-    old_period_end: currentSub.current_period_end,
-    new_period_end: newPeriodEnd.toISOString(),
-    reason: input.reason || "Manual subscription period extension",
-    admin_id: admin.id,
-  });
-
-  // 5. Invalidate cached usage
-  invalidateUsageCache(currentSub.business_id);
-
-  revalidatePath("/admin/subscriptions");
-  revalidatePath("/dashboard/billing");
-
-  const updatedSubscription = await fetchSubscriptionById(input.subscriptionId);
-  return { success: true, subscription: updatedSubscription };
+  await requireAdmin();
+  extendPeriodSchema.parse({ subscriptionId, extendByDays, reason });
+  return {
+    success: false,
+    subscription: null,
+    error: "Billing periods can only advance after a provider-verified successful payment.",
+  };
 }
 
 /**

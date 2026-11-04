@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { PlanConfig } from "@/lib/billing/plans";
 
 interface PricingViewProps {
   user: { id: string; email?: string } | null;
@@ -25,36 +26,67 @@ interface PricingViewProps {
     status: string;
     current_period_end?: string | null;
   } | null;
+  plans: Record<"starter" | "growth" | "enterprise", Pick<
+    PlanConfig,
+    "name" | "price_usd" | "messages" | "daily_messages" | "knowledge_sources" | "leads" | "widgets" | "features"
+  >>;
 }
 
-const COMPARISON_FEATURES = [
-  {
-    category: "AI & Reply Quotas",
-    features: [
-      { name: "Monthly AI Replies", starter: "200 replies", growth: "1,500 replies", enterprise: "Custom volume" },
-      { name: "Daily Soft Safety Cap", starter: "50 / day", growth: "250 / day", enterprise: "Custom limit" },
-      { name: "AI Assistants / Widgets", starter: "1 Assistant", growth: "Up to 3 Assistants", enterprise: "Unlimited" },
-      { name: "Knowledge Base Sources", starter: "25 sources", growth: "100 sources", enterprise: "Unlimited" },
-      { name: "Lead Capture Capacity", starter: "50 leads / mo", growth: "Unlimited leads", enterprise: "Unlimited" },
-    ],
-  },
-  {
-    category: "Branding & Customization",
-    features: [
-      { name: "Remove Agentify Badge", starter: "—", growth: "✓ Included", enterprise: "✓ Included" },
-      { name: "Custom Avatar & Colors", starter: "✓ Included", growth: "✓ Included", enterprise: "✓ Included" },
-      { name: "Custom Domain & Hosted Chat", starter: "—", growth: "✓ Included", enterprise: "✓ Full White-label" },
-    ],
-  },
-  {
-    category: "Support & Integrations",
-    features: [
-      { name: "Support Level", starter: "Standard Email", growth: "Priority Support", enterprise: "Dedicated SLA & Slack" },
-      { name: "Webhooks & Lead Exports", starter: "✓ Included", growth: "✓ Included", enterprise: "✓ Custom Webhooks" },
-      { name: "Security & Role Access", starter: "1 Admin Seat", growth: "3 Team Seats", enterprise: "Custom RBAC" },
-    ],
-  },
-];
+type PublicPlan = PricingViewProps["plans"]["starter"];
+
+function formatPlanLimit(limit: number | null, unit: string, unlimited = "Unlimited"): string {
+  return limit === null ? unlimited : `${limit.toLocaleString("en-US")} ${unit}`;
+}
+
+function comparisonFeatures(plans: PricingViewProps["plans"]) {
+  return [
+    {
+      category: "AI & Reply Quotas",
+      features: [
+        {
+          name: "Monthly AI Replies",
+          starter: formatPlanLimit(plans.starter.messages, "replies", "Custom volume"),
+          growth: formatPlanLimit(plans.growth.messages, "replies", "Custom volume"),
+          enterprise: formatPlanLimit(plans.enterprise.messages, "replies", "Custom volume"),
+        },
+        {
+          name: "AI Assistants / Widgets",
+          starter: formatPlanLimit(plans.starter.widgets, "Assistant"),
+          growth: formatPlanLimit(plans.growth.widgets, "Assistants"),
+          enterprise: formatPlanLimit(plans.enterprise.widgets, "Assistants"),
+        },
+        {
+          name: "Knowledge Base Sources",
+          starter: formatPlanLimit(plans.starter.knowledge_sources, "sources"),
+          growth: formatPlanLimit(plans.growth.knowledge_sources, "sources"),
+          enterprise: formatPlanLimit(plans.enterprise.knowledge_sources, "sources"),
+        },
+        {
+          name: "Lead Capture Capacity",
+          starter: formatPlanLimit(plans.starter.leads, "leads / cycle"),
+          growth: formatPlanLimit(plans.growth.leads, "leads / cycle"),
+          enterprise: formatPlanLimit(plans.enterprise.leads, "leads / cycle"),
+        },
+      ],
+    },
+    {
+      category: "Branding & Customization",
+      features: [
+        { name: "Remove Agentify Badge", starter: "—", growth: "✓ Included", enterprise: "✓ Included" },
+        { name: "Custom Avatar & Colors", starter: "✓ Included", growth: "✓ Included", enterprise: "✓ Included" },
+        { name: "Custom Domain & Hosted Chat", starter: "—", growth: "✓ Included", enterprise: "✓ Full White-label" },
+      ],
+    },
+    {
+      category: "Support & Integrations",
+      features: [
+        { name: "Support Level", starter: "Standard Email", growth: "Priority Support", enterprise: "Dedicated SLA & Slack" },
+        { name: "Webhooks & Lead Exports", starter: "✓ Included", growth: "✓ Included", enterprise: "✓ Custom Webhooks" },
+        { name: "Security & Role Access", starter: "1 Admin Seat", growth: "3 Team Seats", enterprise: "Custom RBAC" },
+      ],
+    },
+  ];
+}
 
 const FAQS = [
   {
@@ -63,9 +95,9 @@ const FAQS = [
       "Yes. Upgrades apply immediately with full access to your expanded AI reply limits. If you request a downgrade, your current limits remain active until the end of your prepaid 30-day billing period so you always receive what you paid for.",
   },
   {
-    question: "What happens when I reach my monthly AI reply limit?",
+    question: "What happens when I reach my billing-cycle AI reply limit?",
     answer:
-      "Agentify never surprises you with automated overage charges. When your monthly reply limit is reached, your assistant will pause further AI answers until your billing cycle resets, or you can upgrade instantly from your dashboard.",
+      "Agentify never surprises you with automated overage charges. When your billing-cycle reply limit is reached, your assistant will pause further AI answers until your billing cycle resets, or you can upgrade instantly from your dashboard.",
   },
   {
     question: "What payment currencies and methods do you support?",
@@ -92,6 +124,7 @@ const FAQS = [
 export function PricingView({
   user,
   subscription,
+  plans,
 }: PricingViewProps) {
   const router = useRouter();
   // USD-only billing — no currency toggle
@@ -102,6 +135,12 @@ export function PricingView({
   const isStarterCurrent = user && subscription?.plan === "starter" && subscription?.status === "active";
   const isGrowthCurrent = user && subscription?.plan === "growth" && subscription?.status === "active";
   const isPending = user && subscription?.status === "pending";
+  const comparisonRows = comparisonFeatures(plans);
+  const assistantCountLabel = (plan: PublicPlan) =>
+    formatPlanLimit(
+      plan.widgets,
+      plan.widgets === 1 ? "Assistant" : "Assistants"
+    );
 
   const handleSelectPlan = async (plan: "starter" | "growth") => {
     setCheckoutError(null);
@@ -211,9 +250,11 @@ export function PricingView({
 
                 <div className="mt-4 mb-3 flex items-baseline gap-2">
                   <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                    $2
+                    {plans.starter.price_usd === null ? "Custom" : `$${plans.starter.price_usd}`}
                   </span>
-                  <span className="text-sm font-medium text-slate-400">/month</span>
+                  {plans.starter.price_usd !== null && (
+                    <span className="text-sm font-medium text-slate-400">/month</span>
+                  )}
                 </div>
 
                 <p className="text-xs text-slate-400 leading-relaxed min-h-[40px]">
@@ -227,11 +268,11 @@ export function PricingView({
               <div className="grid grid-cols-2 gap-2 mb-6 p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] text-[11px]">
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">AI Replies</span>
-                  <span className="text-slate-200 font-semibold">200 / month</span>
+                  <span className="text-slate-200 font-semibold">{formatPlanLimit(plans.starter.messages, "/ month")}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Assistants</span>
-                  <span className="text-slate-200 font-semibold">1 Assistant</span>
+                  <span className="text-slate-200 font-semibold">{assistantCountLabel(plans.starter)}</span>
                 </div>
               </div>
 
@@ -239,19 +280,19 @@ export function PricingView({
               <ul className="space-y-3 mb-8 text-xs text-slate-300 font-medium">
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>200 AI-generated replies per month</span>
+                  <span>{formatPlanLimit(plans.starter.messages, "AI-generated replies per billing cycle")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>1 AI Assistant & Embeddable Widget</span>
+                  <span>{assistantCountLabel(plans.starter)} & Embeddable Widget</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>25 Knowledge Base sources</span>
+                  <span>{formatPlanLimit(plans.starter.knowledge_sources, "Knowledge Base sources")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>50 Leads captured per month</span>
+                  <span>{formatPlanLimit(plans.starter.leads, "leads captured per billing cycle")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -315,9 +356,11 @@ export function PricingView({
 
                 <div className="mt-4 mb-3 flex items-baseline gap-2">
                   <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                    $10
+                    {plans.growth.price_usd === null ? "Custom" : `$${plans.growth.price_usd}`}
                   </span>
-                  <span className="text-sm font-medium text-slate-400">/month</span>
+                  {plans.growth.price_usd !== null && (
+                    <span className="text-sm font-medium text-slate-400">/month</span>
+                  )}
                 </div>
 
                 <p className="text-xs text-slate-300 leading-relaxed min-h-[40px]">
@@ -331,11 +374,11 @@ export function PricingView({
               <div className="grid grid-cols-2 gap-2 mb-6 p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-[11px]">
                 <div>
                   <span className="text-indigo-300/80 block text-[10px] uppercase font-bold tracking-wider">AI Replies</span>
-                  <span className="text-white font-bold">1,500 / month</span>
+                  <span className="text-white font-bold">{formatPlanLimit(plans.growth.messages, "/ month")}</span>
                 </div>
                 <div>
                   <span className="text-indigo-300/80 block text-[10px] uppercase font-bold tracking-wider">Assistants</span>
-                  <span className="text-white font-bold">Up to 3 Assistants</span>
+                  <span className="text-white font-bold">{assistantCountLabel(plans.growth)}</span>
                 </div>
               </div>
 
@@ -343,19 +386,19 @@ export function PricingView({
               <ul className="space-y-3 mb-8 text-xs text-slate-200 font-medium">
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>1,500 AI-generated replies</strong> per month</span>
+                  <span><strong>{formatPlanLimit(plans.growth.messages, "AI-generated replies")}</strong> per billing cycle</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>Up to 3 AI assistants</strong> & custom widgets</span>
+                  <span><strong>{assistantCountLabel(plans.growth)}</strong> & custom widgets</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>100 Knowledge Base sources</span>
+                  <span>{formatPlanLimit(plans.growth.knowledge_sources, "Knowledge Base sources")}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>Unlimited leads captured</strong></span>
+                  <span><strong>{formatPlanLimit(plans.growth.leads, "leads captured")}</strong></span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -427,11 +470,11 @@ export function PricingView({
               <div className="grid grid-cols-2 gap-2 mb-6 p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.04] text-[11px]">
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">AI Replies</span>
-                  <span className="text-slate-200 font-semibold">Custom Volume</span>
+                  <span className="text-slate-200 font-semibold">{formatPlanLimit(plans.enterprise.messages, "replies", "Custom Volume")}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Assistants</span>
-                  <span className="text-slate-200 font-semibold">Unlimited</span>
+                  <span className="text-slate-200 font-semibold">{assistantCountLabel(plans.enterprise)}</span>
                 </div>
               </div>
 
@@ -495,25 +538,25 @@ export function PricingView({
                     Features & Limits
                   </th>
                   <th className="py-4 px-6 text-white font-extrabold text-center w-1/5">
-                    Starter
+                    {plans.starter.name}
                     <span className="block text-[10px] font-normal text-slate-400 mt-0.5">
-                      $2/mo
+                      {plans.starter.price_usd === null ? "Custom" : `$${plans.starter.price_usd}/mo`}
                     </span>
                   </th>
                   <th className="py-4 px-6 text-indigo-400 font-extrabold text-center w-1/5 bg-indigo-500/[0.04]">
-                    Growth
+                    {plans.growth.name}
                     <span className="block text-[10px] font-normal text-indigo-300/80 mt-0.5">
-                      $10/mo
+                      {plans.growth.price_usd === null ? "Custom" : `$${plans.growth.price_usd}/mo`}
                     </span>
                   </th>
                   <th className="py-4 px-6 text-white font-extrabold text-center w-1/5">
-                    Enterprise
+                    {plans.enterprise.name}
                     <span className="block text-[10px] font-normal text-slate-400 mt-0.5">Custom</span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.06]">
-                {COMPARISON_FEATURES.map((section, sIndex) => (
+                {comparisonRows.map((section, sIndex) => (
                   <>
                     <tr key={`sec-${sIndex}`} className="bg-white/[0.02]">
                       <td

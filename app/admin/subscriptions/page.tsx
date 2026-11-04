@@ -17,7 +17,7 @@ export default async function AdminSubscriptionsPage() {
             Subscriptions Management
           </h1>
           <p className="text-slate-400 text-sm">
-            Audit subscription logs, change active tiers manually, reset AI quota usages, and suspend access.
+            Review subscription state, usage and payment records. Plan changes and billing periods advance only after verified payments.
           </p>
         </div>
       </div>

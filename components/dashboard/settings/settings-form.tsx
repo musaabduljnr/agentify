@@ -52,14 +52,16 @@ function Toggle({
   onChange,
   label,
   description,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label: string;
   description: string;
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center justify-between gap-6 rounded-2xl border border-slate-200 p-4 cursor-pointer hover:bg-slate-50">
+    <label className={`flex items-center justify-between gap-6 rounded-2xl border border-slate-200 p-4 ${disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer hover:bg-slate-50"}`}>
       <span>
         <span className="block text-sm font-bold text-slate-900">{label}</span>
         <span className="block text-sm text-slate-500">{description}</span>
@@ -68,6 +70,7 @@ function Toggle({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
+        disabled={disabled}
         className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
       />
     </label>
@@ -300,7 +303,7 @@ export function SettingsForm({
               </h3>
               <Toggle checked={privacyForm.is_enabled} onChange={(value) => setPrivacyForm({ ...privacyForm, is_enabled: value })} label="Enable public widget" description="Allow the embedded chat widget to load on approved websites." />
               <Toggle checked={privacyForm.collect_leads} onChange={(value) => setPrivacyForm({ ...privacyForm, collect_leads: value })} label="Collect lead details" description="Allow the assistant to request and store visitor contact details." />
-              <Toggle checked={privacyForm.show_branding} onChange={(value) => setPrivacyForm({ ...privacyForm, show_branding: value })} label="Show Agentify branding" description="Display Agentify branding inside the customer chat widget." />
+              <Toggle checked={privacyForm.show_branding} onChange={(value) => setPrivacyForm({ ...privacyForm, show_branding: value })} label="Show Agentify branding" description="Branding visibility is determined by your subscription plan." disabled />
               <TextareaField label="Allowed Domains" rows={5} value={privacyForm.allowed_domains} onChange={(value) => setPrivacyForm({ ...privacyForm, allowed_domains: value })} placeholder={"example.com\nwww.example.com"} />
               <p className="text-sm text-slate-500">
                 Leave allowed domains empty only if you intentionally want the widget available anywhere.

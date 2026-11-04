@@ -124,9 +124,9 @@ function StatusBadge({ status }: { status: string }) {
       icon: AlertCircle,
     },
     trialing: {
-      label: "Active",
-      class: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: CheckCircle2,
+      label: "Pending Payment",
+      class: "bg-amber-50 text-amber-700 border-amber-200",
+      icon: Clock,
     },
   };
 
@@ -556,8 +556,8 @@ export default async function BillingPage({
 
               <p className="text-xs text-slate-300 mb-6 leading-relaxed">
                 {subscription.plan === "starter"
-                  ? "Scale to 1,500 AI replies/month, 3 assistants, 100 knowledge pages, and remove Agentify branding."
-                  : "You're on our high-performance Growth tier with 1,500 monthly AI replies and unlimited lead capture."}
+                  ? "Scale to 1,500 AI replies per billing cycle, 3 assistants, 100 knowledge sources, and remove Agentify branding."
+                  : "You're on our high-performance Growth tier with 1,500 AI replies per billing cycle and unlimited lead capture."}
               </p>
 
               {subscription.plan === "starter" && (

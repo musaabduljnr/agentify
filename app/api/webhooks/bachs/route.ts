@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 const eventSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
-  created_at: z.string().optional(),
+  created_at: z.string().min(1),
   data: z.record(z.string(), z.unknown()),
 });
 
@@ -32,7 +32,7 @@ function nestedId(value: unknown): string | null {
 }
 
 function eventDate(event: BachsEvent): string {
-  const date = event.created_at ? new Date(event.created_at) : new Date();
+  const date = new Date(event.created_at);
   if (!Number.isFinite(date.getTime())) throw new Error("Bachs event has an invalid created_at value.");
   return date.toISOString();
 }

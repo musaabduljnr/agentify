@@ -1,7 +1,7 @@
 export const stats = [
   { label: "Total Conversations", value: "1,284", change: "+12%", changeType: "positive" },
   { label: "Leads Captured", value: "482", change: "+8%", changeType: "positive" },
-  { label: "Message Usage", value: "84%", change: "12,482 / 15,000", changeType: "neutral" },
+  { label: "Message Usage", value: "84%", change: "168 / 200", changeType: "neutral" },
   { label: "Assistant Status", value: "Active", change: "Online", changeType: "positive" },
 ];
 

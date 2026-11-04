@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { SettingsForm } from "@/components/dashboard/settings/settings-form";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
+import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
 import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export default async function SettingsPage() {
   const setup = await getCurrentBusinessSetup();
   if (!setup.user) redirect("/login");
   if (!setup.business) redirect("/onboarding");
+  const entitlements = await resolveBusinessEntitlements(setup.business.id);
 
   return (
     <SettingsForm
@@ -21,7 +23,10 @@ export default async function SettingsPage() {
         email: setup.user.email,
         user_metadata: setup.user.user_metadata,
       }}
-      initialWidgetConfig={setup.widgetConfig}
+      initialWidgetConfig={{
+        ...setup.widgetConfig,
+        show_branding: !entitlements.canRemoveBranding,
+      }}
     />
   );
 }

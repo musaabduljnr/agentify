@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentBusiness } from "@/lib/queries/business";
+import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
 
 const widgetConfigSchema = z.object({
   primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid color format"),
@@ -36,6 +37,7 @@ export async function updateWidgetConfig(data: WidgetConfigData) {
   try {
     const business = await getCurrentBusiness();
     if (!business) throw new Error("Unauthorized");
+    const entitlements = await resolveBusinessEntitlements(business.id);
 
     const validatedData = widgetConfigSchema.safeParse(data);
     if (!validatedData.success) {
@@ -63,7 +65,7 @@ export async function updateWidgetConfig(data: WidgetConfigData) {
         position: validatedData.data.position,
         welcome_text: validatedData.data.welcomeText,
         suggested_questions: validatedData.data.suggestedQuestions,
-        show_branding: validatedData.data.showBranding,
+        show_branding: !entitlements.canRemoveBranding,
         is_enabled: validatedData.data.isEnabled,
         collect_leads: validatedData.data.collectLeads,
         hosted_chat_enabled: validatedData.data.hostedChatEnabled,
@@ -90,6 +92,7 @@ export async function getWidgetConfig() {
   try {
     const business = await getCurrentBusiness();
     if (!business) return null;
+    const entitlements = await resolveBusinessEntitlements(business.id);
 
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -102,6 +105,7 @@ export async function getWidgetConfig() {
     return {
       ...data,
       hosted_chat_slug: data?.hosted_chat_slug || business.slug,
+      show_branding: !entitlements.canRemoveBranding,
     };
   } catch (error) {
     console.error("Fetch widget config error:", error);

@@ -3,16 +3,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  adminChangeSubscriptionPlan,
   adminChangeSubscriptionStatus,
   adminUpdateSubscriptionLimits,
-  adminResetSubscriptionUsage,
-  adminExtendSubscriptionPeriod,
   adminUpdateSubscriptionNotes,
 } from "@/lib/actions/admin-subscriptions";
 import {
   Search,
-  RotateCcw,
   Calendar,
   Loader2,
   Sliders,
@@ -22,8 +18,6 @@ import {
   AlertTriangle,
   Info,
   ShieldCheck,
-  PlusCircle,
-  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -47,10 +41,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
 
   // Form states inside the drawer
   const [notesText, setNotesText] = useState("");
-  const [targetPlan, setTargetPlan] = useState("");
   const [targetStatus, setTargetStatus] = useState("");
-  const [extendDays, setExtendDays] = useState<string>("7");
-  const [customExtDate, setCustomExtDate] = useState("");
   
   // Custom limits state
   const [limitMsgs, setLimitMsgs] = useState<number | string>("");
@@ -58,7 +49,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
   const [limitLeads, setLimitLeads] = useState<number | string>("");
   const [limitWidgets, setLimitWidgets] = useState<number | string>("");
   const [limitEmbeddings, setLimitEmbeddings] = useState<number | string>("");
-  const [currentUsageInput, setCurrentUsageInput] = useState<number | string>("");
 
   // Search & Filter logic
   const filtered = subscriptions.filter((sub) => {
@@ -100,14 +90,12 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
   const openDrawer = (sub: any) => {
     setSelectedSub(sub);
     setNotesText(sub.metadata?.admin_notes || "");
-    setTargetPlan(sub.plan);
     setTargetStatus(sub.status);
     setLimitMsgs(sub.message_limit ?? "");
     setLimitKnowledge(sub.knowledge_limit ?? "");
     setLimitLeads(sub.lead_limit ?? "");
     setLimitWidgets(sub.widget_limit ?? "");
     setLimitEmbeddings(sub.embedding_limit ?? "");
-    setCurrentUsageInput(sub.current_usage ?? "");
   };
 
   const handleSaveNotes = async () => {
@@ -125,32 +113,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       triggerToast("success", "Admin notes updated successfully.");
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to update notes.");
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const handleUpdatePlan = async () => {
-    if (!selectedSub || !targetPlan) return;
-    setLoadingId("update_plan");
-    try {
-      const res = await adminChangeSubscriptionPlan(selectedSub.id, targetPlan as any);
-      if (res.error) throw new Error(res.error);
-
-      if (res.subscription) {
-        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
-        setSelectedSub(res.subscription);
-        // Sync limits input states
-        setLimitMsgs(res.subscription.message_limit ?? "");
-        setLimitKnowledge(res.subscription.knowledge_limit ?? "");
-        setLimitLeads(res.subscription.lead_limit ?? "");
-        setLimitWidgets(res.subscription.widget_limit ?? "");
-        setLimitEmbeddings(res.subscription.embedding_limit ?? "");
-        setCurrentUsageInput(res.subscription.current_usage ?? "");
-      }
-      triggerToast("success", `Plan updated to ${targetPlan} (manual billing).`);
-    } catch (err: any) {
-      triggerToast("error", err.message || "Failed to update plan.");
     } finally {
       setLoadingId(null);
     }
@@ -184,7 +146,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
       const leadLimit = limitLeads === "" ? null : Number(limitLeads);
       const widgetLimit = limitWidgets === "" ? null : Number(limitWidgets);
       const embeddingLimit = limitEmbeddings === "" ? null : Number(limitEmbeddings);
-      const usageVal = currentUsageInput === "" ? null : Number(currentUsageInput);
 
       const res = await adminUpdateSubscriptionLimits(selectedSub.id, {
         message_limit: msgLimit,
@@ -192,7 +153,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
         lead_limit: leadLimit,
         widget_limit: widgetLimit,
         embedding_limit: embeddingLimit,
-        current_usage: usageVal,
       });
 
       if (res.error) throw new Error(res.error);
@@ -201,56 +161,9 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
         setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
         setSelectedSub(res.subscription);
       }
-      triggerToast("success", "Custom limits override applied.");
+      triggerToast("success", "Subscription limits saved.");
     } catch (err: any) {
       triggerToast("error", err.message || "Failed to apply custom limits.");
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const handleResetUsage = async () => {
-    if (!selectedSub) return;
-    if (!confirm("Are you sure you want to reset all current usage stats back to 0 for this business?")) {
-      return;
-    }
-    setLoadingId("reset_usage");
-    try {
-      const res = await adminResetSubscriptionUsage(selectedSub.id);
-      if (res.error) throw new Error(res.error);
-
-      if (res.subscription) {
-        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
-        setSelectedSub(res.subscription);
-        setCurrentUsageInput(res.subscription.current_usage ?? "");
-      }
-      triggerToast("success", "Usage metrics reset successfully.");
-    } catch (err: any) {
-      triggerToast("error", err.message || "Failed to reset usage.");
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
-  const handleExtendPeriod = async () => {
-    if (!selectedSub) return;
-    setLoadingId("extend_period");
-    try {
-      const param = extendDays === "custom" ? customExtDate : Number(extendDays);
-      if (extendDays === "custom" && !customExtDate) {
-        throw new Error("Please select a custom extension date.");
-      }
-
-      const res = await adminExtendSubscriptionPeriod(selectedSub.id, param);
-      if (res.error) throw new Error(res.error);
-
-      if (res.subscription) {
-        setSubscriptions((prev) => prev.map((s) => (s.id === selectedSub.id ? res.subscription : s)));
-        setSelectedSub(res.subscription);
-      }
-      triggerToast("success", "Subscription period extended.");
-    } catch (err: any) {
-      triggerToast("error", err.message || "Failed to extend subscription.");
     } finally {
       setLoadingId(null);
     }
@@ -472,7 +385,7 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                     {selectedSub.businesses?.name || "Subscription Details"}
                   </h3>
                   <p className="text-slate-400 text-xs font-semibold">
-                    Manage manual plan settings, limits, and status states
+                    Plan and billing-period changes require verified payments.
                   </p>
                 </div>
                 <button
@@ -526,30 +439,14 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                   </h4>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Plan Selector */}
                     <div className="p-4 bg-slate-950/40 rounded-2xl border border-slate-850 space-y-2">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                        Subscription Plan Tier
+                        Subscription Plan
                       </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={targetPlan}
-                          onChange={(e) => setTargetPlan(e.target.value)}
-                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-medium focus:outline-none"
-                        >
-                          <option value="starter">Starter</option>
-                          <option value="growth">Growth</option>
-                          <option value="business">Business</option>
-                          <option value="enterprise">Enterprise</option>
-                        </select>
-                        <Button
-                          onClick={handleUpdatePlan}
-                          disabled={loadingId === "update_plan"}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-xs font-bold px-3 py-2 rounded-xl h-auto"
-                        >
-                          {loadingId === "update_plan" ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
-                        </Button>
-                      </div>
+                      <p className="text-sm font-bold text-white capitalize">{selectedSub.plan.replace("_", " ")}</p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Plan changes are applied only after a provider-verified payment.
+                      </p>
                     </div>
 
                     {/* Status Selector */}
@@ -590,6 +487,9 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                   </h4>
 
                   <div className="p-5 bg-slate-950/40 rounded-2xl border border-slate-850 space-y-4">
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Starter and Growth quotas are fixed by the platform plan configuration. Enterprise limits may be customized here.
+                    </p>
                     <div className="grid grid-cols-2 gap-4">
                       {/* Message Limit */}
                       <div className="space-y-1">
@@ -656,18 +556,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                         />
                       </div>
 
-                      {/* Current Usage override */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          Current Usage Counter
-                        </label>
-                        <input
-                          type="number"
-                          value={currentUsageInput}
-                          onChange={(e) => setCurrentUsageInput(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none"
-                        />
-                      </div>
                     </div>
 
                     <div className="flex justify-end pt-2">
@@ -679,82 +567,14 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                         {loadingId === "apply_limits" ? (
                           <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
                         ) : null}
-                        Apply Custom Limits
+                        Save Limits
                       </Button>
                     </div>
                   </div>
                 </div>
 
-                {/* 4. Billing Period Extensions & Usage Resets */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-white flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-indigo-400" /> Billing Period Extensions & Resets
-                  </h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Period Extension */}
-                    <div className="p-4 bg-slate-950/40 rounded-2xl border border-slate-850 space-y-3">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                        Extend Billing Cycle
-                      </label>
-                      <select
-                        value={extendDays}
-                        onChange={(e) => setExtendDays(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white font-medium focus:outline-none"
-                      >
-                        <option value="7">Extend by 7 Days</option>
-                        <option value="14">Extend by 14 Days</option>
-                        <option value="30">Extend by 30 Days</option>
-                        <option value="custom">Custom End Date</option>
-                      </select>
-
-                      {extendDays === "custom" && (
-                        <input
-                          type="date"
-                          value={customExtDate}
-                          onChange={(e) => setCustomExtDate(e.target.value)}
-                          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none"
-                        />
-                      )}
-
-                      <Button
-                        onClick={handleExtendPeriod}
-                        disabled={loadingId === "extend_period"}
-                        className="w-full bg-slate-800 hover:bg-slate-705 border border-slate-700 text-xs font-bold py-2 rounded-xl h-auto mt-2"
-                      >
-                        {loadingId === "extend_period" ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                        ) : null}
-                        Apply Extension
-                      </Button>
-                    </div>
-
-                    {/* Reset Usage */}
-                    <div className="p-4 bg-slate-950/40 rounded-2xl border border-slate-850 flex flex-col justify-between space-y-3">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
-                          Reset Message Usage
-                        </label>
-                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                          Reset current message counters back to 0 and push the next reset date 30 days out.
-                        </p>
-                      </div>
-
-                      <Button
-                        onClick={handleResetUsage}
-                        disabled={loadingId === "reset_usage"}
-                        variant="destructive"
-                        className="w-full text-xs font-bold py-2 rounded-xl h-auto"
-                      >
-                        {loadingId === "reset_usage" ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                        ) : (
-                          <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
-                        )}
-                        Reset Account Usage
-                      </Button>
-                    </div>
-                  </div>
+                <div className="rounded-2xl border border-slate-850 bg-slate-950/40 p-4 text-[11px] leading-relaxed text-slate-400">
+                  Billing periods and usage quotas advance only after a provider-verified successful payment. Usage history is not manually reset or deleted.
                 </div>
 
                 {/* 5. Persistent Admin Notes */}

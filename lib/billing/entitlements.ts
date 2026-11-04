@@ -71,7 +71,7 @@ export async function resolveBusinessEntitlements(
   const { data: subscription, error } = await supabase
     .from("subscriptions")
     .select(
-      "id, business_id, plan, status, message_limit, knowledge_limit, lead_limit, widget_limit, embedding_limit, team_member_limit, daily_message_limit, current_period_end"
+      "id, business_id, plan, status, current_period_end"
     )
     .eq("business_id", businessId)
     .maybeSingle();
@@ -84,16 +84,15 @@ export async function resolveBusinessEntitlements(
   if (!validPlan(subscription.plan)) return denied(businessId, "unknown_plan");
   if (subscription.status !== "active") return denied(businessId, "inactive_subscription");
 
-  if (
-    subscription.current_period_end &&
-    new Date(subscription.current_period_end).getTime() <= Date.now()
-  ) {
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end).getTime()
+    : Number.NaN;
+  if (!Number.isFinite(periodEnd) || periodEnd <= Date.now()) {
     return denied(businessId, "expired_period");
   }
 
   const planConfig = await getEffectivePlanConfig(subscription.plan);
-  const finiteLimit = (value: number | null | undefined, fallback: number | null) =>
-    value ?? fallback ?? 999999999;
+  const finiteLimit = (value: number | null) => value ?? 999999999;
 
   return {
     businessId,
@@ -107,13 +106,13 @@ export async function resolveBusinessEntitlements(
     canUseTeamFeatures: true,
     canRemoveBranding: subscription.plan !== "starter",
     limits: {
-      messages: finiteLimit(subscription.message_limit, planConfig.messages),
-      knowledgeSources: finiteLimit(subscription.knowledge_limit, planConfig.knowledge_sources),
-      assistants: finiteLimit(subscription.widget_limit, planConfig.widgets),
-      leads: finiteLimit(subscription.lead_limit, planConfig.leads),
-      embeddings: finiteLimit(subscription.embedding_limit, planConfig.embeddings),
-      teamMembers: finiteLimit(subscription.team_member_limit, planConfig.team_members),
-      dailyMessages: finiteLimit(subscription.daily_message_limit, planConfig.daily_messages),
+      messages: finiteLimit(planConfig.messages),
+      knowledgeSources: finiteLimit(planConfig.knowledge_sources),
+      assistants: finiteLimit(planConfig.widgets),
+      leads: finiteLimit(planConfig.leads),
+      embeddings: finiteLimit(planConfig.embeddings),
+      teamMembers: finiteLimit(planConfig.team_members),
+      dailyMessages: finiteLimit(planConfig.daily_messages),
     },
   };
 }
@@ -138,4 +137,39 @@ export async function requireBusinessEntitlement(
     );
   }
   return entitlements;
+}
+
+export async function hasVerifiedPaymentForCurrentPeriod(subscription: {
+  business_id: string;
+  plan: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  created_at: string;
+}): Promise<boolean> {
+  const periodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end).getTime()
+    : Number.NaN;
+  if (!Number.isFinite(periodEnd) || periodEnd <= Date.now()) return false;
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("payment_transactions")
+    .select("id")
+    .eq("business_id", subscription.business_id)
+    .eq("plan", subscription.plan)
+    .eq("status", "success")
+    .not("verified_at", "is", null)
+    .gte("verified_at", subscription.current_period_start || subscription.created_at)
+    .lte("verified_at", subscription.current_period_end!)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[Entitlements] Failed to verify current-period payment", {
+      businessId: subscription.business_id,
+      error,
+    });
+    throw new Error("Unable to verify the current subscription payment.");
+  }
+  return Boolean(data);
 }

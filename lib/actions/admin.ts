@@ -2,15 +2,15 @@
 
 import { requireAdmin } from "@/lib/admin/require-admin";
 import { createServiceClient } from "@/utils/supabase/service";
-import { PLAN_ORDER, type PlanId } from "@/lib/billing/plans";
+import { PLAN_CONFIG, PLAN_ORDER, type PlanId } from "@/lib/billing/plans";
 import {
   DEFAULT_BILLING_SETTINGS,
   getBillingPlatformSettings,
   getEffectivePlanConfigs,
-  getEffectivePlanLimits,
   type BillingPlatformSettings,
   type EditablePlanConfig,
 } from "@/lib/billing/platform";
+import { hasVerifiedPaymentForCurrentPeriod } from "@/lib/billing/entitlements";
 import { revalidatePath } from "next/cache";
 import { generateGeminiChat, generateGeminiEmbedding } from "@/lib/ai/providers/gemini";
 import { generateOpenRouterChat } from "@/lib/ai/providers/openrouter";
@@ -177,6 +177,23 @@ export async function updateBusinessStatus(businessId: string, suspend: boolean)
 
   // Suspending works by changing the linked subscription status
   const targetStatus = suspend ? "suspended" : "active";
+  if (!suspend) {
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("subscriptions")
+      .select("business_id, plan, status, current_period_start, current_period_end, created_at")
+      .eq("business_id", businessId)
+      .maybeSingle();
+    if (subscriptionError || !subscription) {
+      return { error: subscriptionError?.message || "Subscription not found." };
+    }
+    try {
+      if (!(await hasVerifiedPaymentForCurrentPeriod(subscription))) {
+        return { error: "A verified successful payment for the current billing period is required." };
+      }
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : "Unable to verify subscription payment." };
+    }
+  }
 
   const { error } = await supabase
     .from("subscriptions")
@@ -241,30 +258,9 @@ export async function getAllSubscriptions() {
 
 export async function updateSubscriptionPlan(subscriptionId: string, plan: PlanId) {
   await requireAdmin();
-  const supabase = createServiceClient();
-
-  const planLimits = await getEffectivePlanLimits(plan);
-  const now = new Date();
-  const periodEnd = new Date();
-  periodEnd.setDate(periodEnd.getDate() + 30);
-
-  const { error } = await supabase
-    .from("subscriptions")
-    .update({
-      plan,
-      current_period_start: now.toISOString(),
-      current_period_end: periodEnd.toISOString(),
-      reset_date: periodEnd.toISOString(),
-      cancel_at_period_end: false,
-      ...planLimits,
-      updated_at: now.toISOString(),
-    })
-    .eq("id", subscriptionId);
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/admin/subscriptions");
-  return { success: true };
+  void subscriptionId;
+  void plan;
+  return { error: "Plan changes must be applied by a provider-verified successful payment." };
 }
 
 export async function updateSubscriptionCustomLimits(
@@ -279,12 +275,15 @@ export async function updateSubscriptionCustomLimits(
 
   const { data: sub, error: fetchError } = await supabase
     .from("subscriptions")
-    .select("metadata, message_limit")
+    .select("metadata, message_limit, plan")
     .eq("id", subscriptionId)
     .maybeSingle();
 
   if (fetchError || !sub) {
     return { error: fetchError?.message || "Subscription not found." };
+  }
+  if (["starter", "growth"].includes(sub.plan) && limits.message_limit !== undefined) {
+    return { error: "AI reply limits for Starter and Growth are fixed by the official plan configuration." };
   }
 
   const existingMetadata = sub.metadata || {};
@@ -372,14 +371,16 @@ export async function updateAdminBillingSettings(input: {
 
     const config = {
       name: plan.name.trim() || plan.id.replace("_", " "),
-      price_usd: normalizeLimit(plan.price_usd),
-      messages: normalizeLimit(plan.messages),
-      daily_messages: normalizeLimit(plan.daily_messages),
-      knowledge_sources: normalizeLimit(plan.knowledge_sources),
-      leads: normalizeLimit(plan.leads),
-      widgets: normalizeLimit(plan.widgets),
+      price_usd: PLAN_CONFIG[plan.id].price_usd,
+      messages: PLAN_CONFIG[plan.id].messages,
+      daily_messages: plan.id === "starter" || plan.id === "growth"
+        ? null
+        : normalizeLimit(plan.daily_messages),
+      knowledge_sources: PLAN_CONFIG[plan.id].knowledge_sources,
+      leads: PLAN_CONFIG[plan.id].leads,
+      widgets: PLAN_CONFIG[plan.id].widgets,
       embeddings: normalizeLimit(plan.embeddings),
-      features: plan.features.map((feature) => feature.trim()).filter(Boolean),
+      features: PLAN_CONFIG[plan.id].features,
       bachs_product_id: plan.bachs_product_id?.trim() || null,
       contact_sales: Boolean(plan.contact_sales),
     };
@@ -402,6 +403,43 @@ export async function updateAdminBillingSettings(input: {
 export async function updateSubscriptionStatus(subscriptionId: string, status: string) {
   await requireAdmin();
   const supabase = createServiceClient();
+
+  if (status === "active") {
+    const { data: subscription, error: subscriptionError } = await supabase
+      .from("subscriptions")
+      .select("business_id, plan, status, current_period_start, current_period_end, created_at")
+      .eq("id", subscriptionId)
+      .maybeSingle();
+
+    if (subscriptionError || !subscription) {
+      return { error: subscriptionError?.message || "Subscription not found." };
+    }
+    if (
+      subscription.status !== "active" &&
+      (!subscription.current_period_end ||
+        new Date(subscription.current_period_end).getTime() <= Date.now())
+    ) {
+      return { error: "An expired subscription requires a provider-verified successful payment." };
+    }
+
+    if (subscription.status !== "active") {
+      const { data: payment, error: paymentError } = await supabase
+        .from("payment_transactions")
+        .select("id")
+        .eq("business_id", subscription.business_id)
+        .eq("plan", subscription.plan)
+        .eq("status", "success")
+        .not("verified_at", "is", null)
+        .gte("verified_at", subscription.current_period_start || subscription.created_at)
+        .lte("verified_at", subscription.current_period_end)
+        .limit(1)
+        .maybeSingle();
+      if (paymentError) return { error: paymentError.message };
+      if (!payment) {
+        return { error: "A verified successful payment for the current billing period is required." };
+      }
+    }
+  }
 
   const { error } = await supabase
     .from("subscriptions")
@@ -857,6 +895,3 @@ export async function getAdminAISystemErrors(filters?: {
   if (error) throw error;
   return logs || [];
 }
-
-
-

@@ -1,68 +1,41 @@
 import { Check, Sparkles, HelpCircle, ArrowRight, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { 
-  getEffectivePlanConfigs, 
-  getBillingPlatformSettings, 
-} from "@/lib/billing/platform";
+import { getEffectivePlanConfigs } from "@/lib/billing/platform";
 import type { PlanId } from "@/lib/billing/plans";
 
 const planMeta: Record<"starter" | "growth" | "enterprise", {
   badge?: string;
   tagline: string;
-  usdPrice: string;
-  period: string;
   buttonText: string;
   href: string;
   highlighted: boolean;
-  replies: string;
-  agents: string;
-  knowledge: string;
-  leads: string;
-  branding: string;
 }> = {
   starter: {
     tagline: "Perfect for individuals, creators, and small stores launching AI customer engagement.",
-    usdPrice: "$2",
-    period: "/month",
     buttonText: "Get Started with Starter",
     href: "/signup?plan=starter",
     highlighted: false,
-    replies: "200 AI replies / mo",
-    agents: "1 AI Assistant",
-    knowledge: "25 knowledge pages",
-    leads: "50 leads captured",
-    branding: "Agentify badge included",
   },
   growth: {
     badge: "Most Popular",
     tagline: "Ideal for growing businesses that require multi-agent capacity and brand control.",
-    usdPrice: "$10",
-    period: "/month",
     buttonText: "Scale with Growth",
     href: "/signup?plan=growth",
     highlighted: true,
-    replies: "1,500 AI replies / mo",
-    agents: "Up to 3 AI Assistants",
-    knowledge: "100 knowledge pages",
-    leads: "Unlimited leads",
-    branding: "Remove Agentify branding",
   },
   enterprise: {
     badge: "Custom Scale",
     tagline: "Tailored volume, dedicated architecture, custom SLA, and hands-on onboarding.",
-    usdPrice: "Custom",
-    period: "",
     buttonText: "Contact Enterprise Sales",
     href: "mailto:sales@agentify.app?subject=Agentify%20Enterprise%20Plan%20Inquiry",
     highlighted: false,
-    replies: "Custom AI volume",
-    agents: "Unlimited AI Assistants",
-    knowledge: "Unlimited knowledge pages",
-    leads: "Unlimited leads",
-    branding: "Full white-label & custom domain",
   },
 };
+
+function formatPlanLimit(limit: number | null, unit: string, unlimited = "Unlimited"): string {
+  return limit === null ? unlimited : `${limit.toLocaleString("en-US")} ${unit}`;
+}
 
 const faqs = [
   {
@@ -70,7 +43,7 @@ const faqs = [
     answer: "Yes. You can upgrade immediately from your dashboard. Downgrades take effect at the end of your current billing cycle so you always receive the full value you paid for.",
   },
   {
-    question: "What happens when I reach my monthly AI reply limit?",
+    question: "What happens when I reach my billing-cycle AI reply limit?",
     answer: "To protect you from unexpected bills, we never charge surprise overage fees. Once your limit is reached, your assistant will pause until the monthly cycle resets, or you can upgrade instantly.",
   },
   {
@@ -85,7 +58,6 @@ const faqs = [
 
 export async function Pricing() {
   const configs = await getEffectivePlanConfigs();
-  const settings = await getBillingPlatformSettings();
 
   const planKeys: ("starter" | "growth" | "enterprise")[] = ["starter", "growth", "enterprise"];
 
@@ -117,6 +89,11 @@ export async function Pricing() {
             const meta = planMeta[planKey];
             const config = configs[planKey as PlanId];
             const isHighlighted = meta.highlighted;
+            const replies = formatPlanLimit(config.messages, "AI replies / billing cycle", "Custom AI volume");
+            const assistants = formatPlanLimit(
+              config.widgets,
+              config.widgets === 1 ? "AI Assistant" : "AI Assistants"
+            );
 
             return (
               <div 
@@ -139,7 +116,7 @@ export async function Pricing() {
                   {/* Title & Tagline */}
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-xl font-bold text-white tracking-tight">{config?.name || meta.replies}</h3>
+                      <h3 className="text-xl font-bold text-white tracking-tight">{config.name}</h3>
                       {planKey === "starter" && (
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white/[0.06] px-2.5 py-0.5 rounded-full">
                           Starter Pack
@@ -150,11 +127,11 @@ export async function Pricing() {
                     {/* Price Block */}
                     <div className="mt-4 mb-3 flex items-baseline gap-2">
                       <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
-                        {meta.usdPrice}
+                        {config.price_usd === null ? "Custom" : `$${config.price_usd}`}
                       </span>
-                      {meta.period && (
+                      {config.price_usd !== null && (
                         <span className="text-sm font-medium text-slate-400">
-                          {meta.period}
+                          /month
                         </span>
                       )}
                     </div>
@@ -169,11 +146,11 @@ export async function Pricing() {
                   <div className="grid grid-cols-2 gap-2 mb-6 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.04] text-[11px]">
                     <div>
                       <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">AI Replies</span>
-                      <span className="text-slate-200 font-semibold">{meta.replies}</span>
+                      <span className="text-slate-200 font-semibold">{replies}</span>
                     </div>
                     <div>
                       <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">Assistants</span>
-                      <span className="text-slate-200 font-semibold">{meta.agents}</span>
+                      <span className="text-slate-200 font-semibold">{assistants}</span>
                     </div>
                   </div>
 

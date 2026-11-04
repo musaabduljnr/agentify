@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
       suggestedQuestions: config.suggested_questions,
       avatarUrl: config.avatar_url,
       isEnabled: config.is_enabled,
-      showBranding: config.show_branding,
+      showBranding: !entitlements.canRemoveBranding,
     });
   } catch (error: unknown) {
     logErrorSync(error, "widget-config");

@@ -30,45 +30,31 @@ function asFiniteNumber(value: unknown): number | null {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
-function asStringArray(value: unknown, fallback: string[]): string[] {
-  if (!Array.isArray(value)) return fallback;
-  return value.map((entry) => String(entry).trim()).filter(Boolean);
-}
-
 function mergePlanConfig(planId: PlanId, override: Record<string, unknown> | null | undefined): EditablePlanConfig {
   const fallback = getPlanConfig(planId);
-  const priceUsd = Object.prototype.hasOwnProperty.call(override || {}, "price_usd")
-    ? asFiniteNumber(override?.price_usd)
-    : fallback.price_usd;
 
   return {
     id: planId,
     name: typeof override?.name === "string" && override.name.trim() ? override.name.trim() : fallback.name,
-    price_usd: priceUsd,
+    price_usd: fallback.price_usd,
     price_ngn: null,
-    amount_decimal: typeof override?.amount_decimal === "string" ? override.amount_decimal : fallback.amount_decimal,
-    messages: Object.prototype.hasOwnProperty.call(override || {}, "messages")
-      ? asFiniteNumber(override?.messages)
-      : fallback.messages,
-    daily_messages: Object.prototype.hasOwnProperty.call(override || {}, "daily_messages")
-      ? asFiniteNumber(override?.daily_messages)
-      : fallback.daily_messages,
-    knowledge_sources: Object.prototype.hasOwnProperty.call(override || {}, "knowledge_sources")
-      ? asFiniteNumber(override?.knowledge_sources)
-      : fallback.knowledge_sources,
-    leads: Object.prototype.hasOwnProperty.call(override || {}, "leads")
-      ? asFiniteNumber(override?.leads)
-      : fallback.leads,
-    widgets: Object.prototype.hasOwnProperty.call(override || {}, "widgets")
-      ? asFiniteNumber(override?.widgets)
-      : fallback.widgets,
+    amount_decimal: fallback.amount_decimal,
+    messages: fallback.messages,
+    daily_messages: planId === "starter" || planId === "growth"
+      ? null
+      : Object.prototype.hasOwnProperty.call(override || {}, "daily_messages")
+        ? asFiniteNumber(override?.daily_messages)
+        : fallback.daily_messages,
+    knowledge_sources: fallback.knowledge_sources,
+    leads: fallback.leads,
+    widgets: fallback.widgets,
     embeddings: Object.prototype.hasOwnProperty.call(override || {}, "embeddings")
       ? asFiniteNumber(override?.embeddings)
       : fallback.embeddings,
     team_members: Object.prototype.hasOwnProperty.call(override || {}, "team_members")
       ? asFiniteNumber(override?.team_members)
       : fallback.team_members,
-    features: asStringArray(override?.features, fallback.features),
+    features: fallback.features,
     bachs_product_id:
       typeof override?.bachs_product_id === "string" && override.bachs_product_id.trim()
         ? override.bachs_product_id.trim()

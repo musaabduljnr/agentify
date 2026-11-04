@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { activateSubscriptionPlan, resolvePlanFromProductId } from "@/lib/billing/upgrade";
-import { getEffectivePlanConfig, getEffectivePlanLimits } from "@/lib/billing/platform";
+import { getEffectivePlanLimits } from "@/lib/billing/platform";
 import { createServiceClient } from "@/utils/supabase/service";
 
 const fixtures = vi.hoisted(() => ({
@@ -42,11 +42,11 @@ vi.mock("@/lib/billing/platform", () => ({
   getEffectivePlanLimits: vi.fn(async (plan: "starter" | "growth") => ({
     message_limit: plan === "growth" ? 1500 : 200,
     knowledge_limit: plan === "growth" ? 100 : 25,
-    lead_limit: plan === "growth" ? 500 : 50,
+    lead_limit: plan === "growth" ? 999999999 : 50,
     widget_limit: plan === "growth" ? 3 : 1,
-    embedding_limit: plan === "growth" ? 30000 : 5000,
-    daily_message_limit: plan === "growth" ? 500 : 100,
-    team_member_limit: plan === "growth" ? 5 : 1,
+    embedding_limit: plan === "growth" ? 50000 : 5000,
+    daily_message_limit: 999999999,
+    team_member_limit: plan === "growth" ? 3 : 1,
   })),
 }));
 
@@ -105,7 +105,7 @@ describe("Bachs subscription activation", () => {
     expect(await resolvePlanFromProductId("unknown-product")).toBeNull();
   });
 
-  it("activates only a matching, paid Growth checkout through the atomic RPC", async () => {
+  it("applies a verified Starter-to-Growth upgrade with Growth limits through the atomic RPC", async () => {
     const result = await activateSubscriptionPlan({
       eventId: "evt-1",
       eventTimestamp: "2026-11-01T11:00:00.000Z",

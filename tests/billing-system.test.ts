@@ -142,6 +142,19 @@ describe("Bachs checkout reconciliation", () => {
     expect(fixtures.activate).not.toHaveBeenCalled();
   });
 
+  it("does not activate an unpaid or failed checkout", async () => {
+    fixtures.session.payment_status = "unpaid";
+
+    const result = await reconcileCheckoutSession("chk-1");
+
+    expect(result).toMatchObject({
+      isSuccess: false,
+      isPending: true,
+      paymentStatus: "unpaid",
+    });
+    expect(fixtures.activate).not.toHaveBeenCalled();
+  });
+
   it("does not retrieve or activate a checkout that is not owned by the business", async () => {
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn(() => createQuery(null)),

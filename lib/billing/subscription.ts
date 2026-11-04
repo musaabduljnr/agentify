@@ -7,6 +7,7 @@
 import { createServiceClient } from "@/utils/supabase/service";
 import { type PlanId } from "./plans";
 import { getEffectivePlanConfig, getEffectivePlanLimits } from "@/lib/billing/platform";
+import { getUsageSummary } from "@/lib/billing/usage";
 
 export type Subscription = {
   id: string;
@@ -46,9 +47,6 @@ export async function getBusinessSubscription(businessId: string): Promise<Subsc
     .maybeSingle();
 
   if (error || !data) return null;
-
-  // Auto-reset if needed
-  await resetMonthlyUsageIfNeeded(businessId, data);
 
   return data as Subscription;
 }
@@ -117,46 +115,7 @@ export async function getCurrentPlan(businessId: string) {
  * Get remaining usage across all resource types.
  */
 export async function getRemainingUsage(businessId: string) {
-  const supabase = createServiceClient();
-  const sub = await getBusinessSubscription(businessId);
-  if (!sub) return null;
-
-  // Get actual usage counts from usage_logs for the current period
-  const periodStart = sub.current_period_start || sub.created_at;
-
-  const { data: usageLogs } = await supabase
-    .from("usage_logs")
-    .select("type, amount")
-    .eq("business_id", businessId)
-    .gte("created_at", periodStart);
-
-  const usageByType: Record<string, number> = {};
-  (usageLogs || []).forEach((log: any) => {
-    usageByType[log.type] = (usageByType[log.type] || 0) + log.amount;
-  });
-
-  return {
-    messages: {
-      used: usageByType["message"] || 0,
-      limit: sub.message_limit,
-      remaining: Math.max(0, sub.message_limit - (usageByType["message"] || 0)),
-    },
-    embeddings: {
-      used: usageByType["embedding"] || 0,
-      limit: sub.embedding_limit,
-      remaining: Math.max(0, sub.embedding_limit - (usageByType["embedding"] || 0)),
-    },
-    leads: {
-      used: usageByType["lead"] || 0,
-      limit: sub.lead_limit,
-      remaining: Math.max(0, sub.lead_limit - (usageByType["lead"] || 0)),
-    },
-    knowledge_sources: {
-      used: usageByType["knowledge_source"] || 0,
-      limit: sub.knowledge_limit,
-      remaining: Math.max(0, sub.knowledge_limit - (usageByType["knowledge_source"] || 0)),
-    },
-  };
+  return getUsageSummary(businessId);
 }
 
 /**
@@ -165,89 +124,9 @@ export async function getRemainingUsage(businessId: string) {
  */
 export async function resetMonthlyUsageIfNeeded(
   businessId: string,
-  subscription?: any
+  subscription?: Subscription
 ): Promise<void> {
-  const supabase = createServiceClient();
-
-  let sub = subscription;
-  if (!sub) {
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .eq("business_id", businessId)
-      .maybeSingle();
-    sub = data;
-  }
-
-  if (!sub) return;
-
-  const now = new Date();
-  const resetDate = sub.reset_date ? new Date(sub.reset_date) : null;
-  const periodEnd = sub.current_period_end ? new Date(sub.current_period_end) : null;
-
-  const needsReset = (resetDate && now >= resetDate) || (periodEnd && now >= periodEnd);
-
-  if (!needsReset) return;
-
-  const nextResetDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-  // Audit H2: If there is a pending downgrade scheduled for period end, apply it now
-  const pendingDowngrade = sub.metadata?.downgrade_to as string | undefined;
-  if (pendingDowngrade && ["starter", "growth"].includes(pendingDowngrade)) {
-    const targetLimits = await getEffectivePlanLimits(pendingDowngrade as PlanId);
-    const cleanMetadata = { ...sub.metadata };
-    delete cleanMetadata.downgrade_to;
-    delete cleanMetadata.downgrade_requested_at;
-
-    const { data: updatedDowngrade, error: downgradeError } = await supabase
-      .from("subscriptions")
-      .update({
-        plan: pendingDowngrade,
-        cancel_at_period_end: false,
-        metadata: cleanMetadata,
-        current_usage: 0,
-        reset_date: nextResetDate.toISOString(),
-        current_period_start: now.toISOString(),
-        current_period_end: nextResetDate.toISOString(),
-        ...targetLimits,
-        updated_at: now.toISOString(),
-      })
-      .eq("business_id", businessId)
-      .or(`current_period_end.lte.${now.toISOString()},reset_date.lte.${now.toISOString()}`)
-      .select("id");
-
-    if (!downgradeError && updatedDowngrade && updatedDowngrade.length > 0) {
-      sub.plan = pendingDowngrade;
-      sub.current_usage = 0;
-      sub.cancel_at_period_end = false;
-      sub.metadata = cleanMetadata;
-      sub.current_period_start = now.toISOString();
-      sub.current_period_end = nextResetDate.toISOString();
-      sub.reset_date = nextResetDate.toISOString();
-      return;
-    }
-  }
-
-  // Audit M8: Use conditional update to prevent multiple writes on consecutive failed requests
-  const { data: updatedRows, error } = await supabase
-    .from("subscriptions")
-    .update({
-      current_usage: 0,
-      reset_date: nextResetDate.toISOString(),
-      current_period_start: now.toISOString(),
-      current_period_end: nextResetDate.toISOString(),
-      updated_at: now.toISOString(),
-    })
-    .eq("business_id", businessId)
-    .or(`current_period_end.lte.${now.toISOString()},reset_date.lte.${now.toISOString()}`)
-    .select("id");
-
-  if (error) {
-    console.error("Failed to reset monthly usage:", error);
-  } else if (updatedRows && updatedRows.length > 0) {
-    sub.current_usage = 0;
-    sub.reset_date = nextResetDate.toISOString();
-    sub.current_period_start = now.toISOString();
-    sub.current_period_end = nextResetDate.toISOString();
-  }
+  // Billing periods advance only after a provider-verified payment event.
+  void businessId;
+  void subscription;
 }

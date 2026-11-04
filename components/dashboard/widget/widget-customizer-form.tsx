@@ -200,8 +200,11 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
                   {config.collectLeads ? "Lead Collection On" : "Lead Collection Off"}
                 </button>
                  <button 
-                  onClick={() => setConfig({...config, showBranding: !config.showBranding})}
-                  className={`px-6 py-2 rounded-xl text-xs font-bold border-2 transition-all ${config.showBranding ? 'bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
+                   type="button"
+                   disabled
+                   title="Branding visibility is determined by your subscription plan."
+                   onClick={() => setConfig({...config, showBranding: !config.showBranding})}
+                   className={`px-6 py-2 rounded-xl text-xs font-bold border-2 transition-all cursor-not-allowed opacity-70 ${config.showBranding ? 'bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-slate-50 border-slate-200 text-slate-400'}`}
                 >
                   {config.showBranding ? "Branding On" : "Branding Off"}
                 </button>

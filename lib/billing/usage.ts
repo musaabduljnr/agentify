@@ -98,15 +98,6 @@ export async function releaseUsageQuota(reservation: UsageReservation): Promise<
   invalidateUsageCache(reservation.businessId);
 }
 
-// Maps usage types to their limit columns on the subscription
-const USAGE_LIMIT_MAP: Record<UsageType, string> = {
-  message: "message_limit",
-  widget_chat: "message_limit", // widget chats count against message limit
-  embedding: "embedding_limit",
-  lead: "lead_limit",
-  knowledge_source: "knowledge_limit",
-};
-
 /**
  * Increment usage for a business. Inserts a usage_log and updates current_usage.
  */
@@ -166,19 +157,35 @@ export async function checkUsageLimit(
   const supabase = createServiceClient();
 
   // 1. Get subscription
-  const { data: sub } = await supabase
+  const { data: sub, error: subscriptionError } = await supabase
     .from("subscriptions")
     .select("*")
     .eq("business_id", businessId)
     .maybeSingle();
 
+  if (subscriptionError) {
+    console.error("[Usage] Failed to load subscription usage period", {
+      businessId,
+      error: subscriptionError,
+    });
+    throw new Error("Unable to verify your subscription usage.");
+  }
   if (!sub) {
     return { allowed: false, used: 0, limit: 0, remaining: 0 };
   }
 
-  // 2. Get the limit for this usage type
-  const limitColumn = USAGE_LIMIT_MAP[type];
-  const limit = (sub as any)[limitColumn] as number;
+  const entitlements = await resolveBusinessEntitlements(businessId);
+  if (!entitlements.active) {
+    return { allowed: false, used: 0, limit: 0, remaining: 0 };
+  }
+
+  const limit = type === "message" || type === "widget_chat"
+    ? entitlements.limits.messages
+    : type === "embedding"
+      ? entitlements.limits.embeddings
+      : type === "lead"
+        ? entitlements.limits.leads
+        : entitlements.limits.knowledgeSources;
 
   // If limit is very large (enterprise), always allow
   if (limit >= 999999999) {
@@ -200,15 +207,48 @@ export async function checkUsageLimit(
       .select("amount")
       .eq("business_id", businessId)
       .in("type", ["message", "widget_chat"])
+      .eq("status", "completed")
       .gte("created_at", periodStart);
 
     totalUsed = (usageLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+  } else if (type === "knowledge_source") {
+    const { count, error } = await supabase
+      .from("knowledge_sources")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId);
+    if (error) {
+      console.error("[Usage] Failed to count knowledge sources", { businessId, error });
+      throw new Error("Unable to verify knowledge source usage.");
+    }
+    totalUsed = count || 0;
+  } else if (type === "lead") {
+    const [{ count, error }, { data: usageLogs, error: usageError }] = await Promise.all([
+      supabase
+        .from("leads")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", businessId)
+        .gte("created_at", periodStart),
+      supabase
+        .from("usage_logs")
+        .select("amount")
+        .eq("business_id", businessId)
+        .eq("type", "lead")
+        .eq("status", "completed")
+        .gte("created_at", periodStart),
+    ]);
+    if (error || usageError) {
+      console.error("[Usage] Failed to count lead usage", { businessId, error, usageError });
+      throw new Error("Unable to verify lead usage.");
+    }
+    const loggedUsage = (usageLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
+    totalUsed = Math.max(count || 0, loggedUsage);
   } else {
     const { data: usageLogs } = await supabase
       .from("usage_logs")
       .select("amount")
       .eq("business_id", businessId)
       .eq("type", logType)
+      .eq("status", "completed")
       .gte("created_at", periodStart);
 
     totalUsed = (usageLogs || []).reduce((sum: number, log: any) => sum + log.amount, 0);
@@ -345,6 +385,7 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
     .select("amount")
     .eq("business_id", businessId)
     .in("type", ["message", "widget_chat"])
+    .eq("status", "completed")
     .gte("created_at", periodStart);
 
   if (monthlyError) {
@@ -373,6 +414,7 @@ export async function verifyAIUsageLimits(businessId: string): Promise<{
     .select("amount")
     .eq("business_id", businessId)
     .in("type", ["message", "widget_chat"])
+    .eq("status", "completed")
     .gte("created_at", startOfToday.toISOString());
 
   if (dailyError) {

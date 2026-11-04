@@ -6,40 +6,42 @@ This guide explains how AI message quotas, vector embedding limits, API rate lim
 
 ## 1. Platform Subscription Quotas
 
-Each customer business profile is bound to a subscription plan tier. Quotas are monitored monthly and reset at the end of the billing period.
+Each customer business profile is bound to a subscription plan tier. AI replies and lead capture are counted per verified billing cycle. Knowledge-source and assistant limits are caps on resources currently attached to the business. A new billing period begins only after a successful, provider-verified payment.
 
-| Plan Tier | Price (Monthly) | AI Message Limit | Knowledge Sources | Leads Limit | Embeddings Limit |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Free Trial** | Free | 100 messages | 5 sources | 50 leads | 1,000 chunks |
-| **Starter** | ₦5,000 NGN | 5,000 messages | 25 sources | 1,000 leads | 20,000 chunks |
-| **Growth** | ₦15,000 NGN | 25,000 messages | 100 sources | 10,000 leads | 100,000 chunks |
-| **Enterprise**| Custom | Unlimited | Unlimited | Unlimited | Unlimited |
+| Plan Tier | Price (Monthly) | AI Replies / Billing Cycle | Assistants / Widgets | Knowledge Sources | Leads / Billing Cycle | Embeddings |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Starter** | $2 USD | 200 replies | 1 | 25 | 50 | 5,000 chunks |
+| **Growth** | $10 USD | 1,500 replies | 3 | 100 | Unlimited | 50,000 chunks |
+| **Enterprise** | Custom | Custom volume | Custom | Custom | Unlimited | Custom |
 
 ### Quota Consumption Triggers
-- **AI Messages**: Consumed when a visitor sends a chat message through the widget/hosted chat, or when the admin uses the dashboard message simulator.
-- **Embeddings**: Consumed when RAG files (PDFs, text files, crawled site URLs) are processed. Each file is split into chunks of text, and each chunk generates one vector embedding.
-- **Leads**: Consumed when the AI extracts contact details (Email, Phone, Name) from a conversation and updates the CRM lead pipeline.
+- **AI Replies**: One unit is consumed after an AI reply is successfully generated and saved. Widget, hosted-chat, and dashboard chat requests share the same business-level monthly quota. Failed generations do not count.
+- **Assistants and widgets**: Each assistant counts toward the plan's business-level cap.
+- **Knowledge sources**: Each website, document, FAQ, or manual source counts as one source. Pages crawled and embeddings generated do not create extra sources.
+- **Leads**: A newly captured lead counts once per billing cycle. Updating an existing lead does not count again. Growth leads are unlimited.
+- **Embeddings**: Consumed when trained knowledge is processed. Each text chunk counts as one vector embedding.
 
 ---
 
 ## 2. Hit-Limit Runout Estimations
 
-To estimate how long a tenant's message quota will last based on daily incoming visitor volume:
+To estimate how long the monthly reply quota will last based on daily successful AI replies:
 
 $$\text{Days Before Limit} = \frac{\text{Plan Message Limit}}{\text{Average Chat Messages Per Day}}$$
 
 ### Estimations Grid (Days of Operations)
 
-| Daily Messages | Free Trial (100) | Starter (5,000) | Growth (25,000) |
-| :--- | :--- | :--- | :--- |
-| **5 msgs/day** | 20 days | 1,000 days | 5,000 days |
-| **20 msgs/day** | 5 days | 250 days | 1,250 days |
-| **100 msgs/day** | 1 day | 50 days | 250 days |
-| **500 msgs/day** | < 1 day | 10 days | 50 days |
-| **1,000 msgs/day**| < 1 day | 5 days | 25 days |
+| Successful replies / day | Starter (200 / cycle) | Growth (1,500 / cycle) |
+| :--- | :--- | :--- |
+| **5 replies/day** | 40 days | 300 days |
+| **20 replies/day** | 10 days | 75 days |
+| **50 replies/day** | 4 days | 30 days |
+| **100 replies/day** | 2 days | 15 days |
+| **200 replies/day** | 1 day | 7.5 days |
+| **500 replies/day** | Less than 1 day | 3 days |
 
 > [!TIP]
-> Standard monthly billing runs on a 30-day cycle. A Starter plan easily supports up to **166 messages per day** without hitting the limit. A Growth plan supports up to **833 messages per day**.
+> The billing-cycle quota is authoritative. Usage resets only at the start of a verified billing period.
 
 ---
 
@@ -92,19 +94,14 @@ $$\text{Cost Per Message} \approx \text{₦0.80 NGN}$$
 
 Admin tracking of raw API costs against the pricing of subscription packages:
 
-### A. Starter Plan (₦5,000 NGN)
-- **Quota Limit**: 5,000 messages
-- **Max Raw API Cost**: $5,000 \times \$0.0005325 = \$2.66 \text{ USD}$
-- **Max Raw Cost in NGN**: $\approx \text{₦3,990 NGN}$
-- **Gross Profit Margin (At 100% usage)**: **20.2%** (Profit: ₦1,010 NGN)
-- **Gross Profit Margin (At average 20% usage)**: **84.0%** (Profit: ₦4,202 NGN)
+### A. Starter Plan ($2 USD)
+- **Quota Limit**: 200 replies
+- **Estimated maximum raw API cost**: $200 \times \$0.0005325 = \$0.1065 \text{ USD}$
+- **Estimated gross margin at 100% usage**: **94.7%**
 
-### B. Growth Plan (₦15,000 NGN)
-- **Quota Limit**: 25,000 messages
-- **Max Raw API Cost**: $25,000 \times \$0.0005325 = \$13.31 \text{ USD}$
-- **Max Raw Cost in NGN**: $\approx \text{₦19,965 NGN}$
-- **Gross Profit Margin (At 100% usage)**: **-33.1%** (Gross Loss: -₦4,965 NGN)
-- **Gross Profit Margin (At average 20% usage)**: **73.4%** (Profit: ₦11,007 NGN)
+### B. Growth Plan ($10 USD)
+- **Quota Limit**: 1,500 replies
+- **Estimated maximum raw API cost**: $1,500 \times \$0.0005325 = \$0.79875 \text{ USD}$
+- **Estimated gross margin at 100% usage**: **92.0%**
 
-> [!WARNING]
-> Growth plan users who utilize 100% of their quotas represent a negative margin due to the high volume of input tokens sent via RAG (3,300 tokens context retrieved per chat). Keep an eye on high-usage accounts inside the dashboard's "High Usage Businesses" monitor. Consider adding prompt caches or system prompt reductions to optimize input sizes if margins decay.
+> These estimates use the example token and model pricing assumptions above; actual provider costs vary by model and request size.

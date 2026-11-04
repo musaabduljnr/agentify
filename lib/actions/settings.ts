@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
+import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
 
 export async function updateProfileSettings(data: {
   full_name: string;
@@ -119,12 +120,13 @@ export async function updatePrivacySettings(data: {
       .map((domain) => domain.trim().toLowerCase())
       .filter(Boolean);
 
+    const entitlements = await resolveBusinessEntitlements(setup.business.id);
     const supabase = await createClient();
     const { error } = await supabase
       .from("widget_configs")
       .update({
         collect_leads: data.collect_leads,
-        show_branding: data.show_branding,
+        show_branding: !entitlements.canRemoveBranding,
         is_enabled: data.is_enabled,
         allowed_domains: allowedDomains,
       })

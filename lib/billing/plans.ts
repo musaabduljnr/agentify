@@ -31,7 +31,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     price_ngn: null,
     amount_decimal: "2.00",
     messages: 200,
-    daily_messages: 50,
+    daily_messages: null,
     knowledge_sources: 25,
     leads: 50,
     widgets: 1,
@@ -39,7 +39,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     team_members: 1,
     features: [
       "1 AI Assistant",
-      "200 AI replies/month",
+      "200 AI replies per billing cycle",
       "25 knowledge sources",
       "50 leads captured",
       "1 chat widget",
@@ -56,7 +56,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     price_ngn: null,
     amount_decimal: "10.00",
     messages: 1500,
-    daily_messages: 200,
+    daily_messages: null,
     knowledge_sources: 100,
     leads: null, // unlimited leads
     widgets: 3,
@@ -65,7 +65,7 @@ export const PLAN_CONFIG: Record<PlanId, PlanConfig> = {
     highlighted: true,
     features: [
       "Up to 3 AI Assistants",
-      "1,500 AI replies/month",
+      "1,500 AI replies per billing cycle",
       "100 knowledge sources",
       "Unlimited leads captured",
       "3 chat widgets",

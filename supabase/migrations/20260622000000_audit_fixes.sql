@@ -148,6 +148,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 7. Row-Level Security (RLS) Tightening
 -- Profiles
 DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
+DROP POLICY IF EXISTS "Profiles viewable by owner or admin" ON public.profiles;
 CREATE POLICY "Profiles viewable by owner or admin" ON public.profiles
   FOR SELECT USING (
     auth.uid() = id OR
@@ -156,6 +157,7 @@ CREATE POLICY "Profiles viewable by owner or admin" ON public.profiles
 
 -- Demo Businesses
 DROP POLICY IF EXISTS "Anyone can view active demo businesses" ON public.demo_businesses;
+DROP POLICY IF EXISTS "Owner or admin can view demo businesses" ON public.demo_businesses;
 CREATE POLICY "Owner or admin can view demo businesses" ON public.demo_businesses
   FOR SELECT USING (
     created_by = auth.uid() OR

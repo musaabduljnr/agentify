@@ -3,6 +3,7 @@ import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { PricingView } from "@/components/pricing/pricing-view";
 import { createClient } from "@/utils/supabase/server";
+import { getEffectivePlanConfigs } from "@/lib/billing/platform";
 
 export const metadata: Metadata = {
   title: "Pricing & Plans — Agentify",
@@ -13,6 +14,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function PricingPage() {
+  const planConfigs = await getEffectivePlanConfigs();
+  const publicPlan = (planId: "starter" | "growth" | "enterprise") => {
+    const { name, price_usd, messages, daily_messages, knowledge_sources, leads, widgets, features } =
+      planConfigs[planId];
+    return { name, price_usd, messages, daily_messages, knowledge_sources, leads, widgets, features };
+  };
   const supabase = await createClient();
   const {
     data: { user },
@@ -51,6 +58,11 @@ export default async function PricingPage() {
         <PricingView
           user={user ? { id: user.id, email: user.email } : null}
           subscription={subscription}
+          plans={{
+            starter: publicPlan("starter"),
+            growth: publicPlan("growth"),
+            enterprise: publicPlan("enterprise"),
+          }}
         />
       </main>
       <Footer />
