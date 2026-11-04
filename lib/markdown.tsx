@@ -7,6 +7,39 @@ import React from "react";
 export function formatMarkdownToReact(text: string): React.ReactNode {
   if (!text) return null;
 
+  const codeBlockPattern = /```([^\r\n`]*)\r?\n([\s\S]*?)```/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let partIndex = 0;
+
+  while ((match = codeBlockPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(<React.Fragment key={`text-${partIndex++}`}>{formatMarkdownText(text.slice(lastIndex, match.index))}</React.Fragment>);
+    }
+
+    parts.push(
+      <pre key={`code-${partIndex++}`} className="my-3 max-w-full overflow-x-auto rounded-lg border bg-muted/60 p-3 text-xs leading-relaxed text-foreground">
+        {match[1].trim() && (
+          <span className="mb-2 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {match[1].trim()}
+          </span>
+        )}
+        <code className="whitespace-pre">{match[2].replace(/\n$/, "")}</code>
+      </pre>
+    );
+    lastIndex = codeBlockPattern.lastIndex;
+  }
+
+  if (lastIndex === 0) return formatMarkdownText(text);
+  if (lastIndex < text.length) {
+    parts.push(<React.Fragment key={`text-${partIndex}`}>{formatMarkdownText(text.slice(lastIndex))}</React.Fragment>);
+  }
+
+  return <>{parts}</>;
+}
+
+function formatMarkdownText(text: string): React.ReactNode {
   // 1. Escape HTML to prevent XSS
   let escaped = text
     .replace(/&/g, "&amp;")

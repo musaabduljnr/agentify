@@ -14,14 +14,14 @@ export function MessageBubble({ message }: { message: Message }) {
   return (
     <div
       className={cn(
-        "flex w-full gap-3 mb-4 animate-in fade-in slide-in-from-bottom-2",
+        "mb-5 flex w-full gap-3 animate-in fade-in slide-in-from-bottom-2",
         isUser ? "flex-row-reverse" : "flex-row"
       )}
     >
       <div
         className={cn(
-          "flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border shadow",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
+          "flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-lg border",
+          isUser ? "border-primary bg-primary text-primary-foreground" : "bg-background text-primary"
         )}
       >
         {isUser ? <User size={16} /> : <Bot size={16} />}
@@ -34,20 +34,20 @@ export function MessageBubble({ message }: { message: Message }) {
       >
         <div
           className={cn(
-            "max-w-full rounded-lg px-4 py-2 text-sm break-words",
+            "max-w-full rounded-xl px-4 py-3 text-sm",
             isUser
-              ? "bg-primary text-primary-foreground shadow-md"
-              : "bg-muted shadow-sm"
+                ? "bg-primary text-primary-foreground"
+                : "border bg-background"
           )}
         >
-          <div className="leading-relaxed break-words">{formatMarkdownToReact(message.content)}</div>
+            <div className="break-words leading-6 [overflow-wrap:anywhere]">{formatMarkdownToReact(message.content)}</div>
         </div>
-        <span className="text-[10px] text-muted-foreground px-1">
+          <time dateTime={message.created_at} className="px-1 text-[10px] text-muted-foreground">
           {new Date(message.created_at).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}
-        </span>
+          </time>
       </div>
     </div>
   );
