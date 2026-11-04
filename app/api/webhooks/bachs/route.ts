@@ -4,6 +4,10 @@ import { getBachsWebhookSecret, verifyBachsWebhookEvent } from "@/lib/payments/b
 import { logErrorSync } from "@/lib/monitoring/log-error";
 import { createServiceClient } from "@/utils/supabase/service";
 import { revalidatePath } from "next/cache";
+import { createBusinessNotification } from "@/lib/notifications/service";
+import { sendTransactionalEmail } from "@/lib/email/send-email";
+import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
+import { PaymentFailedEmail } from "@/lib/email/templates/payment-failed-email";
 
 const eventSchema = z.object({
   id: z.string().min(1),
@@ -331,7 +335,7 @@ export async function POST(request: Request) {
           throw new Error("Bachs paid invoice is missing required billing identifiers.");
         }
 
-        const { error } = await supabase.rpc("apply_bachs_invoice_paid_event", {
+        const { data: invoiceResult, error } = await supabase.rpc("apply_bachs_invoice_paid_event", {
           p_event_id: event.id,
           p_subscription_id: invoiceSubscriptionId,
           p_invoice_id: invoiceId,
@@ -343,6 +347,61 @@ export async function POST(request: Request) {
           p_event_created_at: createdAt,
         });
         if (error) throw new Error(`Failed to apply paid Bachs invoice: ${error.message}`);
+
+        if (!(asRecord(invoiceResult).duplicate === true)) {
+          try {
+            const { data: subscription, error: subscriptionError } = await supabase
+              .from("subscriptions")
+              .select("business_id, plan")
+              .or(`bachs_subscription_id.eq.${invoiceSubscriptionId},provider_subscription_id.eq.${invoiceSubscriptionId}`)
+              .maybeSingle();
+            if (subscriptionError) throw new Error(`Failed to resolve renewed subscription: ${subscriptionError.message}`);
+            if (subscription) {
+              const { data: business, error: businessError } = await supabase
+                .from("businesses")
+                .select("name, contact_email")
+                .eq("id", subscription.business_id)
+                .maybeSingle();
+              if (businessError) throw new Error(`Failed to resolve renewed business: ${businessError.message}`);
+
+              const notification = await createBusinessNotification({
+                businessId: subscription.business_id,
+                eventKey: `billing-invoice:${invoiceId}`,
+                category: "billing",
+                title: "Subscription renewed",
+                message: `Your ${subscription.plan === "growth" ? "Growth" : "Starter"} subscription payment was successful.`,
+                href: "/dashboard/billing",
+                severity: "success",
+                metadata: { invoiceId, amount },
+              }).catch((error) => {
+                logErrorSync(error, "bachs-renewal-notification", {
+                  metadata: { eventId: event.id, invoiceId },
+                });
+                return null;
+              });
+
+              if (business) {
+                await sendTransactionalEmail({
+                  businessId: subscription.business_id,
+                  notificationId: notification?.ownerNotificationId || undefined,
+                  to: business.contact_email,
+                  subject: "Your Agentify subscription has been renewed",
+                  templateName: "payment-success-email",
+                  react: PaymentSuccessEmail({
+                    businessName: business.name || "there",
+                    plan: subscription.plan === "growth" ? "Growth" : "Starter",
+                    amount: `$${Number(amount).toFixed(2)} USD`,
+                    billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+                  }),
+                });
+              }
+            }
+          } catch (notificationError) {
+            logErrorSync(notificationError, "bachs-renewal-notification", {
+              metadata: { eventId: event.id, invoiceId },
+            });
+          }
+        }
         break;
       }
 
@@ -387,6 +446,95 @@ export async function POST(request: Request) {
           p_event_created_at: createdAt,
         });
         if (error) throw new Error(`Failed to apply Bachs subscription status: ${error.message}`);
+
+        if (event.type === "invoice.payment_failed") {
+          try {
+            const { data: subscription, error: subscriptionError } = await supabase
+              .from("subscriptions")
+              .select("business_id, plan, status, provider_event_created_at")
+              .or(`bachs_subscription_id.eq.${statusSubscriptionId},provider_subscription_id.eq.${statusSubscriptionId}`)
+              .maybeSingle();
+            if (subscriptionError) throw new Error(`Failed to resolve past-due subscription: ${subscriptionError.message}`);
+
+            if (
+              subscription?.status === "past_due" &&
+              (!subscription.provider_event_created_at ||
+                new Date(subscription.provider_event_created_at).getTime() <= new Date(createdAt).getTime())
+            ) {
+              const { data: business, error: businessError } = await supabase
+                .from("businesses")
+                .select("name, contact_email")
+                .eq("id", subscription.business_id)
+                .maybeSingle();
+              if (businessError) throw new Error(`Failed to resolve past-due business: ${businessError.message}`);
+
+              const notification = await createBusinessNotification({
+                businessId: subscription.business_id,
+                eventKey: `billing-payment-failed:${event.id}`,
+                category: "billing",
+                title: "Subscription payment failed",
+                message: "Your subscription payment could not be processed. Update your billing details to avoid interruption.",
+                href: "/dashboard/billing",
+                severity: "critical",
+                metadata: { subscriptionId: statusSubscriptionId },
+              }).catch((error) => {
+                logErrorSync(error, "bachs-payment-failed-notification", {
+                  metadata: { eventId: event.id, subscriptionId: statusSubscriptionId },
+                });
+                return null;
+              });
+
+              if (business) {
+                await sendTransactionalEmail({
+                  businessId: subscription.business_id,
+                  notificationId: notification?.ownerNotificationId || undefined,
+                  to: business.contact_email,
+                  subject: "Action required: Agentify subscription payment failed",
+                  templateName: "payment-failed-email",
+                  react: PaymentFailedEmail({
+                    businessName: business.name || "there",
+                    plan: subscription.plan,
+                    billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+                  }),
+                });
+              }
+            }
+          } catch (notificationError) {
+            logErrorSync(notificationError, "bachs-payment-failed-notification", {
+              metadata: { eventId: event.id, subscriptionId: statusSubscriptionId },
+            });
+          }
+        } else {
+          try {
+            const { data: subscription, error: subscriptionError } = await supabase
+              .from("subscriptions")
+              .select("business_id, plan, status, provider_event_created_at")
+              .or(`bachs_subscription_id.eq.${statusSubscriptionId},provider_subscription_id.eq.${statusSubscriptionId}`)
+              .maybeSingle();
+            if (subscriptionError) throw new Error(`Failed to resolve subscription status: ${subscriptionError.message}`);
+
+            const attentionStatuses = ["past_due", "unpaid", "paused", "cancelled", "pending_payment"];
+            const eventIsCurrent = !subscription?.provider_event_created_at ||
+              new Date(subscription.provider_event_created_at).getTime() <= new Date(createdAt).getTime();
+            if (subscription && attentionStatuses.includes(subscription.status) && eventIsCurrent) {
+              const statusLabel = subscription.status.replace("_", " ");
+              await createBusinessNotification({
+                businessId: subscription.business_id,
+                eventKey: `billing-status:${event.id}`,
+                category: "billing",
+                title: `Subscription ${statusLabel}`,
+                message: `Your ${subscription.plan === "growth" ? "Growth" : "Starter"} subscription is ${statusLabel}.`,
+                href: "/dashboard/billing",
+                severity: ["past_due", "unpaid"].includes(subscription.status) ? "critical" : "warning",
+                metadata: { subscriptionId: statusSubscriptionId, status: subscription.status },
+              });
+            }
+          } catch (notificationError) {
+            logErrorSync(notificationError, "bachs-subscription-status-notification", {
+              metadata: { eventId: event.id, subscriptionId: statusSubscriptionId },
+            });
+          }
+        }
         break;
       }
 

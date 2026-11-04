@@ -12,6 +12,7 @@ import {
   ChevronRight,
   TrendingDown,
   Activity,
+  BellRing,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -66,13 +67,22 @@ export default async function AdminOverviewPage() {
   return (
     <div className="space-y-10">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
-          Overview Control Panel
-        </h1>
-        <p className="text-slate-400 text-sm">
-          Platform-wide health metrics, payment streams, and usage auditing.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight mb-2">
+            Overview Control Panel
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Platform-wide health metrics, payment streams, and usage auditing.
+          </p>
+        </div>
+        <Link
+          href="/admin/notifications"
+          className="inline-flex items-center gap-2 self-start rounded-xl border border-slate-700 bg-slate-900 px-4 py-2.5 text-sm font-bold text-indigo-300 hover:bg-slate-800 sm:self-auto"
+        >
+          <BellRing className="h-4 w-4" />
+          Manage announcements
+        </Link>
       </div>
 
       {/* Early Access & Quota Safety Monitors */}

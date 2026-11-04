@@ -1,6 +1,22 @@
 -- ==========================================================
 -- Notifications Schema & Row-Level Security (RLS) Policies
 -- ==========================================================
+-- DEPRECATED historical bootstrap only. Do not apply to a migrated project.
+-- Current durable notifications and channel preferences are defined in
+-- supabase/migrations/20261105000000_persistent_notifications.sql.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'notification_preferences'
+      AND column_name = 'category'
+  ) THEN
+    RAISE EXCEPTION 'This legacy schema has been superseded. Do not reapply it; use the persistent notifications migration.';
+  END IF;
+END;
+$$;
 
 -- 1. Create notification_preferences table
 CREATE TABLE IF NOT EXISTS public.notification_preferences (

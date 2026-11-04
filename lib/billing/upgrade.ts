@@ -8,6 +8,7 @@ import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { PaymentSuccessEmail } from "@/lib/email/templates/payment-success-email";
 import { getConfig } from "@/lib/config/platform-config";
 import { revalidatePath } from "next/cache";
+import { createBusinessNotification } from "@/lib/notifications/service";
 
 type CheckoutTransaction = {
   id: string;
@@ -245,6 +246,24 @@ export async function activateSubscriptionPlan(
     duplicate?: boolean;
   };
   const activePlan = result.plan || transaction.plan;
+  const paymentNotification = !result.duplicate
+    ? await createBusinessNotification({
+        businessId: transaction.business_id,
+        eventKey: `billing-payment:${params.eventId || transaction.id}`,
+        category: "billing",
+        title: "Subscription payment successful",
+        message: `Your ${activePlan === "growth" ? "Growth" : "Starter"} subscription is active.`,
+        href: "/dashboard/billing",
+        severity: "success",
+        metadata: { plan: activePlan, transactionId: transaction.id },
+      }).catch((error) => {
+        logErrorSync(error, "bachs-payment-notification", {
+          businessId: transaction.business_id,
+          metadata: { eventId: params.eventId },
+        });
+        return null;
+      })
+    : null;
 
   try {
     revalidatePath("/dashboard", "layout");
@@ -261,6 +280,7 @@ export async function activateSubscriptionPlan(
       const appUrl = await getAppBaseUrl();
       await sendTransactionalEmail({
         businessId: transaction.business_id,
+        notificationId: paymentNotification?.ownerNotificationId || undefined,
         to: business.contact_email,
         subject: `Your Agentify ${activePlan === "growth" ? "Growth" : "Starter"} subscription is active`,
         templateName: "payment-success-email",

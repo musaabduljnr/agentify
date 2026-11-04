@@ -4,18 +4,17 @@ import * as React from "react";
 import { getResendClient } from "@/lib/email/resend";
 import { getNodemailerTransporter } from "@/lib/email/nodemailer";
 import { getBusinessNotificationEmail, validateEmail } from "@/lib/email/recipients";
-import { logEmailSent, logEmailFailed } from "@/lib/email/email-log";
+import { logEmailSent, logEmailFailed, logEmailSkipped } from "@/lib/email/email-log";
 import { createServiceClient } from "@/utils/supabase/service";
 import { getConfig, getConfigWithEnvFallback, getSecretWithEnvFallback } from "@/lib/config/platform-config";
 
-// Maps email template names to notification preferences table columns
 const TEMPLATE_PREF_MAP: Record<string, string> = {
-  "new-lead-email": "email_new_leads",
-  "booking-request-email": "email_booking_requests",
-  "support-request-email": "email_support_requests",
-  "usage-warning-email": "email_usage_warnings",
-  "payment-success-email": "email_payment_updates",
-  "payment-failed-email": "email_payment_updates",
+  "new-lead-email": "leads",
+  "booking-request-email": "booking",
+  "support-request-email": "support",
+  "usage-warning-email": "usage",
+  "payment-success-email": "billing",
+  "payment-failed-email": "billing",
 };
 
 interface SendTransactionalEmailInput {
@@ -25,53 +24,23 @@ interface SendTransactionalEmailInput {
   templateName: string;
   react: React.ReactElement;
   fallbackText?: string;
+  notificationId?: string;
 }
 
-/**
- * Fetches or initializes default notification preferences for a business.
- */
-async function getOrInitializePreferences(businessId: string) {
+async function isEmailEnabled(businessId: string, category: string): Promise<boolean> {
   const supabase = createServiceClient();
-  
-  try {
-    const { data: pref, error } = await supabase
-      .from("notification_preferences")
-      .select("*")
-      .eq("business_id", businessId)
-      .maybeSingle();
+  const { data, error } = await supabase
+    .from("notification_preferences")
+    .select("email_enabled")
+    .eq("business_id", businessId)
+    .eq("category", category)
+    .is("user_id", null)
+    .maybeSingle();
 
-    if (pref) return pref;
-
-    // Initialize default row if it does not exist
-    const { data: newPref, error: insertErr } = await supabase
-      .from("notification_preferences")
-      .insert({ business_id: businessId })
-      .select()
-      .single();
-
-    if (insertErr) {
-      console.error(`[PREFS WARNING] Failed to initialize default notification preferences for business ${businessId}:`, insertErr.message);
-      // Return fallback defaulting all to true
-      return {
-        email_new_leads: true,
-        email_support_requests: true,
-        email_booking_requests: true,
-        email_usage_warnings: true,
-        email_payment_updates: true,
-      };
-    }
-
-    return newPref;
-  } catch (err) {
-    console.error(`[PREFS CRITICAL] Exception resolving preferences for business ${businessId}:`, err);
-    return {
-      email_new_leads: true,
-      email_support_requests: true,
-      email_booking_requests: true,
-      email_usage_warnings: true,
-      email_payment_updates: true,
-    };
+  if (error) {
+    throw new Error(`Failed to load ${category} notification preference: ${error.message}`);
   }
+  return data?.email_enabled ?? true;
 }
 
 /**
@@ -89,6 +58,13 @@ export async function sendTransactionalEmail(
   const emailsEnabled = await getConfig("feature_flags", "enable_emails");
   if (emailsEnabled === "false") {
     console.log("[EMAIL SKIP] Emails are globally disabled via feature flags.");
+    if (input.notificationId) {
+      await logEmailSkipped({
+        notificationId: input.notificationId,
+        recipient: input.to?.trim() || "unresolved",
+        provider: "disabled",
+      });
+    }
     return { success: true, skipped: true };
   }
 
@@ -117,6 +93,7 @@ export async function sendTransactionalEmail(
           templateName: input.templateName,
           provider,
           errorMessage: errMsg,
+          notificationId: input.notificationId,
         });
       }
       return { success: false, error: errMsg };
@@ -126,11 +103,17 @@ export async function sendTransactionalEmail(
     if (input.businessId) {
       const prefColumn = TEMPLATE_PREF_MAP[input.templateName];
       if (prefColumn) {
-        const prefs = await getOrInitializePreferences(input.businessId);
-        const isEnabled = (prefs as any)[prefColumn] ?? true;
+        const isEnabled = await isEmailEnabled(input.businessId, prefColumn);
 
         if (!isEnabled) {
           console.log(`[EMAIL SKIP] Template '${input.templateName}' is disabled in notification preferences for business ${input.businessId}`);
+          if (input.notificationId) {
+            await logEmailSkipped({
+              notificationId: input.notificationId,
+              recipient: finalTo,
+              provider,
+            });
+          }
           return { success: true, skipped: true };
         }
       }
@@ -152,6 +135,7 @@ export async function sendTransactionalEmail(
           templateName: input.templateName,
           provider,
           errorMessage: errMsg,
+          notificationId: input.notificationId,
         });
       }
       return { success: false, error: errMsg };
@@ -177,6 +161,7 @@ export async function sendTransactionalEmail(
             templateName: input.templateName,
             provider,
             errorMessage: errMsg,
+            notificationId: input.notificationId,
           });
         }
         return { success: false, error: errMsg };
@@ -201,6 +186,8 @@ export async function sendTransactionalEmail(
             templateName: input.templateName,
             provider,
             responseBody: { messageId: info.messageId, response: info.response },
+            notificationId: input.notificationId,
+            providerMessageId: info.messageId,
           });
         }
 
@@ -218,6 +205,7 @@ export async function sendTransactionalEmail(
             provider,
             errorMessage: errMsg,
             responseBody: sendError,
+            notificationId: input.notificationId,
           });
         }
         return { success: false, error: errMsg };
@@ -235,6 +223,7 @@ export async function sendTransactionalEmail(
             templateName: input.templateName,
             provider,
             errorMessage: errMsg,
+            notificationId: input.notificationId,
           });
         }
         return { success: false, error: errMsg };
@@ -261,6 +250,7 @@ export async function sendTransactionalEmail(
             templateName: input.templateName,
             provider,
             errorMessage: errMsg,
+            notificationId: input.notificationId,
             responseBody: sendError,
           });
         }
@@ -276,6 +266,8 @@ export async function sendTransactionalEmail(
           templateName: input.templateName,
           provider,
           responseBody: responseData,
+          notificationId: input.notificationId,
+          providerMessageId: responseData?.id,
         });
       }
 
@@ -294,6 +286,7 @@ export async function sendTransactionalEmail(
         templateName: input.templateName,
         provider,
         errorMessage: errMsg,
+        notificationId: input.notificationId,
       });
     }
     return { success: false, error: errMsg };
@@ -333,4 +326,3 @@ export async function sendTeamInvitationEmail({
     }),
   });
 }
-

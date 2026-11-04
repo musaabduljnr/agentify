@@ -60,6 +60,11 @@ export default function NotificationsSettingsPage() {
     email_booking_requests: true,
     email_usage_warnings: true,
     email_payment_updates: true,
+    in_app_new_leads: true,
+    in_app_support_requests: true,
+    in_app_booking_requests: true,
+    in_app_usage_warnings: true,
+    in_app_payment_updates: true,
   });
 
   useEffect(() => {
@@ -76,6 +81,11 @@ export default function NotificationsSettingsPage() {
             email_booking_requests: data.preferences.email_booking_requests ?? true,
             email_usage_warnings: data.preferences.email_usage_warnings ?? true,
             email_payment_updates: data.preferences.email_payment_updates ?? true,
+            in_app_new_leads: data.preferences.in_app_new_leads ?? true,
+            in_app_support_requests: data.preferences.in_app_support_requests ?? true,
+            in_app_booking_requests: data.preferences.in_app_booking_requests ?? true,
+            in_app_usage_warnings: data.preferences.in_app_usage_warnings ?? true,
+            in_app_payment_updates: data.preferences.in_app_payment_updates ?? true,
           });
           setSupportEmail(data.supportEmail || "");
           setContactEmailFallback(data.contactEmail || "");
@@ -219,6 +229,45 @@ export default function NotificationsSettingsPage() {
               onChange={(value) => setForm({ ...form, email_payment_updates: value })}
               label="Billing updates"
               description="Receive invoices, successful renewal confirmations, and failed card notifications."
+            />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-4 mb-5">
+            <Bell className="w-5 h-5 text-indigo-600" />
+            In-app Preferences
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Toggle
+              checked={form.in_app_new_leads}
+              onChange={(value) => setForm({ ...form, in_app_new_leads: value })}
+              label="New lead alerts"
+              description="Show captured lead updates in the notification bell and feed."
+            />
+            <Toggle
+              checked={form.in_app_booking_requests}
+              onChange={(value) => setForm({ ...form, in_app_booking_requests: value })}
+              label="Booking requests"
+              description="Show visitor appointment and scheduling requests."
+            />
+            <Toggle
+              checked={form.in_app_support_requests}
+              onChange={(value) => setForm({ ...form, in_app_support_requests: value })}
+              label="Support requests"
+              description="Show customer technical issues and complaints."
+            />
+            <Toggle
+              checked={form.in_app_usage_warnings}
+              onChange={(value) => setForm({ ...form, in_app_usage_warnings: value })}
+              label="Usage warnings"
+              description="Show alerts when workspace usage approaches its limits."
+            />
+            <Toggle
+              checked={form.in_app_payment_updates}
+              onChange={(value) => setForm({ ...form, in_app_payment_updates: value })}
+              label="Billing updates"
+              description="Show successful renewals, payment failures, and subscription updates."
             />
           </div>
         </div>

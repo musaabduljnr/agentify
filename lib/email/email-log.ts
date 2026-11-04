@@ -7,6 +7,8 @@ interface LogEmailSentInput {
   templateName: string;
   provider: string;
   responseBody?: any;
+  notificationId?: string;
+  providerMessageId?: string;
 }
 
 interface LogEmailFailedInput {
@@ -17,6 +19,41 @@ interface LogEmailFailedInput {
   provider: string;
   errorMessage: string;
   responseBody?: any;
+  notificationId?: string;
+}
+
+interface LogEmailSkippedInput {
+  notificationId: string;
+  recipient: string;
+  provider: string;
+}
+
+async function logNotificationDelivery(params: {
+  notificationId?: string;
+  recipient: string;
+  provider: string;
+  providerMessageId?: string;
+  status: "sent" | "failed" | "skipped";
+  errorMessage?: string;
+}): Promise<void> {
+  if (!params.notificationId) return;
+
+  try {
+    const supabase = createServiceClient();
+    const { error } = await supabase.from("notification_deliveries").insert({
+      notification_id: params.notificationId,
+      channel: "email",
+      recipient: params.recipient,
+      provider: params.provider,
+      provider_message_id: params.providerMessageId || null,
+      status: params.status,
+      error_message: params.errorMessage || null,
+    });
+
+    if (error) console.error("[NOTIFICATION DELIVERY LOGGING ERROR]", error.message);
+  } catch (error) {
+    console.error("[NOTIFICATION DELIVERY LOGGING ERROR]", error);
+  }
 }
 
 /**
@@ -43,6 +80,14 @@ export async function logEmailSent(params: LogEmailSentInput): Promise<void> {
   } catch (err) {
     console.error(`[EMAIL LOGGING CRITICAL] Exception logging sent email:`, err);
   }
+
+  await logNotificationDelivery({
+    notificationId: params.notificationId,
+    recipient: params.recipient,
+    provider: params.provider,
+    providerMessageId: params.providerMessageId,
+    status: "sent",
+  });
 }
 
 /**
@@ -70,4 +115,21 @@ export async function logEmailFailed(params: LogEmailFailedInput): Promise<void>
   } catch (err) {
     console.error(`[EMAIL LOGGING CRITICAL] Exception logging failed email:`, err);
   }
+
+  await logNotificationDelivery({
+    notificationId: params.notificationId,
+    recipient: params.recipient,
+    provider: params.provider,
+    status: "failed",
+    errorMessage: params.errorMessage,
+  });
+}
+
+export async function logEmailSkipped(params: LogEmailSkippedInput): Promise<void> {
+  await logNotificationDelivery({
+    notificationId: params.notificationId,
+    recipient: params.recipient,
+    provider: params.provider,
+    status: "skipped",
+  });
 }

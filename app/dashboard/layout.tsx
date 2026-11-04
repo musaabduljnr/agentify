@@ -14,7 +14,10 @@ export default async function DashboardLayout({
 
   // Fetch subscription data for sidebar
   let subscriptionData = null;
-  let notifications: Awaited<ReturnType<typeof getDashboardNotifications>> = [];
+  let notificationData: Awaited<ReturnType<typeof getDashboardNotifications>> = {
+    notifications: [],
+    unreadCount: 0,
+  };
   if (setup.business && setup.subscription) {
     try {
       const usage = await getUsageSummary(setup.business.id);
@@ -35,9 +38,9 @@ export default async function DashboardLayout({
     }
 
     try {
-      notifications = await getDashboardNotifications(setup.business.id, setup.subscription);
-    } catch {
-      notifications = [];
+      notificationData = await getDashboardNotifications(setup.business.id, setup.user.id);
+    } catch (error) {
+      console.error("Failed to load dashboard notifications:", error);
     }
   }
 
@@ -49,7 +52,9 @@ export default async function DashboardLayout({
       businesses={setup.businesses}
       assistant={setup.assistant}
       subscription={subscriptionData}
-      notifications={notifications}
+      notifications={notificationData.notifications}
+      notificationUnreadCount={notificationData.unreadCount}
+      notificationUserId={setup.user.id}
     >
       <ClaimDemoHandler userId={setup.user.id} />
       {children}

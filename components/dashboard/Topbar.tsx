@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Menu, User, Bot, Building2, AlertTriangle, CheckCircle2, Info, ChevronDown } from "lucide-react";
 import type { DashboardNotification } from "@/lib/queries/notifications";
 import { LanguageSwitcher } from "@/components/ui/language-switcher";
+import { createClient } from "@/utils/supabase/client";
+import { getNotificationFeed, markAllNotificationsRead, markNotificationRead } from "@/lib/actions/notifications";
+import { toast } from "sonner";
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -14,30 +17,77 @@ interface TopbarProps {
   businesses?: any[];
   assistant: any;
   notifications?: DashboardNotification[];
+  notificationUnreadCount?: number;
+  notificationUserId?: string;
 }
 
-const levelStyles: Record<DashboardNotification["level"], string> = {
+const levelStyles: Record<DashboardNotification["severity"], string> = {
   critical: "bg-red-50 text-red-600 border-red-100",
   warning: "bg-amber-50 text-amber-600 border-amber-100",
   success: "bg-emerald-50 text-emerald-600 border-emerald-100",
   info: "bg-indigo-50 text-indigo-600 border-indigo-100",
 };
 
-function NotificationIcon({ level }: { level: DashboardNotification["level"] }) {
-  if (level === "success") return <CheckCircle2 className="h-4 w-4" />;
-  if (level === "info") return <Info className="h-4 w-4" />;
+function NotificationIcon({ severity }: { severity: DashboardNotification["severity"] }) {
+  if (severity === "success") return <CheckCircle2 className="h-4 w-4" />;
+  if (severity === "info") return <Info className="h-4 w-4" />;
   return <AlertTriangle className="h-4 w-4" />;
 }
 
-export function Topbar({ onMenuClick, user, profile, business, businesses = [], assistant, notifications = [] }: TopbarProps) {
+export function Topbar({
+  onMenuClick,
+  user,
+  profile,
+  business,
+  businesses = [],
+  assistant,
+  notifications = [],
+  notificationUnreadCount = 0,
+  notificationUserId,
+}: TopbarProps) {
   const displayName = profile?.full_name || user?.email || "User";
   const [open, setOpen] = useState(false);
+  const [currentNotifications, setCurrentNotifications] = useState(notifications);
+  const [unreadCount, setUnreadCount] = useState(notificationUnreadCount);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const result = await getNotificationFeed();
+      setCurrentNotifications(result.notifications as DashboardNotification[]);
+      setUnreadCount(result.unreadCount);
+    } catch (error) {
+      console.error("Failed to refresh notifications:", error);
+    }
+  }, []);
 
   const handleSwitchBusiness = (businessId: string) => {
     document.cookie = `active_business_id=${businessId}; path=/; max-age=${30 * 24 * 60 * 60}; SameSite=Lax`;
     window.location.reload();
   };
+
+  useEffect(() => {
+    if (!business?.id || !notificationUserId) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`notifications:${business.id}:${notificationUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${notificationUserId}`,
+        },
+        () => void refreshNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [business?.id, notificationUserId, refreshNotifications]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
@@ -55,7 +105,25 @@ export function Topbar({ onMenuClick, user, profile, business, businesses = [], 
       document.removeEventListener("touchstart", handleClickOutside);
     };
   }, [open]);
-  const criticalCount = notifications.filter((item) => item.level === "critical").length;
+  const criticalCount = currentNotifications.filter((item) => item.severity === "critical" && !item.read_at).length;
+
+  const handleMarkRead = async (notificationId: string) => {
+    const result = await markNotificationRead(notificationId);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    await refreshNotifications();
+  };
+
+  const handleMarkAllRead = async () => {
+    const result = await markAllNotificationsRead();
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    await refreshNotifications();
+  };
 
   return (
     <header className="min-h-20 bg-white border-b border-slate-200 flex items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-10">
@@ -115,13 +183,13 @@ export function Topbar({ onMenuClick, user, profile, business, businesses = [], 
             aria-label="Open notifications"
           >
             <Bell className="w-5 h-5" />
-            {notifications.length > 0 && (
+            {unreadCount > 0 && (
               <span
                 className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white px-1 text-[10px] font-extrabold text-white ${
                   criticalCount > 0 ? "bg-red-500" : "bg-indigo-600"
                 }`}
               >
-                {notifications.length}
+                {unreadCount > 99 ? "99+" : unreadCount}
               </span>
             )}
           </button>
@@ -131,25 +199,38 @@ export function Topbar({ onMenuClick, user, profile, business, businesses = [], 
               <div className="border-b border-slate-100 p-4">
                 <p className="text-sm font-extrabold text-slate-900">Notifications</p>
                 <p className="text-xs text-slate-500">Important business and account updates.</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <Link href="/dashboard/notifications" onClick={() => setOpen(false)} className="text-xs font-bold text-indigo-600 hover:text-indigo-700">
+                    View all
+                  </Link>
+                  {unreadCount > 0 && (
+                    <button onClick={handleMarkAllRead} className="text-xs font-semibold text-slate-500 hover:text-slate-800">
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="max-h-[360px] overflow-y-auto p-2">
-                {notifications.length === 0 ? (
+                {currentNotifications.length === 0 ? (
                   <div className="p-6 text-center">
                     <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
                     <p className="text-sm font-bold text-slate-900">All clear</p>
                     <p className="mt-1 text-xs text-slate-500">No important updates right now.</p>
                   </div>
                 ) : (
-                  notifications.map((notification) => (
+                  currentNotifications.map((notification) => (
                     <Link
                       key={notification.id}
                       href={notification.href}
-                      onClick={() => setOpen(false)}
-                      className="flex gap-3 rounded-2xl p-3 transition-colors hover:bg-slate-50"
+                      onClick={() => {
+                        setOpen(false);
+                        void handleMarkRead(notification.id);
+                      }}
+                      className={`flex gap-3 rounded-2xl p-3 transition-colors hover:bg-slate-50 ${notification.read_at ? "opacity-70" : "bg-indigo-50/40"}`}
                     >
-                      <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${levelStyles[notification.level]}`}>
-                        <NotificationIcon level={notification.level} />
+                      <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${levelStyles[notification.severity]}`}>
+                        <NotificationIcon severity={notification.severity} />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-sm font-bold text-slate-900 break-words">{notification.title}</span>

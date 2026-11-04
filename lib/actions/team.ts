@@ -14,6 +14,7 @@ import {
   releaseUsageQuota,
   reserveUsageQuota,
 } from "@/lib/billing/usage";
+import { createBusinessNotification } from "@/lib/notifications/service";
 
 // Helper to normalize error messages
 function getErrorMessage(err: unknown): string {
@@ -180,7 +181,7 @@ export async function inviteTeamMember(email: string, role: string) {
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
     // 5. Insert invitation
-    const { error: inviteError } = await serviceClient
+    const { data: invitation, error: inviteError } = await serviceClient
       .from("team_invitations")
       .insert({
         business_id: ctx.business.id,
@@ -191,13 +192,27 @@ export async function inviteTeamMember(email: string, role: string) {
         invited_by: ctx.user.id,
         expires_at: expiresAt.toISOString(),
         last_sent_at: new Date().toISOString(),
-      });
+      })
+      .select("id")
+      .single();
 
-    if (inviteError) {
+    if (inviteError || !invitation) {
       await releaseUsageQuota(reservation);
-      throw inviteError;
+      throw inviteError || new Error("Invitation could not be created.");
     }
     await completeUsageQuota(reservation);
+    await createBusinessNotification({
+      businessId: ctx.business.id,
+      eventKey: `team-invitation:${invitation.id}`,
+      category: "team",
+      title: "Team invitation sent",
+      message: `An invitation was sent to ${normalizedEmail}.`,
+      href: "/dashboard/settings/team",
+      severity: "info",
+      metadata: { invitationId: invitation.id },
+    }).catch((error) => {
+      console.error("Failed to create team invitation notification:", error);
+    });
 
     // 6. Generate Link
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";

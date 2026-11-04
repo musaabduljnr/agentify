@@ -21,6 +21,26 @@ import { rateLimit } from "@/lib/security/rate-limit";
 import { validateFileUpload } from "@/lib/security/file-upload";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { countWords } from "@/lib/scraper/text-cleaner";
+import { createBusinessNotification } from "@/lib/notifications/service";
+
+async function notifyKnowledgeProcessingFailure(
+  businessId: string,
+  sourceId: string,
+  sourceTitle: string
+) {
+  await createBusinessNotification({
+    businessId,
+    eventKey: `knowledge-processing-failed:${sourceId}`,
+    category: "knowledge",
+    title: "Knowledge source processing failed",
+    message: `“${sourceTitle}” could not be processed. Review it and try again.`,
+    href: "/dashboard/knowledge",
+    severity: "critical",
+    metadata: { sourceId },
+  }).catch((error) => {
+    console.error("Failed to create knowledge-processing notification:", error);
+  });
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -436,6 +456,7 @@ export async function processWebsiteSource(sourceId: string) {
       })
       .eq("id", sourceId);
 
+    await notifyKnowledgeProcessingFailure(business.id, sourceId, source.title);
     revalidatePath("/dashboard/knowledge");
     return { error: err.message || "Scraping failed." };
   }
@@ -446,8 +467,11 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
   depth?: number;
   autoEmbed?: boolean;
 }) {
+  let businessId: string | null = null;
+  let sourceTitle = "Website source";
   try {
     const business = await getCurrentBusiness();
+    businessId = business.id;
     await requireBusinessEntitlement(business.id, "canAddKnowledge");
     const supabase = await createClient();
 
@@ -460,6 +484,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
       .single();
 
     if (fetchError || !source) return { error: "Knowledge source not found." };
+    sourceTitle = source.title;
     if (source.type !== "website") return { error: "Only website sources can be crawled." };
     if (!source.source_url) return { error: "No URL to crawl." };
 
@@ -534,6 +559,10 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
 
     if (updateError) return { error: updateError.message };
 
+    if (trainedStatus === "failed") {
+      await notifyKnowledgeProcessingFailure(business.id, sourceId, source.title);
+    }
+
     // Delete existing knowledge chunks
     await supabase
       .from("knowledge_chunks")
@@ -564,6 +593,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
       })
       .eq("id", sourceId);
 
+    if (businessId) await notifyKnowledgeProcessingFailure(businessId, sourceId, sourceTitle);
     revalidatePath("/dashboard/knowledge");
     return { error: err.message || "Crawling failed." };
   }
@@ -647,6 +677,7 @@ export async function processDocumentSource(sourceId: string) {
       })
       .eq("id", sourceId);
 
+    await notifyKnowledgeProcessingFailure(business.id, sourceId, source.title);
     revalidatePath("/dashboard/knowledge");
     return { error: err.message || "Document processing failed." };
   }

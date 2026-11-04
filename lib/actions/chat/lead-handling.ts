@@ -13,6 +13,7 @@ import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { NewLeadEmail } from "@/lib/email/templates/new-lead-email";
 import { BookingRequestEmail } from "@/lib/email/templates/booking-request-email";
 import { SupportRequestEmail } from "@/lib/email/templates/support-request-email";
+import { createBusinessNotification } from "@/lib/notifications/service";
 
 export async function processLeadHandling({
   message,
@@ -55,8 +56,22 @@ export async function processLeadHandling({
   if (!isDemo) {
     if (intentType === "booking" && !metadata.booking_email_sent) {
       metadata.booking_email_sent = true;
+      const notification = await createBusinessNotification({
+        businessId,
+        eventKey: `booking:${conversationId}`,
+        category: "booking",
+        title: "New booking request",
+        message: "A visitor requested an appointment or scheduling slot.",
+        href: `/dashboard/conversations?id=${conversationId}`,
+        severity: "success",
+        metadata: { conversationId },
+      }).catch((error) => {
+        console.error("Failed to create booking notification:", error);
+        return null;
+      });
       sendTransactionalEmail({
         businessId,
+        notificationId: notification?.ownerNotificationId || undefined,
         subject: "New booking request from your AI assistant",
         templateName: "booking-request-email",
         react: BookingRequestEmail({
@@ -72,8 +87,22 @@ export async function processLeadHandling({
 
     if (intentType === "support_ticket" && !metadata.support_email_sent) {
       metadata.support_email_sent = true;
+      const notification = await createBusinessNotification({
+        businessId,
+        eventKey: `support:${conversationId}`,
+        category: "support",
+        title: "New support request",
+        message: "A visitor submitted a technical issue or support request.",
+        href: `/dashboard/conversations?id=${conversationId}`,
+        severity: "warning",
+        metadata: { conversationId },
+      }).catch((error) => {
+        console.error("Failed to create support notification:", error);
+        return null;
+      });
       sendTransactionalEmail({
         businessId,
+        notificationId: notification?.ownerNotificationId || undefined,
         subject: "New support request from your AI assistant",
         templateName: "support-request-email",
         react: SupportRequestEmail({
@@ -156,8 +185,22 @@ export async function processLeadHandling({
           const { error: leadInsertError } = await supabase.from("leads").insert(leadUpdate);
           if (!leadInsertError) {
             await completeUsageQuota(reservation);
+            const notification = await createBusinessNotification({
+              businessId,
+              eventKey: `lead:${conversationId}`,
+              category: "leads",
+              title: "New lead captured",
+              message: `${extractedInfo.name || extractedInfo.email || extractedInfo.phone || "A visitor"} shared contact information.`,
+              href: `/dashboard/leads`,
+              severity: "success",
+              metadata: { conversationId },
+            }).catch((error) => {
+              console.error("Failed to create new-lead notification:", error);
+              return null;
+            });
             await sendTransactionalEmail({
               businessId,
+              notificationId: notification?.ownerNotificationId || undefined,
               subject: "New lead captured by Agentify",
               templateName: "new-lead-email",
               react: NewLeadEmail({

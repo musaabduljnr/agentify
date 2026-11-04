@@ -19,6 +19,8 @@ interface DashboardLayoutProps {
     messagesLimit: number;
   } | null;
   notifications?: DashboardNotification[];
+  notificationUnreadCount?: number;
+  notificationUserId?: string;
 }
 
 export default function DashboardLayout({ 
@@ -30,6 +32,8 @@ export default function DashboardLayout({
   assistant,
   subscription,
   notifications = [],
+  notificationUnreadCount = 0,
+  notificationUserId,
 }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -50,6 +54,8 @@ export default function DashboardLayout({
           businesses={businesses}
           assistant={assistant}
           notifications={notifications}
+          notificationUnreadCount={notificationUnreadCount}
+          notificationUserId={notificationUserId}
         />
         
         <main className="flex-1 min-w-0 max-w-full overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-10">

@@ -5,6 +5,8 @@ import { createClient } from "@/utils/supabase/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { getCurrentBusinessSetup } from "@/lib/queries/business";
 import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
+import { getUserBusinessRole } from "@/lib/team/permissions";
+import { z } from "zod";
 
 export async function updateProfileSettings(data: {
   full_name: string;
@@ -151,28 +153,29 @@ export async function getNotificationPreferences() {
     if (!setup.user || !setup.business) throw new Error("Unauthorized");
 
     const supabase = createServiceClient();
-    
-    // 1. Fetch preferences
-    let { data: prefs } = await supabase
+    const { data: rows, error } = await supabase
       .from("notification_preferences")
-      .select("*")
+      .select("category, in_app_enabled, email_enabled")
       .eq("business_id", setup.business.id)
-      .maybeSingle();
+      .is("user_id", null);
+    if (error) throw error;
 
-    // 2. If missing, initialize defaults
-    if (!prefs) {
-      const { data: newPrefs, error: insertErr } = await supabase
-        .from("notification_preferences")
-        .insert({ business_id: setup.business.id })
-        .select()
-        .single();
-        
-      if (insertErr) throw insertErr;
-      prefs = newPrefs;
-    }
+    const byCategory = new Map((rows || []).map((row) => [row.category, row]));
+    const preferences = {
+      email_new_leads: byCategory.get("leads")?.email_enabled ?? true,
+      email_booking_requests: byCategory.get("booking")?.email_enabled ?? true,
+      email_support_requests: byCategory.get("support")?.email_enabled ?? true,
+      email_usage_warnings: byCategory.get("usage")?.email_enabled ?? true,
+      email_payment_updates: byCategory.get("billing")?.email_enabled ?? true,
+      in_app_new_leads: byCategory.get("leads")?.in_app_enabled ?? true,
+      in_app_booking_requests: byCategory.get("booking")?.in_app_enabled ?? true,
+      in_app_support_requests: byCategory.get("support")?.in_app_enabled ?? true,
+      in_app_usage_warnings: byCategory.get("usage")?.in_app_enabled ?? true,
+      in_app_payment_updates: byCategory.get("billing")?.in_app_enabled ?? true,
+    };
 
     return {
-      preferences: prefs,
+      preferences,
       supportEmail: setup.business.support_email || "",
       contactEmail: setup.business.contact_email || "",
     };
@@ -190,17 +193,42 @@ export async function saveNotificationPreferences(data: {
   email_booking_requests: boolean;
   email_usage_warnings: boolean;
   email_payment_updates: boolean;
+  in_app_new_leads: boolean;
+  in_app_support_requests: boolean;
+  in_app_booking_requests: boolean;
+  in_app_usage_warnings: boolean;
+  in_app_payment_updates: boolean;
   support_email: string;
 }) {
   try {
+    const parsed = z.object({
+      email_new_leads: z.boolean(),
+      email_support_requests: z.boolean(),
+      email_booking_requests: z.boolean(),
+      email_usage_warnings: z.boolean(),
+      email_payment_updates: z.boolean(),
+      in_app_new_leads: z.boolean(),
+      in_app_support_requests: z.boolean(),
+      in_app_booking_requests: z.boolean(),
+      in_app_usage_warnings: z.boolean(),
+      in_app_payment_updates: z.boolean(),
+      support_email: z.string().max(254),
+    }).safeParse(data);
+    if (!parsed.success) return { error: "Invalid notification settings." };
+    const settings = parsed.data;
+
     const setup = await getCurrentBusinessSetup();
     if (!setup.user || !setup.business) throw new Error("Unauthorized");
+    const role = await getUserBusinessRole(setup.user.id, setup.business.id);
+    if (!role || !["owner", "admin"].includes(role)) {
+      throw new Error("Only business owners and admins can update notification settings.");
+    }
 
     const supabase = await createClient();
     const serviceClient = createServiceClient();
 
     // 1. Update support_email in businesses
-    const supportEmail = data.support_email.trim();
+    const supportEmail = settings.support_email.trim();
     if (supportEmail && !supportEmail.includes("@")) {
       throw new Error("Enter a valid support email address.");
     }
@@ -212,21 +240,24 @@ export async function saveNotificationPreferences(data: {
 
     if (bizError) throw bizError;
 
-    // 2. Update notification_preferences
+    const preferenceRows = [
+      ["leads", settings.email_new_leads, settings.in_app_new_leads],
+      ["booking", settings.email_booking_requests, settings.in_app_booking_requests],
+      ["support", settings.email_support_requests, settings.in_app_support_requests],
+      ["usage", settings.email_usage_warnings, settings.in_app_usage_warnings],
+      ["billing", settings.email_payment_updates, settings.in_app_payment_updates],
+    ].map(([category, emailEnabled, inAppEnabled]) => ({
+      business_id: setup.business!.id,
+      user_id: null,
+      category,
+      email_enabled: emailEnabled,
+      in_app_enabled: inAppEnabled,
+      updated_at: new Date().toISOString(),
+    }));
+
     const { error: prefsError } = await serviceClient
       .from("notification_preferences")
-      .upsert(
-        {
-          business_id: setup.business.id,
-          email_new_leads: data.email_new_leads,
-          email_support_requests: data.email_support_requests,
-          email_booking_requests: data.email_booking_requests,
-          email_usage_warnings: data.email_usage_warnings,
-          email_payment_updates: data.email_payment_updates,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "business_id" }
-      );
+      .upsert(preferenceRows, { onConflict: "business_id,user_id,category" });
 
     if (prefsError) throw prefsError;
 

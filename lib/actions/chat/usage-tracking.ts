@@ -2,6 +2,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { checkUsageLimit } from "@/lib/billing/usage";
 import { sendTransactionalEmail } from "@/lib/email/send-email";
 import { UsageWarningEmail } from "@/lib/email/templates/usage-warning-email";
+import { createBusinessNotification } from "@/lib/notifications/service";
 
 export async function processUsageTracking({
   businessId,
@@ -47,8 +48,23 @@ export async function processUsageTracking({
           .update({ metadata: updatedMetadata })
           .eq("id", sub.id);
 
+        const notification = await createBusinessNotification({
+          businessId,
+          eventKey: `usage-warning:message:80:${periodStart.toISOString()}`,
+          category: "usage",
+          title: "You’re nearing your AI usage limit",
+          message: `${Math.round(percentage)}% of your AI message allowance has been used this billing period.`,
+          href: "/dashboard/billing",
+          severity: "warning",
+          metadata: { usageType, percentage: Math.round(percentage) },
+        }).catch((error) => {
+          console.error("Failed to create usage warning notification:", error);
+          return null;
+        });
+
         sendTransactionalEmail({
           businessId,
+          notificationId: notification?.ownerNotificationId || undefined,
           subject: "You’re nearing your Agentify usage limit",
           templateName: "usage-warning-email",
           react: UsageWarningEmail({
