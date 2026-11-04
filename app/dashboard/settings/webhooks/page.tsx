@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function WebhooksPage() {
   const [webhooks, { data: deliveries, total }, stats] = await Promise.all([
     getWebhooks(),
-    getWebhookDeliveries("all", 1, 20),
+    getWebhookDeliveries({ status: "all" }, 1, 20),
     getWebhookStats(),
   ]);
 
