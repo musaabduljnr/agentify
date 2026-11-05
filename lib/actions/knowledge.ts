@@ -8,8 +8,11 @@ import type { KnowledgeSource } from "@/lib/types";
 import { scrapeUrl } from "@/lib/scraper/scrape-url";
 import { crawlWebsite } from "@/lib/scraper/crawl-website";
 import { generateEmbedding } from "@/lib/vertex/embeddings";
-import { chunkText } from "@/lib/embeddings/chunker";
-import { generateEmbeddingsForSourceInternal } from "@/lib/embeddings/generate-source";
+import { chunkSourceText } from "@/lib/embeddings/chunker";
+import {
+  countChunksNeedingEmbedding,
+  generateEmbeddingsForSourceInternal,
+} from "@/lib/embeddings/generate-source";
 import {
   completeUsageQuota,
   getQuotaDenialMessage,
@@ -22,6 +25,20 @@ import { validateFileUpload } from "@/lib/security/file-upload";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { countWords } from "@/lib/scraper/text-cleaner";
 import { createBusinessNotification } from "@/lib/notifications/service";
+
+type KnowledgeActionResult = {
+  success?: boolean;
+  error?: string;
+  warning?: string;
+  embedded?: boolean;
+  chunkCount?: number;
+  embeddingsGenerated?: number;
+  embeddingsReused?: number;
+  wordCount?: number;
+  pageCount?: number;
+  pagesScraped?: number;
+  pagesFailed?: number;
+};
 
 async function notifyKnowledgeProcessingFailure(
   businessId: string,
@@ -40,6 +57,30 @@ async function notifyKnowledgeProcessingFailure(
   }).catch((error) => {
     console.error("Failed to create knowledge-processing notification:", error);
   });
+}
+
+async function indexSourceContent(sourceId: string): Promise<{
+  embedded: boolean;
+  chunkCount?: number;
+  embeddingsGenerated?: number;
+  embeddingsReused?: number;
+  warning?: string;
+}> {
+  const result = await generateEmbeddingsForSource(sourceId);
+
+  if (result.error) {
+    return {
+      embedded: false,
+      warning: `Content was saved, but search indexing failed: ${result.error} Use "Embed Content" to retry.`,
+    };
+  }
+
+  return {
+    embedded: true,
+    chunkCount: result.chunkCount,
+    embeddingsGenerated: result.embeddingsGenerated,
+    embeddingsReused: result.embeddingsReused,
+  };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -160,7 +201,7 @@ export async function createWebsiteSource(formData: {
   return { success: true, id: data.id };
 }
 
-export async function createFaqSource(formData: { question: string; answer: string }) {
+export async function createFaqSource(formData: { question: string; answer: string }): Promise<KnowledgeActionResult> {
   const parsed = faqSchema.safeParse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -176,24 +217,30 @@ export async function createFaqSource(formData: { question: string; answer: stri
 
   const content = `Question: ${parsed.data.question}\nAnswer: ${parsed.data.answer}`;
 
-  const { error } = await supabase.from("knowledge_sources").insert({
-    business_id: business.id,
-    type: "faq",
-    title: parsed.data.question,
-    content,
-    status: "trained",
-  });
+  const { data: created, error } = await supabase
+    .from("knowledge_sources")
+    .insert({
+      business_id: business.id,
+      type: "faq",
+      title: parsed.data.question,
+      content,
+      status: "trained",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !created) {
     await releaseUsageQuota(reservation);
-    return { error: error.message };
+    return { error: error?.message || "Failed to create FAQ source." };
   }
   await completeUsageQuota(reservation);
+
+  const indexing = await indexSourceContent(created.id);
   revalidatePath("/dashboard/knowledge");
-  return { success: true };
+  return { success: true, ...indexing };
 }
 
-export async function createManualSource(formData: { title: string; content: string }) {
+export async function createManualSource(formData: { title: string; content: string }): Promise<KnowledgeActionResult> {
   const parsed = manualSchema.safeParse(formData);
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
@@ -207,21 +254,27 @@ export async function createManualSource(formData: { title: string; content: str
     return { error: getQuotaDenialMessage(reason, "knowledge source") };
   }
 
-  const { error } = await supabase.from("knowledge_sources").insert({
-    business_id: business.id,
-    type: "manual",
-    title: parsed.data.title,
-    content: parsed.data.content,
-    status: "trained",
-  });
+  const { data: created, error } = await supabase
+    .from("knowledge_sources")
+    .insert({
+      business_id: business.id,
+      type: "manual",
+      title: parsed.data.title,
+      content: parsed.data.content,
+      status: "trained",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !created) {
     await releaseUsageQuota(reservation);
-    return { error: error.message };
+    return { error: error?.message || "Failed to create manual knowledge source." };
   }
   await completeUsageQuota(reservation);
+
+  const indexing = await indexSourceContent(created.id);
   revalidatePath("/dashboard/knowledge");
-  return { success: true };
+  return { success: true, ...indexing };
 }
 
 export async function getSignedUploadUrlAction(formData: {
@@ -339,8 +392,13 @@ export async function updateKnowledgeSource(formData: {
     .eq("business_id", business.id);
 
   if (error) return { error: error.message };
+
+  const indexing = parsed.data.content !== undefined
+    ? await indexSourceContent(parsed.data.id)
+    : null;
+
   revalidatePath("/dashboard/knowledge");
-  return { success: true };
+  return { success: true, ...(indexing || {}) };
 }
 
 export async function deleteKnowledgeSource(id: string) {
@@ -360,7 +418,7 @@ export async function deleteKnowledgeSource(id: string) {
 
 // ── Website Scraping ─────────────────────────────────────────────────────
 
-export async function processWebsiteSource(sourceId: string) {
+export async function processWebsiteSource(sourceId: string): Promise<KnowledgeActionResult> {
   const business = await getCurrentBusiness();
   await requireBusinessEntitlement(business.id, "canAddKnowledge");
   const supabase = await createClient();
@@ -398,6 +456,8 @@ export async function processWebsiteSource(sourceId: string) {
       featureSource: "website_summary_generation",
     });
 
+    const crawlStatus = result.failedPageCount > 0 ? "partial" : "completed";
+
     // 4. Save extracted content
     const { error: updateError } = await supabase
       .from("knowledge_sources")
@@ -407,7 +467,7 @@ export async function processWebsiteSource(sourceId: string) {
         word_count: result.wordCount,
         character_count: result.characterCount,
         scraped_at: new Date().toISOString(),
-        crawl_status: "completed",
+        crawl_status: crawlStatus,
         crawl_completed_at: new Date().toISOString(),
         pages_found: result.pageCount,
         pages_scraped: result.pageCount,
@@ -430,6 +490,7 @@ export async function processWebsiteSource(sourceId: string) {
           scraped_failed_page_count: result.failedPageCount,
           scraped_failed_pages: result.failedPages,
           embedded: false,
+          embedding_status: "pending",
           chunk_count: 0,
         },
       })
@@ -437,14 +498,15 @@ export async function processWebsiteSource(sourceId: string) {
 
     if (updateError) return { error: updateError.message };
 
-    await supabase
-      .from("knowledge_chunks")
-      .delete()
-      .eq("source_id", sourceId)
-      .eq("business_id", business.id);
+    const indexing = await indexSourceContent(sourceId);
 
     revalidatePath("/dashboard/knowledge");
-    return { success: true, wordCount: result.wordCount, pageCount: result.pageCount };
+    return {
+      success: true,
+      wordCount: result.wordCount,
+      pageCount: result.pageCount,
+      ...indexing,
+    };
   } catch (err: any) {
     // 5. Handle errors
     await supabase
@@ -466,9 +528,10 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
   maxPages?: number;
   depth?: number;
   autoEmbed?: boolean;
-}) {
+}): Promise<KnowledgeActionResult> {
   let businessId: string | null = null;
   let sourceTitle = "Website source";
+  let hadPreviousContent = false;
   try {
     const business = await getCurrentBusiness();
     businessId = business.id;
@@ -485,6 +548,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
 
     if (fetchError || !source) return { error: "Knowledge source not found." };
     sourceTitle = source.title;
+    hadPreviousContent = Boolean(source.content);
     if (source.type !== "website") return { error: "Only website sources can be crawled." };
     if (!source.source_url) return { error: "No URL to crawl." };
 
@@ -521,17 +585,49 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
         ? "partial"
         : "completed";
 
-    const trainedStatus = result.pagesScraped > 0 ? "trained" : "failed";
-    const errorMessage = result.pagesScraped === 0 ? "Crawling failed to extract content from any pages." : null;
+    // A completely failed re-crawl must not wipe usable content from a
+    // previous successful crawl.
+    if (result.pagesScraped === 0) {
+      const failedAt = new Date().toISOString();
+
+      await supabase
+        .from("knowledge_sources")
+        .update({
+          status: hadPreviousContent ? "trained" : "failed",
+          crawl_status: "failed",
+          crawl_completed_at: failedAt,
+          pages_found: result.pagesFound,
+          pages_scraped: 0,
+          pages_failed: result.pagesFailed,
+          failed_pages: result.failedPages,
+          error_message: "Crawling failed to extract content from any pages.",
+          metadata: {
+            ...(source.metadata || {}),
+            last_crawl_failed_at: failedAt,
+            last_crawl_failed_pages: result.failedPages,
+            last_crawl_error: "Crawling failed to extract content from any pages.",
+          },
+        })
+        .eq("id", sourceId);
+
+      await notifyKnowledgeProcessingFailure(business.id, sourceId, source.title);
+      revalidatePath("/dashboard/knowledge");
+      return {
+        success: false,
+        error: "Crawling failed to extract content from any pages.",
+        pagesScraped: 0,
+        pagesFailed: result.pagesFailed,
+      };
+    }
 
     const { error: updateError } = await supabase
       .from("knowledge_sources")
       .update({
-        content: result.combinedText || null,
-        status: trainedStatus,
-        error_message: errorMessage,
-        word_count: result.pagesScraped > 0 ? countWords(result.combinedText) : 0,
-        character_count: result.combinedText?.length || 0,
+        content: result.combinedText,
+        status: "trained",
+        error_message: null,
+        word_count: countWords(result.combinedText),
+        character_count: result.combinedText.length,
         scraped_at: new Date().toISOString(),
         crawl_status: crawlStatus,
         crawl_completed_at: new Date().toISOString(),
@@ -552,6 +648,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
             characterCount: p.characterCount
           })),
           embedded: false,
+          embedding_status: "pending",
           chunk_count: 0,
         }
       })
@@ -559,27 +656,22 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
 
     if (updateError) return { error: updateError.message };
 
-    if (trainedStatus === "failed") {
-      await notifyKnowledgeProcessingFailure(business.id, sourceId, source.title);
-    }
-
-    // Delete existing knowledge chunks
-    await supabase
-      .from("knowledge_chunks")
-      .delete()
-      .eq("source_id", sourceId)
-      .eq("business_id", business.id);
-
-    // 5. Optionally run autoEmbed
-    if (options?.autoEmbed && result.pagesScraped > 0) {
-      await generateEmbeddingsForSource(sourceId);
-    }
+    // The previous chunk index is kept until the new one has been built
+    // successfully by the embedding pipeline.
+    const indexing = options?.autoEmbed
+      ? await indexSourceContent(sourceId)
+      : {
+          embedded: false,
+          warning:
+            "Crawl completed, but embeddings were not generated. Click \"Embed Content\" to make this source searchable.",
+        };
 
     revalidatePath("/dashboard/knowledge");
     return {
       success: true,
       pagesScraped: result.pagesScraped,
       pagesFailed: result.pagesFailed,
+      ...indexing,
     };
   } catch (err: any) {
     // Save error state
@@ -587,7 +679,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
     await supabase
       .from("knowledge_sources")
       .update({
-        status: "failed",
+        status: hadPreviousContent ? "trained" : "failed",
         crawl_status: "failed",
         error_message: err.message || "An unknown error occurred during crawling.",
       })
@@ -601,7 +693,7 @@ export async function crawlWebsiteSource(sourceId: string, options?: {
 
 // ── Document Processing ──────────────────────────────────────────────────
 
-export async function processDocumentSource(sourceId: string) {
+export async function processDocumentSource(sourceId: string): Promise<KnowledgeActionResult> {
   const business = await getCurrentBusiness();
   await requireBusinessEntitlement(business.id, "canAddKnowledge");
   const supabase = await createClient();
@@ -657,16 +749,22 @@ export async function processDocumentSource(sourceId: string) {
         word_count: wordCount,
         character_count: charCount,
         metadata: {
+          ...(source.metadata || {}),
           file_type: fileData.type,
           processed_at: new Date().toISOString(),
+          embedded: false,
+          embedding_status: "pending",
+          chunk_count: 0,
         },
       })
       .eq("id", sourceId);
 
     if (updateError) return { error: updateError.message };
 
+    const indexing = await indexSourceContent(sourceId);
+
     revalidatePath("/dashboard/knowledge");
-    return { success: true, wordCount };
+    return { success: true, wordCount, ...indexing };
   } catch (err: any) {
     // 6. Handle errors
     await supabase
@@ -685,7 +783,13 @@ export async function processDocumentSource(sourceId: string) {
 
 // ── Vector Embeddings ────────────────────────────────────────────────────
 
-export async function generateEmbeddingsForSource(sourceId: string) {
+export async function generateEmbeddingsForSource(sourceId: string): Promise<{
+  success?: boolean;
+  error?: string;
+  chunkCount?: number;
+  embeddingsGenerated?: number;
+  embeddingsReused?: number;
+}> {
   try {
     const business = await getCurrentBusiness();
     const supabase = await createClient();
@@ -707,30 +811,48 @@ export async function generateEmbeddingsForSource(sourceId: string) {
     if (source.status !== "trained") return { error: "Source must be 'trained' before generating embeddings." };
     if (!source.content) return { error: "Source has no content to embed." };
 
-    // 1.5 Check embedding usage limit
-    const chunks = chunkText(source.content);
-    if (chunks.length === 0) {
+    // 1.5 Check embedding usage limit. Only count chunks that do not already
+    // have a valid, unchanged embedding.
+    const totalChunks = chunkSourceText(source.content).length;
+    if (totalChunks === 0) {
       return { error: "No usable text was found to embed. Add more content or reprocess this source." };
     }
 
-    const { reservation, reason } = await reserveUsageQuota(business.id, "embedding", chunks.length, {
-      source_id: sourceId,
-    });
-    if (!reservation) {
-      return { error: getQuotaDenialMessage(reason, `${chunks.length} embeddings`) };
+    const neededChunks = await countChunksNeedingEmbedding(sourceId, business.id);
+    const billableChunks = neededChunks === null ? totalChunks : neededChunks;
+
+    let reservation = null;
+    if (billableChunks > 0) {
+      const reservationResult = await reserveUsageQuota(
+        business.id,
+        "embedding",
+        billableChunks,
+        { source_id: sourceId }
+      );
+      if (!reservationResult.reservation) {
+        return {
+          error: getQuotaDenialMessage(reservationResult.reason, `${billableChunks} embeddings`),
+        };
+      }
+      reservation = reservationResult.reservation;
     }
 
     // Call internal generator
     const result = await generateEmbeddingsForSourceInternal(sourceId, business.id);
     if (result.error) {
-      await releaseUsageQuota(reservation);
+      if (reservation) await releaseUsageQuota(reservation);
       return { error: result.error };
     }
 
-    await completeUsageQuota(reservation);
+    if (reservation) await completeUsageQuota(reservation);
 
     revalidatePath("/dashboard/knowledge");
-    return { success: true, chunkCount: chunks.length };
+    return {
+      success: true,
+      chunkCount: result.chunkCount ?? totalChunks,
+      embeddingsGenerated: result.embeddingsGenerated ?? billableChunks,
+      embeddingsReused: result.embeddingsReused ?? 0,
+    };
   } catch (err: any) {
     logErrorSync(err, "embedding-generation");
     return { error: getUserFriendlyError("embedding-generation") };

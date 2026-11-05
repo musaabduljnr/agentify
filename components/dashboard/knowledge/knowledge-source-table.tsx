@@ -29,6 +29,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [crawlErrors, setCrawlErrors] = useState<Record<string, string>>({});
+  const [crawlWarnings, setCrawlWarnings] = useState<Record<string, string>>({});
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this knowledge source?")) return;
@@ -40,9 +41,14 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
   const handleProcessSingle = async (sourceId: string) => {
     setProcessingId(sourceId);
     setCrawlErrors(prev => ({ ...prev, [sourceId]: "" }));
+    setCrawlWarnings(prev => ({ ...prev, [sourceId]: "" }));
     const res = await processWebsiteSource(sourceId);
     if (res.error) {
-      setCrawlErrors(prev => ({ ...prev, [sourceId]: res.error }));
+      const message = res.error;
+      setCrawlErrors(prev => ({ ...prev, [sourceId]: message }));
+    } else if (res.warning) {
+      const message = res.warning;
+      setCrawlWarnings(prev => ({ ...prev, [sourceId]: message }));
     }
     setProcessingId(null);
   };
@@ -50,9 +56,14 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
   const handleCrawlWebsite = async (sourceId: string, autoEmbed: boolean) => {
     setProcessingId(sourceId);
     setCrawlErrors(prev => ({ ...prev, [sourceId]: "" }));
+    setCrawlWarnings(prev => ({ ...prev, [sourceId]: "" }));
     const res = await crawlWebsiteSource(sourceId, { autoEmbed });
     if (res.error) {
-      setCrawlErrors(prev => ({ ...prev, [sourceId]: res.error }));
+      const message = res.error;
+      setCrawlErrors(prev => ({ ...prev, [sourceId]: message }));
+    } else if (res.warning) {
+      const message = res.warning;
+      setCrawlWarnings(prev => ({ ...prev, [sourceId]: message }));
     }
     setProcessingId(null);
   };
@@ -193,6 +204,11 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
                           {crawlErrors[source.id] && (
                             <span className="text-[10px] text-red-500 font-semibold max-w-[150px] truncate block" title={crawlErrors[source.id]}>
                               {crawlErrors[source.id]}
+                            </span>
+                          )}
+                          {crawlWarnings[source.id] && (
+                            <span className="text-[10px] text-amber-600 font-semibold max-w-[220px] block leading-tight" title={crawlWarnings[source.id]}>
+                              {crawlWarnings[source.id]}
                             </span>
                           )}
                         </div>

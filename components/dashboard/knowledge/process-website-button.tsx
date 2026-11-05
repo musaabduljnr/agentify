@@ -7,7 +7,12 @@ import { processWebsiteSource } from "@/lib/actions/knowledge";
 
 export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; status: string }) {
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ success?: boolean; error?: string; pageCount?: number } | null>(null);
+  const [result, setResult] = useState<{
+    success?: boolean;
+    error?: string;
+    warning?: string;
+    pageCount?: number;
+  } | null>(null);
 
   if (status !== "pending" && status !== "failed") return null;
 
@@ -20,7 +25,7 @@ export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; s
     if (res.error) {
       setResult({ error: res.error });
     } else {
-      setResult({ success: true, pageCount: res.pageCount });
+      setResult({ success: true, pageCount: res.pageCount, warning: res.warning });
     }
     setLoading(false);
   };
@@ -62,6 +67,9 @@ export function ProcessWebsiteButton({ sourceId, status }: { sourceId: string; s
         <span className="text-[10px] text-emerald-500 font-medium">
           Scraped{result.pageCount ? ` ${result.pageCount} reachable page${result.pageCount === 1 ? "" : "s"}` : ""}
         </span>
+      )}
+      {result?.warning && (
+        <span className="text-[10px] text-amber-600 font-medium max-w-[220px] leading-tight">{result.warning}</span>
       )}
     </div>
   );

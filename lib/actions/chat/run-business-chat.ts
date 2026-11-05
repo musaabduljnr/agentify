@@ -18,6 +18,15 @@ import { saveUserMessage, saveAssistantMessage } from "./message-persistence";
 import { processLeadHandling } from "./lead-handling";
 import { getAiResponse } from "./ai-response";
 import { processUsageTracking } from "./usage-tracking";
+import { type ChatMessage } from "@/lib/ai/engine/types";
+
+function stripCurrentUserTurn(history: ChatMessage[], message: string): ChatMessage[] {
+  const last = history[history.length - 1];
+  if (last && last.role === "user" && last.content.trim() === message.trim()) {
+    return history.slice(0, -1);
+  }
+  return history;
+}
 
 export async function runBusinessChat({
   message,
@@ -149,28 +158,18 @@ export async function runBusinessChat({
   }
 
   try {
-    const isContinuation = message.toLowerCase().trim() === "continue";
-    let ragQuery = message;
+    // The current user turn was already inserted above, so drop it from the
+    // prior-turn history before passing it to retrieval and to the model.
+    const storedHistory = await getRecentConversationMessages(currentConversationId!, 8);
+    const history = stripCurrentUserTurn(storedHistory, message);
 
-    if (isContinuation && currentConversationId) {
-      const { data: recentMsgs } = await supabase
-        .from("messages")
-        .select("role, content")
-        .eq("conversation_id", currentConversationId)
-        .order("created_at", { ascending: false })
-        .limit(3);
-
-      if (recentMsgs && recentMsgs.length >= 3 && recentMsgs[2].role === "user") {
-        ragQuery = recentMsgs[2].content;
-      }
-    }
-
-    const { chunks, formattedContext, intent } = await retrieveBusinessContext({
+    const { chunks, formattedContext, intent, diagnostics: retrieval } = await retrieveBusinessContext({
       businessId,
-      query: ragQuery,
+      query: message,
       matchCount: 5,
       minSimilarity: 0.55,
       featureSource: computedFeatureSource,
+      conversationHistory: history,
     });
 
     const leadResult = await processLeadHandling({
@@ -186,8 +185,7 @@ export async function runBusinessChat({
     });
 
     const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId, computedFeatureSource);
-    const history = await getRecentConversationMessages(currentConversationId!, 4);
-    const { finalReply, chatResponse, cachedAnswer } = await getAiResponse({
+    const { finalReply, chatResponse, cachedAnswer, quality } = await getAiResponse({
       message,
       businessId,
       conversationId: currentConversationId!,
@@ -209,6 +207,8 @@ export async function runBusinessChat({
       intent,
       cachedAnswer,
       chatResponse,
+      quality,
+      retrieval,
     });
 
     if (!isDemo) {

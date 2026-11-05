@@ -12,12 +12,14 @@ export function ManualSourceForm() {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setWarning(null);
     setSuccess(false);
 
     const result = await createManualSource({ title, content });
@@ -26,6 +28,7 @@ export function ManualSourceForm() {
       setError(result.error);
     } else {
       setSuccess(true);
+      setWarning(result.warning || null);
       setTitle("");
       setContent("");
       setTimeout(() => setSuccess(false), 3000);
@@ -54,6 +57,11 @@ export function ManualSourceForm() {
       {success && (
         <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-600 font-medium">
           ✓ Manual text added and marked as trained!
+        </div>
+      )}
+      {warning && (
+        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+          {warning}
         </div>
       )}
 

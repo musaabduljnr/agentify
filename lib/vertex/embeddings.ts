@@ -1,4 +1,7 @@
-import { generateEmbedding as engineGenerateEmbedding } from "@/lib/ai/engine/embeddings";
+import {
+  generateEmbedding as engineGenerateEmbedding,
+  generateEmbeddingsBatch as engineGenerateEmbeddingsBatch,
+} from "@/lib/ai/engine/embeddings";
 import { type FeatureSource } from "@/lib/ai/logs/ai-logs";
 
 /**
@@ -11,4 +14,12 @@ export async function generateEmbedding(
   featureSource?: FeatureSource
 ): Promise<number[]> {
   return engineGenerateEmbedding(text, businessId, featureSource);
+}
+
+export async function generateEmbeddingsBatch(
+  texts: string[],
+  businessId?: string,
+  featureSource?: FeatureSource
+): Promise<number[][]> {
+  return engineGenerateEmbeddingsBatch(texts, businessId, featureSource);
 }

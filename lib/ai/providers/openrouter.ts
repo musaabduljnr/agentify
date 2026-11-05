@@ -13,12 +13,14 @@ export async function generateOpenRouterChat({
   userMessage,
   history = [],
   temperature = 0.4,
+  signal,
 }: {
   model: string;
   systemInstruction: string;
   userMessage: string;
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
+  signal?: AbortSignal;
 }): Promise<string> {
   const apiKey = await getSecretWithEnvFallback("ai", "openrouter_api_key", "OPENROUTER_API_KEY");
   if (!apiKey) {
@@ -44,6 +46,7 @@ export async function generateOpenRouterChat({
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
+    signal,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

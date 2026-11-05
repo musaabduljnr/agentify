@@ -4,12 +4,14 @@ export async function generateVertexChat({
   userMessage,
   history = [],
   temperature = 0.4,
+  signal,
 }: {
   model: string;
   systemInstruction: string;
   userMessage: string;
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
+  signal?: AbortSignal;
 }): Promise<string> {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
   if (!projectId || projectId.includes("placeholder")) {
@@ -23,9 +25,11 @@ export async function generateVertexChat({
 export async function generateVertexEmbedding({
   model,
   text,
+  signal,
 }: {
   model: string;
   text: string;
+  signal?: AbortSignal;
 }): Promise<number[]> {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT_ID;
   if (!projectId || projectId.includes("placeholder")) {

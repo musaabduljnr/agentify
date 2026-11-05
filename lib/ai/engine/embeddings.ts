@@ -19,19 +19,28 @@ function normalizeText(text: string): string {
   return cleaned;
 }
 
-function ensureCorrectDimensions(vector: number[]): number[] {
-  if (vector.length === REQUIRED_DIMENSIONS) {
-    return vector;
+export function assertCorrectDimensions(
+  vector: number[],
+  provider: string,
+  model: string
+): number[] {
+  if (!Array.isArray(vector) || vector.length === 0) {
+    throw new Error(`Embedding provider ${provider}/${model} returned an empty vector.`);
   }
-  if (vector.length > REQUIRED_DIMENSIONS) {
-    return vector.slice(0, REQUIRED_DIMENSIONS);
+
+  if (vector.length !== REQUIRED_DIMENSIONS) {
+    throw new Error(
+      `Embedding dimension mismatch: ${provider}/${model} returned ${vector.length} values, ` +
+        `but the knowledge base requires ${REQUIRED_DIMENSIONS}. ` +
+        `Configure the embedding model with outputDimensionality=${REQUIRED_DIMENSIONS} and re-index.`
+    );
   }
-  // Pad with zeros if too small
-  const padded = [...vector];
-  while (padded.length < REQUIRED_DIMENSIONS) {
-    padded.push(0);
+
+  if (vector.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
+    throw new Error(`Embedding provider ${provider}/${model} returned non-numeric values.`);
   }
-  return padded;
+
+  return vector;
 }
 
 export async function generateEmbedding(
@@ -54,12 +63,12 @@ export async function generateEmbedding(
   try {
     const rawVector = await executeWithRetryAndTimeout(
       provider,
-      async () => {
+      (signal) => {
         switch (provider) {
           case "gemini":
-            return generateGeminiEmbedding({ model, text: normalized });
+            return generateGeminiEmbedding({ model, text: normalized, signal });
           case "vertex":
-            return generateVertexEmbedding({ model, text: normalized });
+            return generateVertexEmbedding({ model, text: normalized, signal });
           default:
             throw new Error(`Unsupported AI embedding provider: ${provider}`);
         }
@@ -67,7 +76,7 @@ export async function generateEmbedding(
       { maxRetries: 2 }
     );
 
-    const vector = ensureCorrectDimensions(rawVector);
+    const vector = assertCorrectDimensions(rawVector, provider, model);
     const latency = Date.now() - startTime;
 
     // Log embedding generation
@@ -122,7 +131,7 @@ export async function generateEmbeddingsBatch(
       // Gemini supports batching natively
       rawVectors = await executeWithRetryAndTimeout(
         provider,
-        () => generateGeminiEmbeddingsBatch({ model, texts: cleanedTexts }),
+        (signal) => generateGeminiEmbeddingsBatch({ model, texts: cleanedTexts, signal }),
         { maxRetries: 2 }
       );
     } else {
@@ -135,9 +144,9 @@ export async function generateEmbeddingsBatch(
         const promises = batch.map((text) =>
           executeWithRetryAndTimeout(
             provider,
-            () => {
+            (signal) => {
               if (provider === "vertex") {
-                return generateVertexEmbedding({ model, text });
+                return generateVertexEmbedding({ model, text, signal });
               }
               throw new Error(`Unsupported AI embedding provider: ${provider}`);
             },
@@ -149,7 +158,13 @@ export async function generateEmbeddingsBatch(
       }
     }
 
-    const vectors = rawVectors.map((v) => ensureCorrectDimensions(v));
+    if (rawVectors.length !== cleanedTexts.length) {
+      throw new Error(
+        `Embedding batch size mismatch: requested ${cleanedTexts.length} embeddings but received ${rawVectors.length}.`
+      );
+    }
+
+    const vectors = rawVectors.map((vector) => assertCorrectDimensions(vector, provider, model));
     const latency = Date.now() - startTime;
 
     await writeAIEngineLog({

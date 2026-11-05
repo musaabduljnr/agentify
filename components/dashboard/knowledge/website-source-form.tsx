@@ -17,11 +17,13 @@ export function WebsiteSourceForm() {
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   const handleAction = async (actionType: "create" | "process" | "crawl" | "crawl_embed") => {
     setLoading(true);
     setError(null);
+    setWarning(null);
     setSuccess(null);
     setLoadingStep("Creating knowledge source...");
 
@@ -58,6 +60,7 @@ export function WebsiteSourceForm() {
           throw new Error(processResult.error);
         }
         setSuccess(`Successfully scraped single page! Extracted ${processResult.wordCount} words.`);
+        setWarning(processResult.warning || null);
         setTitle("");
         setUrl("");
       } else if (actionType === "crawl" || actionType === "crawl_embed") {
@@ -72,11 +75,12 @@ export function WebsiteSourceForm() {
           throw new Error(crawlResult.error);
         }
 
-        if (actionType === "crawl_embed") {
+        if (actionType === "crawl_embed" && !crawlResult.warning) {
           setSuccess(`Successfully crawled ${crawlResult.pagesScraped} pages and generated vector embeddings!`);
         } else {
           setSuccess(`Successfully crawled ${crawlResult.pagesScraped} pages!`);
         }
+        setWarning(crawlResult.warning || null);
         setTitle("");
         setUrl("");
       }
@@ -109,6 +113,11 @@ export function WebsiteSourceForm() {
       {success && (
         <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-600 font-medium">
           ✓ {success}
+        </div>
+      )}
+      {warning && (
+        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-sm text-amber-700">
+          {warning}
         </div>
       )}
 

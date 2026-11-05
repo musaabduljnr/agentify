@@ -55,7 +55,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
     console.log(`[AI Engine] Optimized: Routing simple FAQ query to gemini-2.5-flash-lite. Query: "${userMessage}"`);
   }
 
-  async function callProvider(prov: AIProvider, mod: string): Promise<string> {
+  async function callProvider(prov: AIProvider, mod: string, signal: AbortSignal): Promise<string> {
     switch (prov) {
       case "gemini":
         return generateGeminiChat({
@@ -64,6 +64,8 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
           userMessage,
           history,
           temperature,
+          maxOutputTokens,
+          signal,
         });
       case "openrouter":
         return generateOpenRouterChat({
@@ -72,6 +74,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
           userMessage,
           history,
           temperature,
+          signal,
         });
       case "groq":
         return generateGroqChat({
@@ -80,6 +83,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
           userMessage,
           history,
           temperature,
+          signal,
         });
       case "vertex":
         return generateVertexChat({
@@ -88,6 +92,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
           userMessage,
           history,
           temperature,
+          signal,
         });
       default:
         throw new Error(`Unsupported AI chat provider: ${prov}`);
@@ -98,7 +103,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
     // Try primary
     const text = await executeWithRetryAndTimeout(
       primaryProvider,
-      () => callProvider(primaryProvider, activeModel),
+      (signal) => callProvider(primaryProvider, activeModel, signal),
       { maxRetries: 2, timeoutMs }
     );
 
@@ -167,7 +172,7 @@ export async function generateChatResponse(params: ChatParams): Promise<ChatResp
       const fallbackStartTime = Date.now();
       const text = await executeWithRetryAndTimeout(
         fallbackProvider,
-        () => callProvider(fallbackProvider, fallbackModel),
+        (signal) => callProvider(fallbackProvider, fallbackModel, signal),
         { maxRetries: 2, timeoutMs }
       );
 

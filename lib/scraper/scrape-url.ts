@@ -1,8 +1,10 @@
 import * as cheerio from "cheerio";
 import {
   assertPublicHttpUrl,
+  canonicalizeCrawlUrl,
   hasRedirectsRemaining,
   normalizeUrl,
+  normalizedHostname,
   resolveRedirectUrl,
 } from "./url-safety";
 import { cleanExtractedText, countWords } from "./text-cleaner";
@@ -27,6 +29,16 @@ const REMOVE_SELECTORS = [
   "svg",
   "iframe",
   "aside",
+  "nav",
+  '[role="navigation"]',
+  ".nav",
+  ".navbar",
+  ".navigation",
+  ".menu",
+  ".main-menu",
+  ".breadcrumb",
+  ".breadcrumbs",
+  ".sidebar",
   ".cookie-banner",
   ".cookie-consent",
   "#cookie-notice",
@@ -89,10 +101,6 @@ function normalizeCrawlUrl(href: string, baseUrl: string): string | null {
     const parsed = new URL(href, baseUrl);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
 
-    parsed.hash = "";
-    parsed.username = "";
-    parsed.password = "";
-
     if (SKIPPED_PATH_EXTENSIONS.test(parsed.pathname)) return null;
 
     const pathname = parsed.pathname.toLowerCase();
@@ -100,11 +108,7 @@ function normalizeCrawlUrl(href: string, baseUrl: string): string | null {
       return null;
     }
 
-    if (parsed.pathname !== "/") {
-      parsed.pathname = parsed.pathname.replace(/\/+$/, "");
-    }
-
-    return normalizeUrl(parsed.toString());
+    return canonicalizeCrawlUrl(parsed);
   } catch {
     return null;
   }
@@ -114,7 +118,10 @@ function isSameOrigin(candidateUrl: string, rootUrl: string): boolean {
   try {
     const candidate = new URL(candidateUrl);
     const root = new URL(rootUrl);
-    return candidate.origin === root.origin;
+    const sameProtocol = candidate.protocol === root.protocol ||
+      (candidate.protocol === "http:" && root.protocol === "https:") ||
+      (candidate.protocol === "https:" && root.protocol === "http:");
+    return sameProtocol && normalizedHostname(candidate.toString()) === normalizedHostname(root.toString());
   } catch {
     return false;
   }
@@ -186,6 +193,11 @@ function collectJsonText(value: unknown, target: string[]): void {
     return;
   }
 
+  if (typeof value === "number") {
+    pushUsefulText(target, String(value));
+    return;
+  }
+
   if (Array.isArray(value)) {
     value.forEach((entry) => collectJsonText(entry, target));
     return;
@@ -202,11 +214,18 @@ function collectJsonText(value: unknown, target: string[]): void {
           "buttontext",
           "content",
           "description",
+          "email",
           "headline",
           "label",
           "name",
+          "openinghours",
+          "openinghoursspecification",
+          "price",
+          "pricecurrency",
           "question",
+          "streetaddress",
           "subtitle",
+          "telephone",
           "text",
           "title",
         ].includes(lowerKey)
@@ -452,6 +471,127 @@ function extractLinks($: cheerio.CheerioAPI, pageUrl: string, rootUrl: string): 
   });
 }
 
+function buildDeterministicText(
+  $: cheerio.CheerioAPI,
+  url: string,
+  title: string,
+  description: string,
+  scriptTextParts: string[]
+): string {
+  const textParts: string[] = [];
+
+  textParts.push(`Source URL: ${url}`);
+  if (title) textParts.push(title);
+  if (description) textParts.push(description);
+
+  $("h1, h2, h3, h4, h5, h6").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text) textParts.push(text);
+  });
+
+  $("p").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text && text.length > 10) textParts.push(text);
+  });
+
+  $("li").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text && text.length > 5) textParts.push(`- ${text}`);
+  });
+
+  $("td, th").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text && text.length > 3) textParts.push(text);
+  });
+
+  $("blockquote").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text) textParts.push(text);
+  });
+
+  $("dt, dd, summary, details").each((_, el) => {
+    const text = $(el).text().trim();
+    if (text) textParts.push(text);
+  });
+
+  // Extract direct text from generic containers if it is substantial (length > 20)
+  $("div, span, section, article, main").each((_, el) => {
+    const $el = $(el);
+    const directText = $el.clone().children().remove().end().text().replace(/\s+/g, " ").trim();
+    if (directText && directText.length > 20) {
+      textParts.push(directText);
+    }
+  });
+
+  // Extract text from divs, spans, strongs, em, b, a that contain pricing/service terms
+  $("div, span, strong, em, b, a").each((_, el) => {
+    const $el = $(el);
+    const directText = $el.clone().children().remove().end().text().trim();
+    if (directText && directText.length > 0) {
+      const classOrId = ($el.attr("class") || "") + " " + ($el.attr("id") || "");
+      const isPricingContext = /price|pricing|cost|rate|fee|plan|package|subscription|tier|billing|menu/i.test(classOrId);
+      const hasCurrencyOrPrice = /[\$\£\€\₦\¥]|(?:usd|gbp|eur|cny|ngn)\b|\b(?:\d+(?:\.\d{2})?)\s*(?:\/mo|\/yr|per\b|month|year|each|qty)\b/i.test(directText);
+
+      if (isPricingContext || hasCurrencyOrPrice) {
+        textParts.push(directText);
+      }
+    }
+  });
+
+  textParts.push(...scriptTextParts);
+
+  return cleanExtractedText(textParts.join("\n"));
+}
+
+const AI_REFUSAL_PATTERNS = [
+  /^(i'?m sorry|i am sorry|i cannot|i can'?t|i am unable|i'?m unable|unable to)\b/i,
+  /\bas an ai\b/i,
+  /cannot (?:access|retrieve|view|process) (?:the )?(?:web|page|html|content)/i,
+  /please provide the (?:html|content|web ?page)/i,
+];
+
+export function sanitizeAiExtraction(raw: string): string {
+  let text = raw.trim();
+  text = text.replace(/^```(?:markdown|md|html|text)?\s*/i, "").replace(/\s*```$/i, "");
+
+  if (/<(?:html|body|main|div|p)\b/i.test(text)) {
+    const fragment = cheerio.load(text);
+    fragment("script, style, noscript").remove();
+    text = fragment("body").text() || fragment.root().text();
+  } else {
+    text = text
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/(?:p|div|li|tr|h[1-6]|section|article)>/gi, "\n")
+      .replace(/<[^>]+>/g, " ");
+  }
+
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function isUsableAiExtraction(text: string, deterministicWordCount: number): boolean {
+  if (!text) return false;
+
+  const words = countWords(text);
+  if (words < 25 || text.length < 120) return false;
+  if (AI_REFUSAL_PATTERNS.some((pattern) => pattern.test(text))) return false;
+  if (/\b(function\s*\(|=>\s*\{|<script|window\.|document\.)/.test(text)) return false;
+
+  // If the deterministic pass found substantial real content, do not accept an
+  // AI output that dropped most of it.
+  if (deterministicWordCount >= 200 && words < deterministicWordCount * 0.2) return false;
+
+  return true;
+}
+
 export async function scrapePage(
   rawUrl: string,
   rootUrl: string,
@@ -472,8 +612,10 @@ export async function scrapePage(
   $(REMOVE_SELECTORS).remove();
   const cleanedHtml = $.html();
 
-  let extractedText = "";
-  let isAiExtracted = false;
+  const deterministicText = buildDeterministicText($, url, title, description, scriptTextParts);
+  const structuredText = [...new Set(scriptTextParts)].join("\n").trim();
+
+  let cleanedText = deterministicText;
 
   if (process.env.GEMINI_API_KEY) {
     try {
@@ -491,7 +633,8 @@ CRITICAL INSTRUCTIONS:
 3. Represent pricing tables, plans, grids, or comparison matrices as Markdown tables or structured lists.
 4. Extract all other useful page content, such as business hours, address, phone numbers, contact info, FAQs, team members, about info, etc.
 5. Filter out navigation headers, footers, social media links, page scripts, layout styling, cookie banner text, and ads.
-6. Return only the extracted markdown content without any introduction, explanations, or wrapper backticks.`;
+6. Return only the extracted markdown content without any introduction, explanations, or wrapper backticks.
+7. Never invent, infer, or "fill in" values. Only include text that appears in the HTML.`;
 
       const prompt = `Here is the clean HTML of the web page at URL: ${url}\n\nHTML:\n${truncatedHtml}`;
 
@@ -505,9 +648,21 @@ CRITICAL INSTRUCTIONS:
         featureSource,
       });
 
-      if (geminiText && geminiText.trim().length > 50) {
-        extractedText = geminiText.trim();
-        isAiExtracted = true;
+      const aiText = sanitizeAiExtraction(geminiText || "");
+      if (isUsableAiExtraction(aiText, countWords(deterministicText))) {
+        const parts = [`Source URL: ${url}`, aiText];
+
+        // Structured data (JSON-LD, Next.js flight data) is removed with the
+        // scripts before the AI sees the HTML, so append it explicitly.
+        if (structuredText && !aiText.includes(structuredText.slice(0, 80))) {
+          parts.push(`Structured data extracted from the page:\n${structuredText.slice(0, 8000)}`);
+        }
+
+        cleanedText = cleanExtractedText(parts.join("\n\n")).slice(0, 120_000);
+      } else if (geminiText && geminiText.trim()) {
+        console.warn(
+          `[AI Scraper Warning] Rejected unusable AI extraction for ${url} (${countWords(aiText)} words). Using deterministic extraction.`
+        );
       }
     } catch (err: any) {
       console.warn(
@@ -516,79 +671,6 @@ CRITICAL INSTRUCTIONS:
         }. Falling back to Cheerio parser.`
       );
     }
-  }
-
-  let cleanedText = "";
-  if (isAiExtracted) {
-    const urlHeader = `Source URL: ${url}`;
-    cleanedText = extractedText.includes(url)
-      ? extractedText
-      : `${urlHeader}\n\n${extractedText}`;
-  } else {
-    const textParts: string[] = [];
-
-    textParts.push(`Source URL: ${url}`);
-    if (title) textParts.push(title);
-    if (description) textParts.push(description);
-
-    $("h1, h2, h3, h4, h5, h6").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text) textParts.push(text);
-    });
-
-    $("p").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length > 10) textParts.push(text);
-    });
-
-    $("li").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length > 5) textParts.push(`- ${text}`);
-    });
-
-    $("td, th").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && text.length > 3) textParts.push(text);
-    });
-
-    $("blockquote").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text) textParts.push(text);
-    });
-
-    $("dt, dd, summary, details").each((_, el) => {
-      const text = $(el).text().trim();
-      if (text) textParts.push(text);
-    });
-
-    // Extract direct text from generic containers if it is substantial (length > 20)
-    $("div, span, section, article, main").each((_, el) => {
-      const $el = $(el);
-      const directText = $el.clone().children().remove().end().text().replace(/\s+/g, " ").trim();
-      if (directText && directText.length > 20) {
-        textParts.push(directText);
-      }
-    });
-
-    // Extract text from divs, spans, strongs, em, b, a that contain pricing/service terms
-    $("div, span, strong, em, b, a").each((_, el) => {
-      const $el = $(el);
-      const directText = $el.clone().children().remove().end().text().trim();
-      if (directText && directText.length > 0) {
-        const classOrId = ($el.attr("class") || "") + " " + ($el.attr("id") || "");
-        const isPricingContext = /price|pricing|cost|rate|fee|plan|package|subscription|tier|billing|menu/i.test(classOrId);
-        const hasCurrencyOrPrice = /[\$\£\€\₦\¥]|(?:usd|gbp|eur|cny|ngn)\b|\b(?:\d+(?:\.\d{2})?)\s*(?:\/mo|\/yr|per\b|month|year|each|qty)\b/i.test(directText);
-
-        if (isPricingContext || hasCurrencyOrPrice) {
-          textParts.push(directText);
-        }
-      }
-    });
-
-    textParts.push(...scriptTextParts);
-
-    const rawText = textParts.join("\n");
-    cleanedText = cleanExtractedText(rawText);
   }
 
   if (!cleanedText || (countWords(cleanedText) < 3 && cleanedText.length < 20)) {
@@ -609,8 +691,10 @@ CRITICAL INSTRUCTIONS:
 function combinePages(pages: PageScrapeResult[]): Pick<ScrapeResult, "text" | "wordCount" | "characterCount"> {
   const combined = cleanExtractedText(
     pages
-      .map((page, index) => {
-        const heading = `Page ${index + 1}: ${page.title || page.url}\nURL: ${page.url}`;
+      .map((page) => {
+        // Same marker format as the multi-page crawler so the chunker can
+        // attach the page URL and title to every chunk.
+        const heading = `=== Page: ${page.title || page.url} ===\nURL: ${page.url}`;
         return `${heading}\n${page.text}`;
       })
       .join("\n\n")
@@ -674,6 +758,16 @@ export async function scrapeUrl(
       }
 
       const { item, page } = result;
+
+      // Redirects can land on a URL that was already crawled or queued.
+      try {
+        page.url = canonicalizeCrawlUrl(new URL(page.url));
+      } catch {
+        // Keep the original URL if it cannot be parsed.
+      }
+      if (pages.some((existing) => existing.url === page.url)) continue;
+
+      visited.add(page.url);
       pages.push(page);
 
       if (pages.length >= maxPages || item.depth >= MAX_CRAWL_DEPTH) continue;

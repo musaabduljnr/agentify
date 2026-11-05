@@ -9,11 +9,17 @@ interface Business {
   address?: string | null;
 }
 
+export interface QualityCheckResult {
+  passed: boolean;
+  sanitizedText: string;
+  reason?: string;
+}
+
 export function runResponseQualityChecks(
   text: string,
   business: Business,
   contextText: string
-): { passed: boolean; sanitizedText: string; reason?: string } {
+): QualityCheckResult {
   if (!text || text.trim().length === 0) {
     return { passed: false, sanitizedText: FALLBACK_MESSAGE, reason: "empty_response" };
   }
@@ -91,6 +97,26 @@ export function runResponseQualityChecks(
         return { passed: false, sanitizedText: FALLBACK_MESSAGE, reason: "hallucinated_phone" };
       }
     }
+  }
+
+  // 5. Unverified price check
+  // Any currency amount in the reply must appear, in the same amount, inside
+  // the retrieved knowledge. Bare numbers (dates, hours, quantities) are
+  // ignored so only explicitly priced figures are evaluated.
+  const currencyAmountRegex =
+    /(?:[$€£₦]\s?(\d[\d,]*(?:\.\d+)?))|\b(\d[\d,]*(?:\.\d+)?)\s?(?:usd|ngn|eur|gbp|dollars?|naira|euros?|pounds?)\b/gi;
+
+  const toAmounts = (source: string) =>
+    [...source.matchAll(currencyAmountRegex)]
+      .map((match) => (match[1] || match[2] || "").replace(/,/g, ""))
+      .filter(Boolean);
+
+  const contextAmounts = new Set(toAmounts(contextText || ""));
+
+  for (const amount of toAmounts(text)) {
+    if (contextAmounts.has(amount)) continue;
+    console.warn(`[Quality Check] Unverified price detected: ${amount}`);
+    return { passed: false, sanitizedText: FALLBACK_MESSAGE, reason: "unverified_price" };
   }
 
   return { passed: true, sanitizedText: text };

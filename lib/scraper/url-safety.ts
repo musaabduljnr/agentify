@@ -12,6 +12,64 @@ const BLOCKED_HOSTS = [
 
 const MAX_REDIRECTS = 5;
 
+const TRACKING_QUERY_PARAMS = new Set([
+  "fbclid",
+  "gclid",
+  "gbraid",
+  "wbraid",
+  "dclid",
+  "msclkid",
+  "twclid",
+  "yclid",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+  "_hsenc",
+  "_hsmi",
+  "ref_src",
+  "ref_url",
+]);
+
+function isTrackingParam(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.startsWith("utm_") || TRACKING_QUERY_PARAMS.has(lower);
+}
+
+/**
+ * Produces a stable crawl identity for same-content URLs so tracking links and
+ * parameter ordering do not consume the crawl budget as duplicate pages.
+ */
+export function canonicalizeCrawlUrl(url: URL): string {
+  url.hash = "";
+  url.username = "";
+  url.password = "";
+
+  const keptParams = [...url.searchParams.entries()]
+    .filter(([name]) => !isTrackingParam(name))
+    .sort(([aName, aValue], [bName, bValue]) =>
+      aName === bName ? aValue.localeCompare(bValue) : aName.localeCompare(bName)
+    );
+
+  url.search = "";
+  for (const [name, value] of keptParams) {
+    url.searchParams.append(name, value);
+  }
+
+  if (url.pathname !== "/") {
+    url.pathname = url.pathname.replace(/\/+$/, "");
+  }
+
+  return url.toString().replace(/\/+$/, "");
+}
+
+export function normalizedHostname(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 export function isValidHttpUrl(url: string): boolean {
   try {
     const parsed = new URL(url);

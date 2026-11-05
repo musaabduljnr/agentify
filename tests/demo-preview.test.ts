@@ -5,6 +5,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { runBusinessChat } from "@/lib/actions/chat/run-business-chat";
 import { retrieveBusinessContext } from "@/lib/ai/rag/retrieve-context";
 import { runResponseQualityChecks } from "@/lib/ai/evaluation/quality-checks";
+import { NO_KNOWLEDGE_CONTEXT } from "@/lib/ai/rag/build-context";
 import { sendDashboardTestMessage } from "@/lib/actions/chat";
 
 const VALID_DEMO_ID = "de305d54-75b4-431b-adb2-eb6b9e546014";
@@ -146,7 +147,7 @@ describe("Milestone 2: Interactive AI Agent Preview Test Suite", () => {
     });
 
     expect(emptyRagResult.chunks).toHaveLength(0);
-    expect(emptyRagResult.formattedContext).toBe("");
+    expect(emptyRagResult.formattedContext).toBe(NO_KNOWLEDGE_CONTEXT);
 
     // Quality check should enforce fallback if model attempts to make up details not in context
     const checkResult = runResponseQualityChecks(

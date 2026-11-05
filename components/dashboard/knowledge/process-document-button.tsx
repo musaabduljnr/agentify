@@ -14,6 +14,7 @@ export function ProcessDocumentButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   if (status !== "pending" && status !== "failed") {
     return null;
@@ -22,11 +23,14 @@ export function ProcessDocumentButton({
   const handleProcess = async () => {
     setLoading(true);
     setError(null);
+    setWarning(null);
 
     const result = await processDocumentSource(sourceId);
 
     if (result.error) {
       setError(result.error);
+    } else if (result.warning) {
+      setWarning(result.warning);
     }
     setLoading(false);
   };
@@ -51,6 +55,12 @@ export function ProcessDocumentButton({
         <span className="text-[10px] text-red-500 font-medium flex items-center gap-1 mt-0.5 leading-tight">
           <AlertCircle className="w-3 h-3 shrink-0" />
           {error}
+        </span>
+      )}
+      {warning && (
+        <span className="text-[10px] text-amber-600 font-medium flex items-center gap-1 mt-0.5 leading-tight">
+          <AlertCircle className="w-3 h-3 shrink-0" />
+          {warning}
         </span>
       )}
     </div>

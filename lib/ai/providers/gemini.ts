@@ -47,12 +47,16 @@ export async function generateGeminiChat({
   userMessage,
   history = [],
   temperature = 0.4,
+  maxOutputTokens = 800,
+  signal,
 }: {
   model: string;
   systemInstruction: string;
   userMessage: string;
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
+  maxOutputTokens?: number;
+  signal?: AbortSignal;
 }): Promise<string> {
   const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
@@ -80,7 +84,8 @@ export async function generateGeminiChat({
       config: {
         systemInstruction: systemInstruction,
         temperature: temperature,
-        maxOutputTokens: 800,
+        maxOutputTokens,
+        abortSignal: signal,
       },
     });
 
@@ -119,6 +124,7 @@ export async function generateGeminiContent({
   maxOutputTokens = 2048,
   businessId,
   featureSource,
+  signal,
 }: {
   model?: string;
   prompt: string;
@@ -127,6 +133,7 @@ export async function generateGeminiContent({
   maxOutputTokens?: number;
   businessId?: string;
   featureSource?: FeatureSource;
+  signal?: AbortSignal;
 }): Promise<string> {
   const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
@@ -144,6 +151,7 @@ export async function generateGeminiContent({
         systemInstruction: systemInstruction,
         temperature: temperature,
         maxOutputTokens: maxOutputTokens,
+        abortSignal: signal,
       },
     });
 
@@ -249,9 +257,11 @@ export async function generateGeminiContent({
 export async function generateGeminiEmbedding({
   model,
   text,
+  signal,
 }: {
   model: string;
   text: string;
+  signal?: AbortSignal;
 }): Promise<number[]> {
   const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
@@ -264,6 +274,7 @@ export async function generateGeminiEmbedding({
     contents: text,
     config: {
       outputDimensionality: 768,
+      abortSignal: signal,
     },
   });
 
@@ -278,9 +289,11 @@ export async function generateGeminiEmbedding({
 export async function generateGeminiEmbeddingsBatch({
   model,
   texts,
+  signal,
 }: {
   model: string;
   texts: string[];
+  signal?: AbortSignal;
 }): Promise<number[][]> {
   const apiKey = await getSecretWithEnvFallback("ai", "gemini_api_key", "GEMINI_API_KEY");
   if (!apiKey) {
@@ -293,6 +306,7 @@ export async function generateGeminiEmbeddingsBatch({
     contents: texts,
     config: {
       outputDimensionality: 768,
+      abortSignal: signal,
     },
   });
 

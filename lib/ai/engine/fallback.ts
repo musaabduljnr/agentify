@@ -10,7 +10,7 @@ const CONSECUTIVE_FAILURE_THRESHOLD = 3;
 
 export async function executeWithRetryAndTimeout<T>(
   provider: string,
-  operation: () => Promise<T>,
+  operation: (signal: AbortSignal) => Promise<T>,
   options: { maxRetries?: number; timeoutMs?: number } = {}
 ): Promise<T> {
   const { maxRetries = 2, timeoutMs = 15000 } = options;
@@ -20,24 +20,22 @@ export async function executeWithRetryAndTimeout<T>(
   while (true) {
     attempt++;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error(`Request timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
 
     try {
-      // Execute the operation and race with timeout if supported by the fetch requests
-      // For general promise timeout:
-      const result = await Promise.race([
-        operation(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Request timed out")), timeoutMs)
-        ),
-      ]);
-      
-      clearTimeout(timeoutId);
+      const result = await Promise.race([operation(controller.signal), timeoutPromise]);
+
       // Reset failures on success
       providerFailures[provider] = 0;
       return result;
     } catch (error: any) {
-      clearTimeout(timeoutId);
       const isTransient = isTransientError(error);
       
       if (isTransient && attempt <= maxRetries) {
@@ -50,6 +48,8 @@ export async function executeWithRetryAndTimeout<T>(
       // Track consecutive failures
       providerFailures[provider] = (providerFailures[provider] || 0) + 1;
       throw error;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
   }
 }

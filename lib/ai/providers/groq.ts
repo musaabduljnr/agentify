@@ -6,12 +6,14 @@ export async function generateGroqChat({
   userMessage,
   history = [],
   temperature = 0.4,
+  signal,
 }: {
   model: string;
   systemInstruction: string;
   userMessage: string;
   history?: { role: "user" | "model"; content: string }[];
   temperature?: number;
+  signal?: AbortSignal;
 }): Promise<string> {
   const apiKey = await getSecretWithEnvFallback("ai", "groq_api_key", "GROQ_API_KEY");
   if (!apiKey) {
@@ -30,6 +32,7 @@ export async function generateGroqChat({
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
+    signal,
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

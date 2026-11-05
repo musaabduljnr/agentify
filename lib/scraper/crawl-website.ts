@@ -1,4 +1,4 @@
-import { assertPublicHttpUrl, normalizeUrl } from "./url-safety";
+import { assertPublicHttpUrl, canonicalizeCrawlUrl, normalizeUrl } from "./url-safety";
 import { fetchRobotsRules, isUrlAllowedByRobots } from "./robots";
 import { getSitemapUrls } from "./sitemap";
 import { scrapePage } from "./scrape-url";
@@ -44,12 +44,10 @@ export async function crawlWebsite({
   businessId?: string;
   featureSource?: FeatureSource;
 }): Promise<CrawlResult> {
-  const startUrl = normalizeUrl(rawStartUrl);
-  
+  const startUrl = canonicalizeCrawlUrl(new URL(normalizeUrl(rawStartUrl)));
+
   // 1. Enforce safety checks
   await assertPublicHttpUrl(startUrl);
-
-  const baseHostname = new URL(startUrl).hostname.toLowerCase();
 
   // 2. Fetch robots.txt rules
   const disallowedPaths = await fetchRobotsRules(startUrl);
@@ -62,6 +60,7 @@ export async function crawlWebsite({
 
   const visited = new Set<string>();
   const queued = new Set<string>();
+  const seenPageUrls = new Set<string>();
   const pages: CrawledPage[] = [];
   const failedPages: FailedPage[] = [];
 
@@ -101,7 +100,27 @@ export async function crawlWebsite({
         try {
           // Scrape individual page
           const scraped = await scrapePage(item.url, startUrl, businessId, featureSource);
-          
+
+          // Redirects can land on a page that was already processed.
+          try {
+            scraped.url = canonicalizeCrawlUrl(new URL(scraped.url));
+          } catch {
+            // Keep the original URL if it cannot be parsed.
+          }
+          if (seenPageUrls.has(scraped.url)) return;
+          seenPageUrls.add(scraped.url);
+
+          // Discover links even from low-value pages: a script-only landing
+          // page often links to the real content pages.
+          if (item.depth < depth) {
+            for (const link of scraped.links) {
+              if (!queued.has(link) && !visited.has(link)) {
+                queued.add(link);
+                queue.push({ url: link, depth: item.depth + 1 });
+              }
+            }
+          }
+
           // Skip low-value content (less than 10 words)
           if (scraped.wordCount < 10) {
             pages.push({
@@ -125,16 +144,6 @@ export async function crawlWebsite({
             characterCount: scraped.characterCount,
             status: "scraped"
           });
-
-          // If depth allows, discover new links from the page
-          if (item.depth < depth) {
-            for (const link of scraped.links) {
-              if (!queued.has(link) && !visited.has(link)) {
-                queued.add(link);
-                queue.push({ url: link, depth: item.depth + 1 });
-              }
-            }
-          }
         } catch (err: any) {
           failedPages.push({
             url: item.url,

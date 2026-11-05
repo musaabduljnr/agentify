@@ -66,15 +66,32 @@ const INTENT_RULES: { intent: QueryIntent; regex: RegExp }[] = [
   },
 ];
 
+function countKeywordMatches(regex: RegExp, text: string): number {
+  const globalRegex = new RegExp(regex.source, regex.flags.includes("g") ? regex.flags : `${regex.flags}g`);
+  let count = 0;
+
+  while (count < 10 && globalRegex.exec(text)) {
+    count++;
+  }
+
+  return count;
+}
+
 export function classifyQueryIntent(query: string): QueryIntent {
   if (!query) return "general";
   const cleaned = query.trim().toLowerCase();
 
+  let bestIntent: QueryIntent = "general";
+  let bestScore = 0;
+
   for (const rule of INTENT_RULES) {
-    if (rule.regex.test(cleaned)) {
-      return rule.intent;
+    const score = countKeywordMatches(rule.regex, cleaned);
+    // Strictly greater keeps the declared rule order as the tie-breaker.
+    if (score > bestScore) {
+      bestScore = score;
+      bestIntent = rule.intent;
     }
   }
 
-  return "general";
+  return bestIntent;
 }
