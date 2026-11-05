@@ -9,5 +9,5 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=yourname@gmail.com
 SMTP_PASSWORD=xxxx-xxxx-xxxx-xxxx
-EMAIL_FROM=Agentify <yourname@gmail.com>
-SUPPORT_EMAIL=support@yourdomain.com
+EMAIL_FROM=Agentify <noreply@agentifychat.online>
+SUPPORT_EMAIL=support@agentifychat.online

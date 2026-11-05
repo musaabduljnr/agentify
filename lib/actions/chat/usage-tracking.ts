@@ -71,7 +71,7 @@ export async function processUsageTracking({
             businessName,
             usageType: "AI messages",
             percentage: Math.round(percentage),
-            billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+            billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online"}/dashboard/billing`,
           }),
         }).catch(err => console.error("Error sending 80% warning email:", err));
       }

@@ -17,4 +17,4 @@ Disallow: /login
 Disallow: /signup
 Disallow: /onboarding
 
-Sitemap: https://agentify.ai/sitemap.xml
+Sitemap: https://agentifychat.online/sitemap.xml

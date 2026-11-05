@@ -90,6 +90,11 @@ function comparisonFeatures(plans: PricingViewProps["plans"]) {
 
 const FAQS = [
   {
+    question: "Can I try it before I pay?",
+    answer:
+      "You can build your assistant and test it in the preview sandbox for free. Publishing it on your site requires a paid plan, starting at $2/month. You can cancel anytime in 1 click.",
+  },
+  {
     question: "Can I upgrade or downgrade my plan at any time?",
     answer:
       "Yes. Upgrades apply immediately with full access to your expanded AI reply limits. If you request a downgrade, your current limits remain active until the end of your prepaid 30-day billing period so you always receive what you paid for.",
@@ -134,7 +139,6 @@ export function PricingView({
 
   const isStarterCurrent = user && subscription?.plan === "starter" && subscription?.status === "active";
   const isGrowthCurrent = user && subscription?.plan === "growth" && subscription?.status === "active";
-  const isPending = user && subscription?.status === "pending";
   const comparisonRows = comparisonFeatures(plans);
   const assistantCountLabel = (plan: PublicPlan) =>
     formatPlanLimit(
@@ -201,6 +205,16 @@ export function PricingView({
           <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight">
             Predictable plans for growing businesses
           </h1>
+
+          <div className="price-banner" style={{ textAlign: "center", padding: "12px 16px", margin: "16px auto", maxWidth: "640px", borderRadius: "8px", background: "#eef2ff", color: "#3730a3", fontWeight: 600 }}>
+            Plans start at $2/month. Cancel anytime in 1 click.
+            <a href="/signup" style={{ marginLeft: "8px", color: "#4f46e5", textDecoration: "underline" }}>Get started</a>
+          </div>
+          <p className="text-xs text-slate-400">
+            <a href="/terms#refunds" className="underline hover:text-slate-200">
+              Read our refund &amp; cancellation policy
+            </a>
+          </p>
 
           <p className="text-slate-400 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
             No surprise overage fees, no complex usage tiers. Select the plan that fits your customer engagement scale.
@@ -327,7 +341,7 @@ export function PricingView({
                     </>
                   ) : (
                     <>
-                      <span>{user ? (isPending ? "Activate Starter" : "Choose Starter") : "Get Started"}</span>
+                      <span>Get Started</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -433,7 +447,7 @@ export function PricingView({
                     </>
                   ) : (
                     <>
-                      <span>{user ? "Upgrade to Growth" : "Choose Growth"}</span>
+                      <span>Choose Growth</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -510,7 +524,7 @@ export function PricingView({
                 variant="outline"
                 className="w-full h-12 rounded-2xl border-white/20 text-white hover:bg-white/10 font-bold text-xs"
               >
-                <Link href="mailto:sales@agentify.app?subject=Agentify%20Enterprise%20Inquiry">
+                <Link href="mailto:sales@agentifychat.online?subject=Agentify%20Enterprise%20Inquiry">
                   Contact Enterprise Sales
                 </Link>
               </Button>

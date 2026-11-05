@@ -339,7 +339,7 @@ JSON format:
     }
     placeholderBizId = placeholderBiz.id;
 
-    // 8.2 Create demo record (14-day expiry)
+    // 8.2 Create demo record (preview expiry)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 14);
     const demoUrl = `/demo/${draftSlug}`;

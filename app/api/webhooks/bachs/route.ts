@@ -391,7 +391,7 @@ export async function POST(request: Request) {
                     businessName: business.name || "there",
                     plan: subscription.plan === "growth" ? "Growth" : "Starter",
                     amount: `$${Number(amount).toFixed(2)} USD`,
-                    billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+                    billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online"}/dashboard/billing`,
                   }),
                 });
               }
@@ -494,7 +494,7 @@ export async function POST(request: Request) {
                   react: PaymentFailedEmail({
                     businessName: business.name || "there",
                     plan: subscription.plan,
-                    billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/billing`,
+                    billingUrl: `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online"}/dashboard/billing`,
                   }),
                 });
               }

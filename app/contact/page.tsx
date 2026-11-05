@@ -94,7 +94,7 @@ export default function ContactPage() {
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm">Email Support</h4>
                       <p className="text-indigo-600 font-semibold text-xs mt-1">
-                        <a href="mailto:support@agentify.app" className="hover:underline">support@agentify.app</a>
+                        <a href="mailto:support@agentifychat.online" className="hover:underline">support@agentifychat.online</a>
                       </p>
                     </div>
                   </div>

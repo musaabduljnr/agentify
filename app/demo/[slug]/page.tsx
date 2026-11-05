@@ -17,7 +17,7 @@ function DemoInactivePage({ status, businessName }: { status: string; businessNa
   
   if (status === "expired") {
     title = "Demo Assistant Expired";
-    description = `The 14-day preview period for the ${businessName} AI assistant has expired.`;
+    description = `The preview period for the ${businessName} AI assistant has expired.`;
   } else if (status === "paused") {
     title = "Demo Assistant Paused";
     description = `The preview for the ${businessName} AI assistant has been temporarily paused by the administrator.`;
@@ -40,7 +40,7 @@ function DemoInactivePage({ status, businessName }: { status: string; businessNa
         <div className="mt-8 flex flex-col gap-3">
           <Link href="/signup">
             <button className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-900/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
-              Create Your Own AI Assistant Free
+              Build Your Own AI Assistant
             </button>
           </Link>
           <Link href="/">

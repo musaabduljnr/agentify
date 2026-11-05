@@ -64,7 +64,7 @@ vi.mock("@/lib/monitoring/log-error", () => ({
 }));
 
 vi.mock("@/lib/config/platform-config", () => ({
-  getConfig: vi.fn().mockResolvedValue("https://agentify.app"),
+  getConfig: vi.fn().mockResolvedValue("https://agentifychat.online"),
   getSecretWithEnvFallback: vi.fn().mockResolvedValue(""),
 }));
 

@@ -50,7 +50,7 @@ export default function DemoPage() {
               <div className="pt-8 border-t border-white/10">
                 <Link href="/signup">
                   <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl h-12 font-bold shadow-lg shadow-indigo-900/20">
-                    Get Started Free
+                    Get Started
                   </Button>
                 </Link>
               </div>

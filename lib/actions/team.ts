@@ -215,7 +215,7 @@ export async function inviteTeamMember(email: string, role: string) {
     });
 
     // 6. Generate Link
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online";
     const inviteLink = `${appUrl}/invite/team?token=${token}`;
 
     // 7. Send Invitation Email
@@ -292,7 +292,7 @@ export async function resendTeamInvitation(invitationId: string) {
 
     if (updateErr) throw updateErr;
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online";
     const inviteLink = `${appUrl}/invite/team?token=${token}`;
 
     // 4. Send email

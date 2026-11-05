@@ -86,7 +86,7 @@ execute function public.handle_updated_at();
 insert into public.platform_configurations (category, key, value, is_secret, description)
 values
   ('email', 'default_provider', 'resend', false, 'Default email provider (resend or smtp)'),
-  ('email', 'from_email', 'noreply@agentifyhq.com', false, 'Standard sender address for emails'),
+  ('email', 'from_email', 'noreply@agentifychat.online', false, 'Standard sender address for emails'),
   ('email', 'from_name', 'Agentify', false, 'Standard sender display name'),
   ('platform', 'default_payment_provider', 'paystack', false, 'Default checkout provider (paystack or flutterwave)'),
   ('feature_flags', 'enable_emails', 'true', false, 'Global toggle to enable email dispatching'),

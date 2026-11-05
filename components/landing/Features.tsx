@@ -20,7 +20,7 @@ export function Features() {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText('<script src="https://agentify.ai/v1.js"></script>');
+    navigator.clipboard.writeText('<script src="https://agentifychat.online/widget.js" async></script>');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -74,7 +74,7 @@ export function Features() {
                 </div>
                 <div className="text-left font-mono text-xs min-w-0">
                   <p className="text-[#181c1f] font-semibold truncate">
-                    &lt;script src=&quot;https://agentify.ai/v1.js&quot;&gt;&lt;/script&gt;
+                    &lt;script src=&quot;https://agentifychat.online/widget.js&quot; async&gt;&lt;/script&gt;
                   </p>
                   <p className="text-[#747684]">Async • Zero impact on page load latency</p>
                 </div>

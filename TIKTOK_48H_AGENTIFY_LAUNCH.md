@@ -9,7 +9,7 @@ Important: 1,000 followers in 48 hours is not guaranteed. The controllable goal 
 Handle ideas:
 - `agentifyai`
 - `tryagentify`
-- `agentifyhq`
+- `agentifychat`
 - `agentifysupport`
 
 Bio:
@@ -20,7 +20,7 @@ Trained on your site. Embed in minutes. Capture leads while you sleep.
 
 Profile link CTA:
 ```
-Start free trial
+Start from $2/month
 ```
 
 Pinned videos:
@@ -51,7 +51,7 @@ Proof points from the product:
 - Analytics
 - Custom branding
 - Human fallback
-- Free trial, then plans from $29/month
+- Plans from $2/month
 
 ## Creative Rules
 
@@ -60,7 +60,7 @@ Use these rules for every post:
 - Show the product on-screen by second 3.
 - Keep most videos 12-30 seconds.
 - Add large on-screen captions.
-- End with one action: follow, comment "AI", or try the free trial.
+- End with one action: follow, comment "AI", or start from $2/month.
 - Reply to every comment in the first hour.
 - Turn good comments into reply videos.
 
@@ -297,12 +297,12 @@ Support is useful. Lead capture pays for it.
 
 Hook:
 ```
-Would you pay $29/month to stop missing website leads?
+Would you pay $2/month to stop missing website leads?
 ```
 
 Voiceover:
 ```
-Agentify has a free trial, then Starter is $29/month for one AI assistant, lead capture, customization, and 500 messages. If one extra customer comes from the widget, the math can be very easy.
+Agentify starts at $2/month for one AI assistant, lead capture, customization, and 200 AI replies. If one extra customer comes from the widget, the math can be very easy.
 ```
 
 Caption:

@@ -75,30 +75,12 @@ export default function LandingPage() {
 
       {/* 6. High-Impact Stats Banner (Stitch Section 5) */}
       <section className="w-full py-20 px-6 lg:px-12 bg-[#181c1f] text-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left divide-y md:divide-y-0 md:divide-x divide-[#2d3134]">
-            <div className="pt-6 md:pt-0 md:px-6">
-              <p className="text-5xl lg:text-6xl font-bold text-[#b4c5ff] mb-2 tracking-tight">85%</p>
-              <h4 className="text-xl font-semibold mb-2">Instant Ticket Resolution</h4>
-              <p className="text-sm text-[#c4c6d5] leading-relaxed">
-                Routine inquiries resolved without any human agent intervention.
-              </p>
-            </div>
-            <div className="pt-6 md:pt-0 md:px-6">
-              <p className="text-5xl lg:text-6xl font-bold text-[#b4c5ff] mb-2 tracking-tight">3.4x</p>
-              <h4 className="text-xl font-semibold mb-2">Qualified Pipeline Growth</h4>
-              <p className="text-sm text-[#c4c6d5] leading-relaxed">
-                Capture interested visitors after business hours in real time.
-              </p>
-            </div>
-            <div className="pt-6 md:pt-0 md:px-6">
-              <p className="text-5xl lg:text-6xl font-bold text-[#b4c5ff] mb-2 tracking-tight">24/7</p>
-              <h4 className="text-xl font-semibold mb-2">Global Autonomous Uptime</h4>
-              <p className="text-sm text-[#c4c6d5] leading-relaxed">
-                Always-on customer service across multiple languages and time zones.
-              </p>
-            </div>
-          </div>
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-5xl lg:text-6xl font-bold text-[#b4c5ff] mb-2 tracking-tight">24/7</p>
+          <h4 className="text-xl font-semibold mb-2">Always on</h4>
+          <p className="text-sm text-[#c4c6d5] leading-relaxed">
+            Always on, across time zones.
+          </p>
         </div>
       </section>
 
@@ -168,7 +150,7 @@ export default function LandingPage() {
           <div className="w-full max-w-xl mx-auto">
             <InstantAgentForm />
             <p className="text-xs text-[#575f6a] mt-4 font-medium">
-              Free 14-day trial • No credit card required • Cancel anytime
+              Plans from $2/month • Cancel anytime in 1 click
             </p>
           </div>
         </div>

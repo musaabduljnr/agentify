@@ -69,7 +69,7 @@ export function TransactionReceiptModal({ transaction, onClose }: TransactionRec
                 <span className="text-2xl font-black text-slate-900 tracking-tight">Agentify</span>
               </div>
               <p className="text-xs text-slate-400">Agentify AI Customer Engagement Platform</p>
-              <p className="text-xs text-slate-400">billing@agentifyhq.com</p>
+              <p className="text-xs text-slate-400">billing@agentifychat.online</p>
             </div>
             <div className="text-right">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${

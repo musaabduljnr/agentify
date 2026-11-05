@@ -46,7 +46,7 @@ export function HowItWorks() {
             </div>
             <div className="p-3 bg-[#f2f4f8] rounded-lg font-mono text-xs text-[#575f6a] flex items-center gap-2 border border-[#eceef2]">
               <Check className="w-4 h-4 text-[#027A48] shrink-0" />
-              <span className="truncate">Crawled 128 sub-pages • Zero hallucinations</span>
+              <span className="truncate">Crawls your public pages • Answers from your sources</span>
             </div>
           </div>
 
@@ -68,7 +68,7 @@ export function HowItWorks() {
             </div>
             <div className="p-3 bg-[#f2f4f8] rounded-lg font-mono text-xs text-[#575f6a] flex items-center gap-2 border border-[#eceef2]">
               <LinkIcon className="w-4 h-4 text-[#2a54c0] shrink-0" />
-              <span className="font-semibold text-[#181c1f] truncate">agentify.chat/your-company</span>
+              <span className="font-semibold text-[#181c1f] truncate">https://agentifychat.online/chat/your-company</span>
             </div>
           </div>
 
@@ -85,12 +85,12 @@ export function HowItWorks() {
                 Automate & Convert
               </h3>
               <p className="text-sm text-[#575f6a] leading-relaxed mb-6">
-                Your AI handles up to 85% of tier-1 support tickets instantaneously, captures warm enterprise leads, and alerts human operators when necessary.
+                Agentify handles repetitive customer questions so your team can focus on the rest, captures warm leads, and alerts human operators when necessary.
               </p>
             </div>
             <div className="p-3 bg-[#ECFDF3] rounded-lg font-mono text-xs text-[#027A48] flex items-center gap-2 border border-[#a6f4c5]">
               <TrendingUp className="w-4 h-4 shrink-0" />
-              <span className="font-semibold truncate">+34% Lead Conversion Rate verified</span>
+              <span className="font-semibold truncate">Captures leads from visitors even when your team is offline.</span>
             </div>
           </div>
 

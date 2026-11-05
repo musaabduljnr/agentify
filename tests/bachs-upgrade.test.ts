@@ -55,7 +55,7 @@ vi.mock("@/lib/email/send-email", () => ({
 }));
 
 vi.mock("@/lib/config/platform-config", () => ({
-  getConfig: vi.fn().mockResolvedValue("https://agentify.app"),
+  getConfig: vi.fn().mockResolvedValue("https://agentifychat.online"),
 }));
 
 vi.mock("next/cache", () => ({

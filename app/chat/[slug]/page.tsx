@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@/utils/supabase/service";
 import { HostedChatClient } from "@/components/hosted-chat/hosted-chat-client";
+import { resolveBusinessEntitlements } from "@/lib/billing/entitlements";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,11 @@ export default async function HostedChatPage({ params }: { params: Promise<{ slu
 
   if (!business || !assistant) {
     notFound();
+  }
+
+  const entitlements = await resolveBusinessEntitlements(business.id);
+  if (!entitlements.active) {
+    return <UnavailablePage />;
   }
 
   const suggestedQuestions = Array.isArray(config.suggested_questions)

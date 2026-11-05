@@ -1,5 +1,10 @@
 import * as React from "react";
 import {
+  COMPANY_LEGAL_NAME,
+  COMPANY_POSTAL_ADDRESS,
+  SUPPORT_EMAIL,
+} from "@/lib/site";
+import {
   Body,
   Container,
   Head,
@@ -15,8 +20,8 @@ interface BaseTemplateProps {
   children: React.ReactNode;
 }
 
-export const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app";
-export const supportEmail = process.env.SUPPORT_EMAIL || "support@agentifyhq.com";
+export const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online";
+export const supportEmail = SUPPORT_EMAIL;
 
 export function BaseTemplate({ previewText, title, children }: BaseTemplateProps) {
   return (
@@ -41,6 +46,9 @@ export function BaseTemplate({ previewText, title, children }: BaseTemplateProps
             <Text style={styles.footerText}>
               This is a transactional email sent by Agentify to help manage your workspace and customer relations.
             </Text>
+            <Text style={styles.footerText}>
+              {COMPANY_LEGAL_NAME} • {COMPANY_POSTAL_ADDRESS}
+            </Text>
             <Text style={styles.footerLinkText}>
               Need help? Reach out to us at{" "}
               <a href={`mailto:${supportEmail}`} style={styles.supportLink}>
@@ -48,7 +56,7 @@ export function BaseTemplate({ previewText, title, children }: BaseTemplateProps
               </a>
             </Text>
             <Text style={styles.copyrightText}>
-              © {new Date().getFullYear()} Agentify. All rights reserved.
+              © {new Date().getFullYear()} {COMPANY_LEGAL_NAME}. All rights reserved.
             </Text>
           </Section>
         </Container>

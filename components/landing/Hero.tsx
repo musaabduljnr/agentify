@@ -18,16 +18,9 @@ export function Hero() {
 
       <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
         
-        {/* Social Proof Rating Chip */}
+        {/* Plans info chip */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#ffffff] border border-[#eceef2] shadow-sm mb-8 transition-transform hover:scale-[1.02]">
-          <div className="flex items-center text-amber-400">
-            {[...Array(5)].map((_, i) => (
-              <Star key={i} className="w-3.5 h-3.5 fill-amber-400" />
-            ))}
-          </div>
-          <span className="text-[13px] font-semibold text-[#181c1f]">4.9 rating</span>
-          <span className="w-1 h-1 rounded-full bg-[#c4c6d5]"></span>
-          <span className="text-[13px] text-[#575f6a]">50k+ conversations handled</span>
+          <span className="text-[13px] font-semibold text-[#181c1f]">Plans from $2/month. Cancel anytime.</span>
         </div>
 
         {/* Main Headline */}
@@ -90,7 +83,7 @@ export function Hero() {
                 <RefreshCw className="w-4 h-4 animate-spin text-[#2a54c0]" />
                 <span className="text-xs font-medium">Neural Synapse Processing...</span>
               </div>
-              <span className="text-[11px] text-[#013daa] font-mono">14ms</span>
+              <span className="text-[11px] text-[#013daa] font-mono">Live</span>
             </div>
           </div>
 
@@ -112,7 +105,7 @@ export function Hero() {
                 </div>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#ECFDF3] text-[#027A48] text-xs font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#027A48] animate-ping" />
-                  99.98% Autonomous
+                  Always on
                 </span>
               </div>
 
@@ -120,20 +113,18 @@ export function Hero() {
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-[#f2f4f8] p-3.5 rounded-lg border border-[#eceef2]/60">
                   <span className="text-[11px] font-semibold text-[#575f6a] uppercase tracking-wider block mb-1">
-                    Total Handled
+                    Availability
                   </span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-[#181c1f]">18,420</span>
-                    <span className="text-xs font-semibold text-[#027A48]">+24.8%</span>
+                    <span className="text-2xl font-bold text-[#181c1f]">24/7</span>
                   </div>
                 </div>
                 <div className="bg-[#f2f4f8] p-3.5 rounded-lg border border-[#eceef2]/60">
                   <span className="text-[11px] font-semibold text-[#575f6a] uppercase tracking-wider block mb-1">
-                    Lead Conversion
+                    Lead Capture
                   </span>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-[#181c1f]">34.2%</span>
-                    <span className="text-xs font-semibold text-[#027A48]">+4.1%</span>
+                    <span className="text-2xl font-bold text-[#181c1f]">Automatic</span>
                   </div>
                 </div>
               </div>
@@ -142,7 +133,7 @@ export function Hero() {
               <div className="w-full mb-4">
                 <div className="flex items-center justify-between text-[#575f6a] text-xs mb-2">
                   <span>Inquiries Autonomous Resolution (Last 7 Days)</span>
-                  <span className="font-mono text-[11px]">Avg Latency: 1.2s</span>
+                  <span className="font-mono text-[11px]">Real-time</span>
                 </div>
                 <svg className="w-full h-32 overflow-visible" preserveAspectRatio="none" viewBox="0 0 500 120">
                   <defs>
@@ -196,7 +187,7 @@ export function Hero() {
                   <span className="text-[13px] font-semibold text-[#181c1f]">Agentify AI</span>
                 </div>
                 <span className="px-2 py-0.5 rounded-full bg-[#ffffff] border border-[#eceef2] text-[11px] text-[#575f6a] font-mono">
-                  99.4% confidence
+                  Grounded in your sources
                 </span>
               </div>
 
@@ -239,6 +230,7 @@ export function Hero() {
           </div>
 
         </div>
+        <p className="text-xs text-[#747684] text-center mt-3">Illustrative example</p>
 
       </div>
     </section>

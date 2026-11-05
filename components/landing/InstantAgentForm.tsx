@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { generateInstantAgent, type InstantGenerationSuccess } from "@/lib/actions/instant-generator";
+import { trackEvent } from "@/lib/analytics";
 import { 
   Globe, 
   Zap, 
@@ -57,6 +58,7 @@ export function InstantAgentForm() {
         if (response.success) {
           setResult(response);
           setError(null);
+          trackEvent("preview_built", { source: "landing" });
         } else {
           setError(response.error);
         }

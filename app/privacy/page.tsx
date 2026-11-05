@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Shield } from "lucide-react";
+import { COMPANY_LEGAL_NAME, COMPANY_POSTAL_ADDRESS, SUPPORT_EMAIL } from "@/lib/site";
 
 export const metadata = {
   title: "Privacy Policy | Agentify",
@@ -35,7 +36,7 @@ export default function PrivacyPage() {
           <div className="bg-white border border-slate-200 rounded-[2rem] p-8 sm:p-12 shadow-sm text-left prose prose-slate">
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4">1. Overview</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              At Agentify, we take your trust and the security of your business and customer data extremely seriously. This Privacy Policy describes how Agentify AI Inc. (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, processes, and protects your information when you subscribe to our SaaS, integrate our chat widgets, or access our dashboards.
+              At Agentify, we take your trust and the security of your business and customer data extremely seriously. This Privacy Policy describes how {COMPANY_LEGAL_NAME} (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, processes, and protects your information when you subscribe to our SaaS, integrate our chat widgets, or access our dashboards.
             </p>
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">2. Data We Collect</h2>
@@ -72,14 +73,42 @@ export default function PrivacyPage() {
               We do not sell, rent, or trade your organization data, lead lists, or chat histories to third parties. We share data only with authorized processors necessary for SaaS delivery, including cloud hosting databases, email networks (e.g. Resend), and payment processing (Bachs).
             </p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">5. Security Standards</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">5. Cookies, Advertising & Analytics</h2>
+            <p className="text-slate-600 text-sm leading-relaxed mb-4">
+              We use first-party cookies and localStorage for sign-in sessions, preferences, preview claims, and campaign attribution (UTM parameters). We also use the Meta Pixel and Google tag to measure page views, signup starts, preview builds, and subscription starts so we can improve our advertising and product.
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 text-sm space-y-3 mb-6">
+              <li>These providers may set cookies and receive device, browser, IP address, and event data.</li>
+              <li>You can block or delete cookies in your browser settings; core account features may stop working.</li>
+              <li>You can opt out of personalized advertising through your Meta and Google ad settings.</li>
+            </ul>
+
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">6. Security Standards</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
               Agentify maintains strict safety protocols. All active connections utilize TLS encryption. Database access conforms to strict Row Level Security (RLS) policies, preventing unauthorized queries. Passwords and credentials remain fully protected behind Supabase Authentication.
             </p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">6. User Rights</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">7. User Rights</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              Under relevant global compliance guidelines (e.g., GDPR, CCPA), you reserve complete rights to inspect, update, or completely delete your account data, knowledge logs, and captured lead logs from our servers. Feel free to contact our support team at <a href="mailto:support@agentify.app" className="text-indigo-600 hover:underline">support@agentify.app</a> to submit requests.
+              Under relevant global compliance guidelines (e.g., GDPR, CCPA), you have the right to inspect, update, or delete your account data, knowledge logs, and captured lead logs. Contact our support team at <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-600 hover:underline">{SUPPORT_EMAIL}</a> to submit requests.
+            </p>
+
+            <h2 id="unsubscribe" className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">8. Email Preferences & Unsubscribe</h2>
+            <p className="text-slate-600 text-sm leading-relaxed mb-4">
+              You can opt out of non-essential email at any time:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 text-sm space-y-3 mb-6">
+              <li>Click the <strong>Unsubscribe</strong> link at the bottom of any marketing email.</li>
+              <li>Email <a href={`mailto:${SUPPORT_EMAIL}?subject=Unsubscribe`} className="text-indigo-600 hover:underline">{SUPPORT_EMAIL}</a> with the subject &quot;Unsubscribe&quot; and we will process it promptly.</li>
+              <li>Turn off optional notifications in your dashboard notification settings.</li>
+            </ul>
+            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              Transactional messages about billing, security, and your account will still be sent while you have an active account.
+            </p>
+
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">9. Contact</h2>
+            <p className="text-slate-600 text-sm leading-relaxed mb-6">
+              {COMPANY_LEGAL_NAME}, {COMPANY_POSTAL_ADDRESS}. Email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-600 hover:underline">{SUPPORT_EMAIL}</a>.
             </p>
           </div>
         </div>

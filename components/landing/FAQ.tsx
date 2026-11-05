@@ -6,7 +6,7 @@ export function FAQ() {
     },
     {
       question: "Does the AI hallucinate or provide false company policies?",
-      answer: "No. Agentify utilizes strict RAG (Retrieval-Augmented Generation) bounds with factual verification layers. If the agent cannot locate verifiable information in your sources, it gracefully falls back to human escalation."
+      answer: "Agentify answers from your own content. If it cannot find an answer in your sources, it hands the conversation to your team instead of guessing."
     },
     {
       question: "Can I test my agent before installing it on my live site?",

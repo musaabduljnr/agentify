@@ -1,6 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Globe, Terminal, Mail } from "lucide-react";
+import {
+  COMPANY_LEGAL_NAME,
+  COMPANY_POSTAL_ADDRESS,
+  SALES_EMAIL,
+  SUPPORT_EMAIL,
+} from "@/lib/site";
 
 export function Footer() {
   return (
@@ -80,11 +86,6 @@ export function Footer() {
               </li>
               <li>
                 <Link href="#solutions" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
-                  Fintech Compliance
-                </Link>
-              </li>
-              <li>
-                <Link href="#solutions" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
                   Lead Qualification
                 </Link>
               </li>
@@ -98,11 +99,6 @@ export function Footer() {
             </h4>
             <ul className="space-y-2.5 text-xs sm:text-[13px]">
               <li>
-                <Link href="/demo" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
-                  Documentation
-                </Link>
-              </li>
-              <li>
                 <Link href="/pricing" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
                   Pricing & Plans
                 </Link>
@@ -113,9 +109,9 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/demo" className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
-                  Customer Stories
-                </Link>
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#575f6a] hover:text-[#181c1f] transition-colors">
+                  Contact Support
+                </a>
               </li>
             </ul>
           </div>
@@ -152,18 +148,32 @@ export function Footer() {
         </div>
 
         {/* Bottom copyright and metadata */}
-        <div className="border-t border-[#eceef2] pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#575f6a]">
-          <p>© {new Date().getFullYear()} Agentify Inc. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link aria-label="Global Network" className="hover:text-[#181c1f] transition-colors" href="/">
-              <Globe className="w-4 h-4" />
-            </Link>
-            <Link aria-label="Developer Portal" className="hover:text-[#181c1f] transition-colors" href="/demo">
-              <Terminal className="w-4 h-4" />
-            </Link>
-            <Link aria-label="Contact Mail" className="hover:text-[#181c1f] transition-colors" href="mailto:support@agentify.app">
-              <Mail className="w-4 h-4" />
-            </Link>
+        <div className="border-t border-[#eceef2] pt-8 flex flex-col gap-4 text-xs text-[#575f6a]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <p>© {new Date().getFullYear()} {COMPANY_LEGAL_NAME}. All rights reserved.</p>
+              <p>{COMPANY_POSTAL_ADDRESS}</p>
+              <p>
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-[#181c1f] transition-colors">
+                  {SUPPORT_EMAIL}
+                </a>
+                {" · "}
+                <a href={`mailto:${SALES_EMAIL}`} className="hover:text-[#181c1f] transition-colors">
+                  {SALES_EMAIL}
+                </a>
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link aria-label="Global Network" className="hover:text-[#181c1f] transition-colors" href="/">
+                <Globe className="w-4 h-4" />
+              </Link>
+              <Link aria-label="Developer Portal" className="hover:text-[#181c1f] transition-colors" href="/integrations">
+                <Terminal className="w-4 h-4" />
+              </Link>
+              <Link aria-label="Contact Mail" className="hover:text-[#181c1f] transition-colors" href={`mailto:${SUPPORT_EMAIL}`}>
+                <Mail className="w-4 h-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>

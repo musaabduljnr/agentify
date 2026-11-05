@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://agentify.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online"),
   title: {
     default: "Agentify | AI Business Assistant for Sales and Support",
     template: "%s | Agentify",
@@ -71,6 +71,7 @@ export const viewport: Viewport = {
 import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { NavigationLoader } from "@/components/ui/navigation-loader";
+import { AnalyticsScripts } from "@/components/analytics/AnalyticsScripts";
 import { headers } from "next/headers";
 import { getConfig } from "@/lib/config/platform-config";
 import { AlertTriangle, Info } from "lucide-react";
@@ -105,12 +106,12 @@ export default async function RootLayout({
             {/* Glowing Gradients */}
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
-            
+
             <div className="z-10 max-w-md w-full text-center space-y-8 bg-slate-950/40 backdrop-blur-xl border border-slate-800 p-10 rounded-3xl shadow-2xl relative">
               <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl flex items-center justify-center mx-auto animate-pulse">
                 <AlertTriangle className="w-8 h-8" />
               </div>
-              
+
               <div className="space-y-3">
                 <h1 className="text-3xl font-extrabold tracking-tight text-white font-outfit">
                   System Offline
@@ -119,14 +120,14 @@ export default async function RootLayout({
                   Agentify is currently undergoing scheduled maintenance to improve our platform services.
                 </p>
               </div>
-              
+
               <div className="bg-slate-900/60 rounded-xl p-4 border border-slate-850/50 flex items-start gap-3 text-left">
                 <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   Our operations team is active. Normal services will resume shortly. We apologize for any inconvenience caused.
                 </p>
               </div>
-              
+
               <div className="text-[10px] text-slate-600 font-medium tracking-widest uppercase">
                 Agentify Platform Services
               </div>
@@ -135,6 +136,7 @@ export default async function RootLayout({
         ) : (
           children
         )}
+        <AnalyticsScripts />
         <Toaster position="top-center" richColors />
         <Suspense fallback={null}>
           <NavigationLoader />

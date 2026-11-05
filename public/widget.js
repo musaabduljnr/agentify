@@ -395,7 +395,7 @@
           <input type="text" class="agentify-input" id="agentify-input-field" placeholder="Type a message..." />
           <button class="agentify-send" id="agentify-send-btn">Send</button>
         </div>
-        ${config.showBranding ? `<div class="agentify-branding">Powered by <a href="https://agentify.ai" target="_blank">Agentify</a></div>` : ""}
+        ${config.showBranding ? `<div class="agentify-branding">Powered by <a href="https://agentifychat.online" target="_blank">Agentify</a></div>` : ""}
       </div>
     `;
 

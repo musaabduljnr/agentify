@@ -67,7 +67,7 @@ vi.mock("@/lib/monitoring/log-error", () => ({
 
 vi.mock("@/lib/config/platform-config", () => ({
   getConfig: vi.fn(async (_category: string, key: string) =>
-    key === "enable_payments" ? "true" : "https://agentify.app"
+    key === "enable_payments" ? "true" : "https://agentifychat.online"
   ),
 }));
 

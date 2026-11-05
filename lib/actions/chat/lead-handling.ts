@@ -50,7 +50,7 @@ export async function processLeadHandling({
     metadata.requested_action = requestedAction;
   }
 
-  const conversationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app"}/dashboard/conversations?id=${conversationId}`;
+  const conversationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online"}/dashboard/conversations?id=${conversationId}`;
 
   // Emails for high intent (non-demo only)
   if (!isDemo) {

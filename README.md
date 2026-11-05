@@ -275,7 +275,7 @@ MIT License – See [LICENSE](LICENSE) file for details.
 ## 📞 Support
 
 Questions? Issues? Reach out:
-- 📧 Email: [your-email@example.com](mailto:your-email@example.com)
+- 📧 Email: [support@agentifychat.online](mailto:support@agentifychat.online)
 - 🐛 Issues: [GitHub Issues](https://github.com/musaabduljnr/agentify/issues)
 
 ---

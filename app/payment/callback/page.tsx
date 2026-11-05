@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { verifyPaymentReference } from "@/lib/actions/payments";
+import { trackEvent } from "@/lib/analytics";
 import { Loader2, CheckCircle2, XCircle, ArrowRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -16,6 +17,7 @@ function CallbackContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [message, setMessage] = useState("Verifying your payment transaction...");
   const [plan, setPlan] = useState("");
+  const subscriptionTracked = useRef(false);
 
   useEffect(() => {
     if (!reference) {
@@ -36,6 +38,10 @@ function CallbackContent() {
           setStatus("success");
           setPlan(result.plan || "Paid");
           setMessage("Your subscription has been upgraded successfully!");
+          if (!subscriptionTracked.current) {
+            subscriptionTracked.current = true;
+            trackEvent("subscription_started", { plan: result.plan || "unknown" });
+          }
           
           // Auto redirect after 3 seconds
           setTimeout(() => {

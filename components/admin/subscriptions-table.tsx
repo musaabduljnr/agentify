@@ -220,7 +220,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
             <option value="all">All Statuses</option>
             <option value="active">Active</option>
             <option value="pending">Pending</option>
-            <option value="trialing">Trialing</option>
             <option value="suspended">Suspended</option>
             <option value="inactive">Inactive</option>
             <option value="cancelled">Cancelled</option>
@@ -462,7 +461,6 @@ export function SubscriptionsTable({ initialSubscriptions }: SubscriptionsTableP
                         >
                           <option value="active">Active</option>
                           <option value="pending">Pending</option>
-                          <option value="trialing">Trialing</option>
                           <option value="inactive">Inactive</option>
                           <option value="suspended">Suspended</option>
                           <option value="cancelled">Cancelled</option>

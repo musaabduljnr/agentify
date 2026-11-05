@@ -23,7 +23,7 @@ The project is in **late-alpha / pre-production** stage. The architecture is sou
 | **Product** | AI customer support chat widget platform (SaaS) |
 | **Target Users** | Small-to-medium businesses in African markets (Nigeria-first via Paystack) |
 | **Core Value** | Turn any website into a 24/7 AI sales/support assistant trained on business data |
-| **Revenue Model** | Subscription tiers (Free Trial → Starter → Growth) via Paystack recurring billing |
+| **Revenue Model** | Subscription tiers (Starter → Growth; paid plans only) via Paystack recurring billing |
 | **Tech Stack** | Next.js 16, React 19, TypeScript, Supabase, Gemini/OpenRouter/Groq/Vertex AI, Tailwind 4, shadcn/ui |
 | **Deployment** | Vercel (serverless), Supabase (hosted), Paystack (payments), Resend (email) |
 
@@ -255,7 +255,7 @@ $$ LANGUAGE plpgsql;
 | TD-7 | Nested `agentify/node_modules/` tracked in git | **LOW** | 10 minutes |
 | TD-8 | `console.log`/`console.error` used in production code paths (14 in core) | **MEDIUM** | 1 day |
 | TD-9 | Some schemas are non-idempotent (CREATE TABLE without IF NOT EXISTS) | **MEDIUM** | 1 day |
-| TD-10 | Hardcoded fallback URLs (`https://agentifyhq.vercel.app`) scattered in code | **LOW** | 2 hours |
+| TD-10 | Hardcoded fallback URLs (`https://agentifychat.online`) scattered in code | **LOW** | 2 hours |
 
 ---
 

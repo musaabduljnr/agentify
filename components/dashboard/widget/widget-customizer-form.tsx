@@ -87,7 +87,7 @@ export function WidgetCustomizerForm({ initialData }: { initialData: any }) {
   };
 
   const colors = ["#4F46E5", "#3B82F6", "#10B981", "#0F172A", "#F43F5E", "#8B5CF6"];
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online").replace(/\/$/, "");
   const hostedChatLink = config.hostedChatSlug ? `${appUrl}/chat/${config.hostedChatSlug}` : "";
   const slugIsValid = /^[a-z0-9-]{3,}$/.test(config.hostedChatSlug);
   const normalizeSlug = (value: string) =>

@@ -18,7 +18,7 @@ const MAX_TOTAL_TEXT_LENGTH = 300_000;
 const MAX_SCRIPT_ASSETS = 8;
 const MAX_SCRIPT_ASSET_SIZE = 300_000;
 const USER_AGENT =
-  "Mozilla/5.0 (compatible; AgentifyBot/1.0; +https://agentify.ai)";
+  "Mozilla/5.0 (compatible; AgentifyBot/1.0; +https://agentifychat.online)";
 
 const REMOVE_SELECTORS = [
   "script",

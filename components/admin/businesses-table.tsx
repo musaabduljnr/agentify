@@ -189,7 +189,7 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                                 : "bg-slate-900 border-slate-800 text-slate-400"
                             }`}
                           >
-                            {sub.status || "trialing"}
+                            {sub.status || "pending"}
                           </span>
                         </div>
                       </td>
@@ -380,12 +380,12 @@ export function BusinessesTable({ initialBusinesses }: BusinessesTableProps) {
                         </div>
                       </div>
                       <a
-                        href={`${(process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "")}/chat/${selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}`}
+                        href={`${(process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online").replace(/\/$/, "")}/chat/${selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}`}
                         target="_blank"
                         rel="noreferrer"
                         className="block rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[10px] text-indigo-300 break-all hover:border-indigo-500/40"
                       >
-                        {`${(process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "")}/chat/${selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}`}
+                        {`${(process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online").replace(/\/$/, "")}/chat/${selectedBusiness.widget_configs[0].hosted_chat_slug || selectedBusiness.slug}`}
                       </a>
                     </div>
                   </div>

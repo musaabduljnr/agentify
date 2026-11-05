@@ -50,7 +50,7 @@ export default function AboutPage() {
                 To solve this, we initiated a high-focus, 48-hour engineering and positioning sprint. We wanted to see if we could build a production-grade, highly secure, and lightning-fast AI system that trains itself from a single URL.
               </p>
               <p className="text-slate-600 leading-relaxed">
-                What began as a sprint quickly evolved into a robust SaaS platform. Today, Agentify helps thousands of businesses worldwide manage automated support, capture pre-qualified sales leads, and create tailored chatbot widgets in minutes.
+                What began as a sprint quickly evolved into a robust SaaS platform. Today, Agentify helps businesses manage automated support, capture pre-qualified sales leads, and create tailored chatbot widgets in minutes.
               </p>
             </div>
             
@@ -97,25 +97,6 @@ export default function AboutPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Metrics Section */}
-      <section className="py-16 bg-slate-50 border-y border-slate-200">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { num: "5,000+", label: "Active Assistants" },
-              { num: "2.4M+", label: "Messages Handled" },
-              { num: "98.7%", label: "Accuracy Rate" },
-              { num: "24/7", label: "Instant Support" }
-            ].map((stat, i) => (
-              <div key={i} className="space-y-1">
-                <div className="text-3xl sm:text-4xl font-extrabold text-indigo-600">{stat.num}</div>
-                <div className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-widest">{stat.label}</div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -175,7 +156,7 @@ export default function AboutPage() {
           <div className="flex justify-center">
             <Link href="/signup">
               <Button className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold rounded-full px-8 h-12 flex items-center gap-2">
-                Start your 14-day free trial
+                Plans from $2/month
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

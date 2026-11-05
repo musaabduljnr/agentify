@@ -310,11 +310,7 @@ export default function IntegrationsPage() {
                 </div>
                 <pre className="text-indigo-300 overflow-x-auto whitespace-pre-wrap select-all">
 {`<!-- Agentify Chat Widget -->
-<script 
-  src="https://cdn.agentify.app/widget.js" 
-  data-agent-id="agent_live_prod_827f3b" 
-  defer>
-</script>
+<script src="https://agentifychat.online/widget.js" async></script>
 <!-- End Agentify Chat Widget -->`}
                 </pre>
               </div>

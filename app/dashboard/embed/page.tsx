@@ -14,7 +14,7 @@ import { CopyButton } from "@/components/dashboard/embed/copy-button";
 export default async function EmbedCodePage() {
   const { business, widgetConfig } = await getCurrentBusinessSetup();
   const businessId = business?.id || "business_id_missing";
-  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://agentifyhq.vercel.app").replace(/\/$/, "");
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://agentifychat.online").replace(/\/$/, "");
   const hostedSlug = widgetConfig?.hosted_chat_slug || business?.slug || "business-slug";
   const hostedChatLink = `${appUrl}/chat/${hostedSlug}`;
 

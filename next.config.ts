@@ -42,12 +42,12 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               process.env.NODE_ENV === "production"
-                ? "script-src 'self' 'unsafe-inline' https://checkout.bachs.io"
-                : "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.bachs.io",
+                ? "script-src 'self' 'unsafe-inline' https://checkout.bachs.io https://connect.facebook.net https://www.googletagmanager.com"
+                : "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://checkout.bachs.io https://connect.facebook.net https://www.googletagmanager.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.bachs.io https://generativelanguage.googleapis.com",
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.bachs.io https://generativelanguage.googleapis.com https://connect.facebook.net https://www.facebook.com https://www.googletagmanager.com https://www.google-analytics.com https://region1.google-analytics.com",
               "frame-src https://checkout.bachs.io",
               "object-src 'none'",
               "base-uri 'self'",

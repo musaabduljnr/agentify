@@ -28,7 +28,7 @@ const planMeta: Record<"starter" | "growth" | "enterprise", {
     badge: "Custom Scale",
     tagline: "Tailored volume, dedicated architecture, custom SLA, and hands-on onboarding.",
     buttonText: "Contact Enterprise Sales",
-    href: "mailto:sales@agentify.app?subject=Agentify%20Enterprise%20Plan%20Inquiry",
+    href: "mailto:sales@agentifychat.online?subject=Agentify%20Enterprise%20Plan%20Inquiry",
     highlighted: false,
   },
 };

@@ -68,7 +68,7 @@ export default function AdminLoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@agentify.com"
+              placeholder="admin@agentifychat.onlinem"
               className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors placeholder-slate-650"
             />
           </div>

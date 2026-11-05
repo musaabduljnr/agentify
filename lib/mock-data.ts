@@ -9,7 +9,7 @@ export const recentConversations = [
   { id: "1", visitor: "John Doe", lastMessage: "How can I integrate this?", time: "2m ago", status: "Lead" },
   { id: "2", visitor: "Anonymous #482", lastMessage: "Pricing details please.", time: "15m ago", status: "Visitor" },
   { id: "3", visitor: "Sarah Smith", lastMessage: "Thank you for the help!", time: "1h ago", status: "Lead" },
-  { id: "4", visitor: "Anonymous #481", lastMessage: "Is there a free trial?", time: "2h ago", status: "Visitor" },
+  { id: "4", visitor: "Anonymous #481", lastMessage: "What are your pricing plans?", time: "2h ago", status: "Visitor" },
   { id: "5", visitor: "Mike Johnson", lastMessage: "I need support with my widget.", time: "3h ago", status: "Visitor" },
 ];
 
@@ -35,8 +35,8 @@ export const leads = [
 ];
 
 export const knowledgeSources = [
-  { id: "1", name: "https://agentify.ai/docs", type: "URL", status: "Trained", lastUpdated: "2 hours ago" },
+  { id: "1", name: "https://agentifychat.online/docs", type: "URL", status: "Trained", lastUpdated: "2 hours ago" },
   { id: "2", name: "business_info.pdf", type: "Document", status: "Trained", lastUpdated: "1 day ago" },
   { id: "3", name: "Pricing FAQ", type: "Manual", status: "Processing", lastUpdated: "Just now" },
-  { id: "4", name: "https://agentify.ai/blog", type: "URL", status: "Failed", lastUpdated: "3 hours ago" },
+  { id: "4", name: "https://agentifychat.online/blog", type: "URL", status: "Failed", lastUpdated: "3 hours ago" },
 ];

@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/landing/Navbar";
 import { Footer } from "@/components/landing/Footer";
 import { Shield } from "lucide-react";
+import { COMPANY_LEGAL_NAME, COMPANY_POSTAL_ADDRESS, SUPPORT_EMAIL } from "@/lib/site";
 
 export const metadata = {
   title: "Terms of Service | Agentify",
@@ -35,7 +36,7 @@ export default function TermsPage() {
           <div className="bg-white border border-slate-200 rounded-[2rem] p-8 sm:p-12 shadow-sm text-left prose prose-slate">
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4">1. Agreement to Terms</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              By registering an account with Agentify AI Inc. (&quot;Agentify&quot;, &quot;we&quot;, &quot;us&quot;, &quot;our&quot;), subscribing to our plans, or integrating our website widgets, you agree to be bound by these Terms of Service. If you do not agree to these rules, you are prohibited from using the platform.
+              By registering an account with {COMPANY_LEGAL_NAME} (&quot;Agentify&quot;, &quot;we&quot;, &quot;us&quot;, &quot;our&quot;), subscribing to our plans, or integrating our website widgets, you agree to be bound by these Terms of Service. If you do not agree to these rules, you are prohibited from using the platform.
             </p>
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">2. Account Terms & Access</h2>
@@ -43,18 +44,25 @@ export default function TermsPage() {
               To utilize our dashboard customizers, scrapers, and embedding tables, you must create an account. You represent that all details provided are complete and correct. You are responsible for preserving credentials and password keys. We reserve the absolute right to terminate accounts that violate security or provide fraudulent information.
             </p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">3. Subscription, Payments, & Refunds</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">3. Subscription & Payments</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-4">
-              Agentify operates subscription packages (Starter, Growth, Enterprise).
+              Agentify operates paid subscription packages (Starter, Growth, Enterprise). A paid plan is required to publish your assistant.
             </p>
             <ul className="list-disc pl-6 text-slate-600 text-sm space-y-3 mb-6">
               <li>Paid subscriptions are processed securely in USD through Bachs hosted checkout.</li>
               <li>Charges occur monthly based on the active tier. You can upgrade, downgrade, or cancel your renewal at any time directly through the Billing dashboard.</li>
               <li>Subscriptions are subject to monthly message or assistant quotas. Excess allocations require tier upgrades.</li>
-              <li>Refunds are reviewed individually. Cancelled subscriptions remain active until the close of the current billing timeline.</li>
             </ul>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">4. Prohibited Uses</h2>
+            <h2 id="refunds" className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">4. Refunds & Cancellation</h2>
+            <ul className="list-disc pl-6 text-slate-600 text-sm space-y-3 mb-6">
+              <li>You can cancel anytime in 1 click from your billing dashboard.</li>
+              <li>Cancellation stops future renewal charges. Your plan remains active until the end of the current billing period.</li>
+              <li>Fees already paid for the current billing period are non-refundable. We do not issue prorated refunds for partial periods.</li>
+              <li>If you believe you were charged in error, contact <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-600 hover:underline">{SUPPORT_EMAIL}</a> within 7 days of the charge and we will review the case.</li>
+            </ul>
+
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">5. Prohibited Uses</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-4">
               You agree not to utilize our web scraping, embeddings, or widget delivery engines to:
             </p>
@@ -65,14 +73,14 @@ export default function TermsPage() {
               <li>Reverse engineer the widget.js delivery scripts or compromise Supabase auth tables.</li>
             </ul>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">5. Limitation of Liability</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">6. Limitation of Liability</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
               Agentify provides services &quot;as is&quot; without guarantees. We do not accept liability for business disruptions, loss of revenue, or incorrect information (hallucinations) supplied by your trained AI assistant to visitors on your site. You bear full responsibility for editing and auditing AI training materials.
             </p>
 
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">6. Amendments & Contact</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">7. Amendments & Contact</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              We update these terms occasionally to reflect changes in our legal guidelines or features. Continued usage represents acceptance of the active terms. For inquiries, email <a href="mailto:support@agentify.app" className="text-indigo-600 hover:underline">support@agentify.app</a>.
+              We update these terms occasionally to reflect changes in our legal guidelines or features. Continued usage represents acceptance of the active terms. For inquiries, email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-indigo-600 hover:underline">{SUPPORT_EMAIL}</a> or write to {COMPANY_LEGAL_NAME}, {COMPANY_POSTAL_ADDRESS}.
             </p>
           </div>
         </div>

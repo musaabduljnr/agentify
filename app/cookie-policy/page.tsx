@@ -114,7 +114,7 @@ export default function CookiePolicyPage() {
 
             <h2 className="text-2xl font-bold text-slate-900 mb-6 border-b border-slate-100 pb-4 mt-10">5. Inquiries</h2>
             <p className="text-slate-600 text-sm leading-relaxed mb-6">
-              For additional context on our tracking protocols or cookie classifications, please message <a href="mailto:support@agentify.app" className="text-indigo-600 hover:underline">support@agentify.app</a>.
+              For additional context on our tracking protocols or cookie classifications, please message <a href="mailto:support@agentifychat.online" className="text-indigo-600 hover:underline">support@agentifychat.online</a>.
             </p>
           </div>
         </div>

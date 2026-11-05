@@ -587,7 +587,7 @@ export async function pauseDemoBusiness(id: string, pause: boolean) {
 }
 
 /**
- * Extends demo expiration by 14 days.
+ * Extends the demo preview period.
  */
 export async function extendDemoBusiness(id: string) {
   try {

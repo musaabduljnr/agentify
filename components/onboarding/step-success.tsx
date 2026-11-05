@@ -3,6 +3,7 @@
 import { CheckCircle2, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export function StepSuccess() {
   const router = useRouter();
@@ -21,16 +22,27 @@ export function StepSuccess() {
         You&apos;re all set! <PartyPopper className="w-8 h-8 text-indigo-600" />
       </h2>
       
+      <p className="text-slate-500 mb-4 max-w-md mx-auto">
+        Your business profile and AI assistant have been created successfully. You can test everything in the preview sandbox for free.
+      </p>
       <p className="text-slate-500 mb-10 max-w-md mx-auto">
-        Your business profile and AI assistant have been created successfully. You can now access your dashboard to start training your assistant.
+        Publishing the widget or hosted chat on your site requires a paid plan, starting at $2/month. Cancel anytime in 1 click.
       </p>
 
-      <Button 
-        onClick={handleGoToDashboard}
-        className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-lg shadow-xl shadow-indigo-200"
-      >
-        Go to Dashboard
-      </Button>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <Link href="/pricing">
+          <Button className="h-14 px-10 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-lg shadow-xl shadow-indigo-200">
+            Choose a plan
+          </Button>
+        </Link>
+        <Button
+          onClick={handleGoToDashboard}
+          variant="outline"
+          className="h-14 px-8 rounded-2xl border-2 border-slate-200 text-slate-700 font-bold text-base"
+        >
+          Go to Dashboard
+        </Button>
+      </div>
     </div>
   );
 }

@@ -68,7 +68,7 @@ export default function DemosCRMPage() {
     if (res.error) {
       toast.error(res.error);
     } else {
-      toast.success("Demo preview extended by 14 days!");
+      toast.success("Demo preview extended!");
       fetchDemos();
     }
   };
@@ -390,7 +390,7 @@ export default function DemosCRMPage() {
                             <button
                               onClick={() => handleExtend(demo.id)}
                               className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400 hover:text-emerald-300 transition-colors"
-                              title="Extend Demo by 14 days"
+                              title="Extend demo preview"
                             >
                               <Calendar className="w-3.5 h-3.5" />
                             </button>

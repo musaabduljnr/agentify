@@ -299,7 +299,7 @@ export function HostedChatClient({
             </button>
           </div>
           <div className="text-center mt-2.5 text-[9px] font-extrabold uppercase tracking-widest text-slate-350">
-            Powered by <a href="https://agentify.ai" target="_blank" rel="noopener noreferrer" className="hover:text-slate-500 underline">Agentify</a>
+            Powered by <a href="https://agentifychat.online" target="_blank" rel="noopener noreferrer" className="hover:text-slate-500 underline">Agentify</a>
           </div>
         </form>
 

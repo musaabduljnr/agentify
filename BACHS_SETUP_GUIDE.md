@@ -133,7 +133,7 @@ BACHS_GROWTH_PRODUCT_ID=prod_growth_def456uvw
    ```
    https://your-domain.com/api/webhooks/bachs
    ```
-   *(Replace `your-domain.com` with your production domain or Vercel production URL, e.g., `https://agentify.vercel.app/api/webhooks/bachs`)*.
+   *(Replace `your-domain.com` with your production domain or Vercel production URL, e.g., `https://agentifychat.online/api/webhooks/bachs`)*.
 4. Select the events to listen for:
    - ✅ `checkout.completed`
    - ✅ `checkout.expired`

@@ -113,7 +113,7 @@ async function getAppBaseUrl(): Promise<string> {
     (process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : "") ||
-    "https://agentify.app";
+    "https://agentifychat.online";
 
   return configuredUrl.trim().replace(/\/+$/, "");
 }

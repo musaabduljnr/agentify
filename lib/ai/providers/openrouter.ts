@@ -40,7 +40,7 @@ export async function generateOpenRouterChat({
     ? DEFAULT_OPENROUTER_MODEL
     : requestedModel;
 
-  const referrerUrl = await getConfigWithEnvFallback("platform", "app_url", "NEXT_PUBLIC_APP_URL") || "https://agentifyhq.vercel.app";
+  const referrerUrl = await getConfigWithEnvFallback("platform", "app_url", "NEXT_PUBLIC_APP_URL") || "https://agentifychat.online";
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",

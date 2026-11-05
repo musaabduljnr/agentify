@@ -5,7 +5,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
+import { captureUtm, getStoredUtm } from "@/lib/analytics/utm";
 import { Bot, Chrome, CheckCircle2, Loader2, Sparkles } from "lucide-react";
+
+const PLAN_PRICES: Record<string, string> = {
+  starter: "$2/month",
+  growth: "$10/month",
+};
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,6 +25,7 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [claimSlug, setClaimSlug] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -27,6 +35,12 @@ export default function SignupPage() {
         setClaimSlug(claim);
         document.cookie = `agentify_claim_demo=${encodeURIComponent(claim)}; path=/; max-age=604800; SameSite=Lax`;
       }
+      const plan = params.get("plan");
+      if (plan === "starter" || plan === "growth") {
+        setSelectedPlan(plan);
+      }
+      captureUtm();
+      trackEvent("signup_started", { plan: plan || "none" });
     }
   }, []);
 
@@ -42,6 +56,7 @@ export default function SignupPage() {
     }
 
     const fullName = `${firstName} ${lastName}`.trim();
+    const utm = getStoredUtm();
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -49,6 +64,8 @@ export default function SignupPage() {
       options: {
         data: {
           full_name: fullName,
+          signup_plan: selectedPlan || "starter",
+          ...utm,
         },
       },
     });
@@ -84,16 +101,15 @@ export default function SignupPage() {
               <Bot className="w-10 h-10 text-white" />
               <span className="text-2xl font-extrabold text-white">Agentify</span>
             </Link>
-            <h2 className="text-4xl font-bold mb-6 leading-tight">Start your 14-day free trial today</h2>
-            <p className="text-indigo-100 mb-10">Join 1,000+ businesses automating their customer support with Agentify.</p>
+            <h2 className="text-4xl font-bold mb-6 leading-tight">Build and preview your AI assistant today</h2>
+            <p className="text-indigo-100 mb-10">Plans from $2/month. Cancel anytime in 1 click.</p>
             
             <ul className="space-y-4">
               {[
-                "No credit card required",
-                "Full access to all features",
-                "Unlimited website scraping",
-                "Real-time analytics",
-                "Lead capture included"
+                "Free build-and-preview sandbox",
+                "Publish with Starter or Growth",
+                "Lead capture included",
+                "Cancel anytime in 1 click"
               ].map((item, index) => (
                 <li key={index} className="flex items-center gap-3 text-indigo-50">
                   <CheckCircle2 className="w-5 h-5 text-indigo-300" />
@@ -104,7 +120,7 @@ export default function SignupPage() {
           </div>
           
           <div className="relative z-10 pt-12 text-sm text-indigo-200">
-            Trusted by modern teams worldwide
+            Build for free. Publish with a paid plan.
           </div>
         </div>
 
@@ -118,7 +134,13 @@ export default function SignupPage() {
               </div>
             )}
             <h1 className="text-2xl font-bold text-slate-900">Create account</h1>
-            <p className="text-slate-500">Get started for free, no credit card required.</p>
+            <p className="text-slate-500">Build and test your assistant in the free preview sandbox. Publishing requires a paid plan, starting at $2/month.</p>
+            {selectedPlan && (
+              <div className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700">
+                <Sparkles className="h-4 w-4" />
+                Selected plan: {selectedPlan === "starter" ? "Starter" : "Growth"} — {PLAN_PRICES[selectedPlan]}
+              </div>
+            )}
           </div>
           
           <form className="space-y-4" onSubmit={handleSignup}>
@@ -190,7 +212,7 @@ export default function SignupPage() {
             <div className="flex items-start gap-2 py-2">
               <input type="checkbox" required className="mt-1 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
               <span className="text-xs text-slate-500">
-                I agree to the <Link href="#" className="text-indigo-600 font-bold hover:underline">Terms of Service</Link> and <Link href="#" className="text-indigo-600 font-bold hover:underline">Privacy Policy</Link>.
+                I agree to the <Link href="/terms" className="text-indigo-600 font-bold hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-indigo-600 font-bold hover:underline">Privacy Policy</Link>.
               </span>
             </div>
             

@@ -339,8 +339,8 @@ export function ConfigurationCenter({ initialConfigs }: ConfigurationCenterProps
                 "platform",
                 "app_url",
                 "App URL",
-                "The canonical URL where Agentify is deployed (e.g. https://agentify.co).",
-                "https://agentify.co"
+                "The canonical URL where Agentify is deployed (e.g. https://agentifychat.online).",
+                "https://agentifychat.online"
               )}
               {renderPlainInput(
                 "platform",

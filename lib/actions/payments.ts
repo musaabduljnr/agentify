@@ -26,7 +26,7 @@ async function getAppBaseUrl(): Promise<string> {
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "https://agentify.app";
+    "https://agentifychat.online";
 
   const trimmedUrl = configuredUrl.trim().replace(/\/+$/, "");
   if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
@@ -217,7 +217,7 @@ export async function createCheckoutSession(
 
     const checkoutRes = await createBachsCheckoutSession({
       productId,
-      customerEmail: user.email || business.contact_email || "billing@agentify.co",
+      customerEmail: user.email || business.contact_email || "billing@agentifychat.online",
       customerName: business.name || user.user_metadata?.name || undefined,
       customerId: customerId || undefined,
       businessId: business.id,

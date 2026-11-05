@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       leadPhone: "+234 000 000 0000",
       interest: "Demo request",
       intentType: "sales",
-      conversationUrl: "https://agentifyhq.vercel.app/dashboard/leads",
+      conversationUrl: "https://agentifychat.online/dashboard/leads",
     });
     templateName = "new-lead-email";
   } else if (template === "booking-support") {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       leadEmail: "visitor@example.com",
       leadPhone: "+234 111 222 3333",
       requestedAction: "Schedule appointment",
-      conversationUrl: "https://agentifyhq.vercel.app/dashboard/conversations",
+      conversationUrl: "https://agentifychat.online/dashboard/conversations",
     });
     templateName = "booking-request-email";
   } else if (template === "payment") {
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       businessName: "Test Workspace",
       plan: "starter",
       amount: "NGN 5,000",
-      billingUrl: "https://agentifyhq.vercel.app/dashboard/billing",
+      billingUrl: "https://agentifychat.online/dashboard/billing",
     });
     templateName = "payment-success-email";
   } else {
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       businessName: "Test Workspace",
       usageType: "AI messages",
       percentage: 90,
-      billingUrl: "https://agentifyhq.vercel.app/dashboard/billing",
+      billingUrl: "https://agentifychat.online/dashboard/billing",
     });
     templateName = "usage-warning-email";
   }

@@ -232,7 +232,7 @@ export default function CareersPage() {
               {/* Form placeholder description */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-sm text-slate-600 leading-relaxed">
                 <span className="font-bold text-indigo-600 block mb-1">To apply:</span>
-                Send your CV and a link to your portfolio or github to <span className="font-bold text-slate-900">careers@agentify.app</span> with the subject line format: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs font-mono">[{selectedRole.title}] - [Your Name]</code>. We review applications within 72 hours.
+                Send your CV and a link to your portfolio or github to <span className="font-bold text-slate-900">careers@agentifychat.online</span> with the subject line format: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs font-mono">[{selectedRole.title}] - [Your Name]</code>. We review applications within 72 hours.
               </div>
             </div>
 
@@ -242,7 +242,7 @@ export default function CareersPage() {
                 Close
               </Button>
               <Button 
-                onClick={() => { window.location.href = `mailto:careers@agentify.app?subject=[${encodeURIComponent(selectedRole.title)}] - Application`; }}
+                onClick={() => { window.location.href = `mailto:careers@agentifychat.online?subject=[${encodeURIComponent(selectedRole.title)}] - Application`; }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full px-6"
               >
                 Email Application

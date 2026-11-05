@@ -17,7 +17,7 @@ const ENV_SPECS: EnvSpec[] = [
   {
     key: "NEXT_PUBLIC_APP_URL",
     required: false,
-    description: "Public base URL of the application, such as https://agentify.co (Optional: falls back to database platform.app_url)",
+    description: "Public base URL of the application, such as https://agentifychat.online (Optional: falls back to database platform.app_url)",
   },
   {
     key: "NEXT_PUBLIC_SUPABASE_URL",

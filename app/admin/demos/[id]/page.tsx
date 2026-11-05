@@ -128,7 +128,7 @@ export default function DemoDetailPage({ params }: { params: Promise<{ id: strin
     if (res.error) {
       toast.error(res.error);
     } else {
-      toast.success("Demo extended by 14 days!");
+      toast.success("Demo preview extended!");
       fetchDetail();
     }
   };
@@ -281,7 +281,7 @@ export default function DemoDetailPage({ params }: { params: Promise<{ id: strin
                 className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-emerald-400 hover:text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
               >
                 <Calendar className="w-3.5 h-3.5" />
-                Extend 14 Days
+                Extend Preview
               </button>
               <button
                 onClick={handleArchive}

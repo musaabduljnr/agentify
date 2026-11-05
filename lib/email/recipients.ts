@@ -21,7 +21,7 @@ export function validateEmail(email: string | null | undefined): boolean {
  */
 export async function getBusinessNotificationEmail(businessId: string): Promise<string> {
   const supabase = createServiceClient();
-  const fallbackEmail = process.env.SUPPORT_EMAIL || "support@agentify.app";
+  const fallbackEmail = process.env.SUPPORT_EMAIL || "support@agentifychat.online";
 
   try {
     const { data: business, error } = await supabase
