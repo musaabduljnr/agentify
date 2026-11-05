@@ -18,7 +18,7 @@ The inbound Bachs payment webhook at `app/api/webhooks/bachs/route.ts` and all i
 
 1. A database `AFTER INSERT` trigger on `public.leads` creates one delivery per active matching endpoint in the same transaction as the lead insert. Updates do not generate duplicate create events.
 2. The lead UUID is the stable event ID. The versioned payload contains `schema_version`, `event_id`, `type`, `created_at`, and a `data` object. An endpoint/event unique index plus `ON CONFLICT DO NOTHING` makes producer retries idempotent.
-3. Vercel Cron calls `GET /api/webhooks/worker` every minute. The worker authenticates `Authorization: Bearer $CRON_SECRET`, atomically claims at most ten due rows through a service-role-only `SKIP LOCKED` RPC, and processes endpoint failures independently.
+3. A scheduled GitHub Actions workflow calls `GET /api/webhooks/worker` every five minutes. The worker authenticates `Authorization: Bearer $CRON_SECRET`, atomically claims at most ten due rows through a service-role-only `SKIP LOCKED` RPC, and processes endpoint failures independently.
 4. Each claim creates a durable ordered `webhook_delivery_attempts` row recording claim time, HTTP-start time, outcome, completion time, response, and duration.
 5. The delivery attempt is an HTTPS POST with `X-Agentify-Event-Id`, `X-Agentify-Event`, `X-Agentify-Timestamp`, and `X-Agentify-Signature: v1=<hex HMAC-SHA256>`. The signature is calculated over the exact JSON request bytes.
 6. A manual retry creates a new delivery row, retains the original event ID and payload, and has its own bounded attempt budget. A unique parent-attempt index prevents concurrent duplicate retries; a failed retry row can itself be retried once. Retries are allowed only for a failed or exhausted delivery whose endpoint still exists and is active.
@@ -59,8 +59,8 @@ Stats are calculated in PostgreSQL over the latest 30 days, avoiding Supabase ro
 ## Deployment and operations
 
 1. Apply `supabase/migrations/20261104160000_outbound_webhooks.sql` and `supabase/migrations/20261104170000_webhook_attempt_history.sql` before deploying the application version that calls their RPCs.
-2. Set `CRON_SECRET` in Vercel Production to a long random value. Vercel Cron sends it as a bearer token when this environment variable is configured.
-3. `vercel.json` schedules `/api/webhooks/worker` every minute. Ensure the selected Vercel plan supports the configured route duration; the worker is bounded to ten concurrent five-second endpoint requests per invocation.
+2. Set `CRON_SECRET` in Vercel Production and as a GitHub Actions repository secret to the same long random value.
+3. `.github/workflows/webhook-worker.yml` invokes `/api/webhooks/worker` every five minutes. Vercel Hobby rejects cron expressions that run more than once per day, so the schedule lives in GitHub Actions; Vercel Pro projects can move it back to `vercel.json` for one-minute latency. GitHub may delay scheduled runs under load and disables them after 60 days without repository activity. The worker is bounded to ten concurrent five-second endpoint requests per invocation.
 4. Monitor worker response counts (`claimed`, `completed`, and `failedToSave`) and failed delivery records. Protect the service-role key and do not expose endpoint secrets in support logs.
 5. The endpoint contract uses JSON request bodies and the headers listed above. Receivers should compare HMAC signatures in constant time and deduplicate by `X-Agentify-Event-Id`; duplicate HTTP delivery is possible if the receiver accepts a request but the worker cannot persist its result.
 

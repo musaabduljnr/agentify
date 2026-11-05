@@ -136,7 +136,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ffffff] border border-[#eceef2] shadow-xs mb-6">
             <span className="w-2 h-2 rounded-full bg-[#027A48]"></span>
-            <span className="text-xs text-[#181c1f] font-medium">Ready in under 120 seconds</span>
+            <span className="text-xs text-[#181c1f] font-medium">No code required</span>
           </div>
           
           <h2 className="text-3xl sm:text-5xl font-bold text-[#181c1f] tracking-tight mb-4">
