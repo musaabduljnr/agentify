@@ -3,6 +3,7 @@ import { POST } from "@/app/api/widget/chat/route";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { createServiceClient } from "@/utils/supabase/service";
 import { runBusinessChat } from "@/lib/actions/chat/run-business-chat";
+import { ConversationAccessError } from "@/lib/actions/chat/conversation-management";
 
 vi.mock("@/lib/security/rate-limit", () => ({
   rateLimit: vi.fn(),
@@ -13,9 +14,10 @@ vi.mock("@/utils/supabase/service", () => ({
   createServiceClient: vi.fn(),
 }));
 
-vi.mock("@/lib/actions/chat/run-business-chat", () => ({
-  runBusinessChat: vi.fn(),
-}));
+vi.mock("@/lib/actions/chat/run-business-chat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/actions/chat/run-business-chat")>();
+  return { ...actual, runBusinessChat: vi.fn() };
+});
 
 vi.mock("@/lib/config/platform-config", () => ({
   getConfig: vi.fn().mockResolvedValue("true"),
@@ -116,5 +118,52 @@ describe("Widget Chat API Endpoint", () => {
     const data = await res.json();
     expect(data.reply).toBe("Hi there!");
     expect(data.conversationId).toBe("conv-123");
+  });
+
+  it("returns 403 when a visitor tries to reuse another visitor's conversation", async () => {
+    vi.mocked(rateLimit).mockResolvedValueOnce({
+      success: true,
+      remaining: 9,
+      reset: Date.now() + 1000,
+      limit: 10,
+    });
+
+    const mockSupabase = {
+      from: vi.fn().mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({
+          data: {
+            is_enabled: true,
+            allowed_domains: ["testsite.com"],
+            hosted_chat_enabled: true,
+          },
+          error: null,
+        }),
+      })),
+    };
+    vi.mocked(createServiceClient).mockReturnValue(mockSupabase as any);
+    vi.mocked(runBusinessChat).mockRejectedValueOnce(new ConversationAccessError());
+
+    const req = {
+      json: async () => ({
+        businessId: "de305d54-75b4-431b-adb2-eb6b9e546014",
+        conversationId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        visitorId: "visitor-b",
+        message: "hello chatbot",
+      }),
+      headers: {
+        get: (name: string) => {
+          if (name === "x-forwarded-for") return "127.0.0.1";
+          if (name === "origin") return "https://testsite.com";
+          return null;
+        },
+      },
+    } as any;
+
+    const res = await POST(req);
+    expect(res.status).toBe(403);
+    const data = await res.json();
+    expect(data.error).toBe("Conversation not found.");
   });
 });

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createServiceClient } from "@/utils/supabase/service";
 import { corsHeaders, jsonWithCors } from "@/lib/http/cors";
 import { runBusinessChat } from "@/lib/actions/chat/run-business-chat";
+import { ConversationAccessError } from "@/lib/actions/chat/conversation-management";
 import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { z } from "zod";
@@ -116,6 +117,9 @@ export async function POST(req: NextRequest) {
       limitReached: result.limitReached || false,
     });
   } catch (error: unknown) {
+    if (error instanceof ConversationAccessError) {
+      return jsonWithCors({ error: error.message }, { status: 403 });
+    }
     logErrorSync(error, "widget-chat");
     return jsonWithCors({ error: getUserFriendlyError("widget-chat") }, { status: 500 });
   }

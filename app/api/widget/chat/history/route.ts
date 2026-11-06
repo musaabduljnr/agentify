@@ -3,6 +3,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { createClient } from "@/utils/supabase/server";
 import { corsHeaders, jsonWithCors } from "@/lib/http/cors";
 import { rateLimit, rateLimitResponse } from "@/lib/security/rate-limit";
+import { toOwnerMessageDTO, toPublicMessageDTO } from "@/lib/actions/chat/message-dto";
 
 export async function OPTIONS() {
   return new Response(null, { headers: corsHeaders });
@@ -43,15 +44,15 @@ export async function GET(req: NextRequest) {
       return jsonWithCors({ error: "Conversation not found" }, { status: 404 });
     }
 
-    let isAuthorized = false;
+    let accessLevel: "visitor" | "owner" | null = null;
 
     // A. Check if visitorId matches the conversation's visitor_id
     if (visitorId && conversation.visitor_id === visitorId) {
-      isAuthorized = true;
+      accessLevel = "visitor";
     }
 
     // B. Check if authenticated user owns the business or is admin
-    if (!isAuthorized) {
+    if (!accessLevel) {
       const userSupabase = await createClient();
       const { data: { user } } = await userSupabase.auth.getUser();
       if (user) {
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest) {
           .maybeSingle();
 
         if (profile?.role === "admin") {
-          isAuthorized = true;
+          accessLevel = "owner";
         } else {
           const { data: business } = await supabase
             .from("businesses")
@@ -72,13 +73,13 @@ export async function GET(req: NextRequest) {
             .maybeSingle();
 
           if (business) {
-            isAuthorized = true;
+            accessLevel = "owner";
           }
         }
       }
     }
 
-    if (!isAuthorized) {
+    if (!accessLevel) {
       return jsonWithCors({ error: "Unauthorized access to conversation history" }, { status: 403 });
     }
 
@@ -93,8 +94,16 @@ export async function GET(req: NextRequest) {
       return jsonWithCors({ error: msgErr.message }, { status: 500 });
     }
 
+    const serialize = accessLevel === "owner" ? toOwnerMessageDTO : toPublicMessageDTO;
+    const safeMessages = Array.isArray(messages)
+      ? messages.flatMap((message) => {
+          const dto = serialize(message as Record<string, unknown>);
+          return dto ? [dto] : [];
+        })
+      : [];
+
     return jsonWithCors({
-      messages: messages || [],
+      messages: safeMessages,
       isManualTakeover: conversation?.is_manual_takeover || conversation?.metadata?.is_manual_takeover === true || false,
     });
   } catch (error: any) {
