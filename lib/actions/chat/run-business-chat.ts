@@ -13,7 +13,12 @@ import {
   verifyAIUsageLimits,
 } from "@/lib/billing/usage";
 import { requireBusinessEntitlement } from "@/lib/billing/entitlements";
-import { resolveOrCreateConversation } from "./conversation-management";
+import { resolveOrCreateConversation, recordConversationKnowledgeVersion } from "./conversation-management";
+import {
+  isConversationKnowledgeStale,
+  readConversationKnowledgeVersion,
+  retainUserTurnsOnly,
+} from "@/lib/knowledge/lifecycle";
 import { saveUserMessage, saveAssistantMessage } from "./message-persistence";
 import { processLeadHandling } from "./lead-handling";
 import { getAiResponse } from "./ai-response";
@@ -107,6 +112,7 @@ export async function runBusinessChat({
   if (assistantError || !assistant) throw new Error("Assistant not found");
 
   const usageType = source === "widget" ? "widget_chat" as const : "message" as const;
+  const currentKnowledgeVersion = Number(business.knowledge_version ?? 0);
   const { conversationId: currentConversationId, conversation } = await resolveOrCreateConversation({
     currentConversationId: conversationId,
     businessId,
@@ -160,8 +166,23 @@ export async function runBusinessChat({
   try {
     // The current user turn was already inserted above, so drop it from the
     // prior-turn history before passing it to retrieval and to the model.
-    const storedHistory = await getRecentConversationMessages(currentConversationId!, 8);
-    const history = stripCurrentUserTurn(storedHistory, message);
+    const storedHistory = await getRecentConversationMessages(
+      currentConversationId!,
+      8,
+      currentKnowledgeVersion
+    );
+    const priorHistory = stripCurrentUserTurn(storedHistory, message);
+
+    // If the business knowledge changed since this conversation last ran,
+    // earlier assistant answers may repeat deleted or outdated facts. Keep the
+    // visitor's questions for follow-up retrieval, but do not feed old answers
+    // back to the model as current evidence.
+    const knowledgeChanged =
+      isConversationKnowledgeStale(conversation?.metadata, currentKnowledgeVersion) &&
+      priorHistory.length > 0;
+    const history = knowledgeChanged
+      ? retainUserTurnsOnly(priorHistory)
+      : priorHistory;
 
     const { chunks, formattedContext, intent, diagnostics: retrieval } = await retrieveBusinessContext({
       businessId,
@@ -184,7 +205,14 @@ export async function runBusinessChat({
       conversation,
     });
 
-    const summary = await summarizeConversationIfNeeded(currentConversationId!, businessId, computedFeatureSource);
+    const summary = knowledgeChanged
+      ? null
+      : await summarizeConversationIfNeeded(
+          currentConversationId!,
+          businessId,
+          computedFeatureSource,
+          currentKnowledgeVersion
+        );
     const { finalReply, chatResponse, cachedAnswer, quality } = await getAiResponse({
       message,
       businessId,
@@ -197,6 +225,7 @@ export async function runBusinessChat({
       summary,
       history,
       computedFeatureSource,
+      knowledgeUpdated: knowledgeChanged,
     });
 
     const savedAssistantMsg = await saveAssistantMessage({
@@ -209,7 +238,19 @@ export async function runBusinessChat({
       chatResponse,
       quality,
       retrieval,
+      knowledgeVersion: currentKnowledgeVersion,
     });
+
+    if (
+      conversation &&
+      readConversationKnowledgeVersion(conversation.metadata) !== currentKnowledgeVersion
+    ) {
+      await recordConversationKnowledgeVersion(
+        currentConversationId!,
+        businessId,
+        currentKnowledgeVersion
+      );
+    }
 
     if (!isDemo) {
       if (usageReservation) await completeUsageQuota(usageReservation);

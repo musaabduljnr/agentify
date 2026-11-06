@@ -32,6 +32,7 @@ export async function saveAssistantMessage({
   chatResponse,
   quality,
   retrieval,
+  knowledgeVersion,
 }: {
   conversationId: string;
   businessId: string;
@@ -42,6 +43,7 @@ export async function saveAssistantMessage({
   chatResponse: { provider: string; model: string; latencyMs: number; fallbackUsed?: boolean } | null;
   quality?: QualityCheckResult;
   retrieval?: RetrievalDiagnostics;
+  knowledgeVersion?: number;
 }) {
   const supabase = createServiceClient();
   const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
@@ -62,6 +64,9 @@ export async function saveAssistantMessage({
         latency_ms: chatResponse?.latencyMs || 0,
         cached_answer: cachedAnswer,
         retrieval: retrieval ?? null,
+        ...(typeof knowledgeVersion === "number"
+          ? { knowledge_version: Number(knowledgeVersion) }
+          : {}),
       }
     })
     .select()

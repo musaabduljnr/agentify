@@ -22,6 +22,7 @@ export async function getAiResponse({
   summary,
   history,
   computedFeatureSource,
+  knowledgeUpdated = false,
 }: {
   message: string;
   businessId: string;
@@ -34,6 +35,7 @@ export async function getAiResponse({
   summary: string | null;
   history: any[];
   computedFeatureSource: string;
+  knowledgeUpdated?: boolean;
 }) {
   const isContinuation = message.toLowerCase().trim() === "continue";
 
@@ -50,6 +52,17 @@ export async function getAiResponse({
 
   // Conversation memory is only a compression of prior turns. It must never
   // outrank the retrieved knowledge base or the verified business profile.
+  if (knowledgeUpdated) {
+    promptInstructions =
+      `# KNOWLEDGE UPDATED DURING THIS CONVERSATION\n` +
+      `The business knowledge base changed after some earlier messages in this conversation. ` +
+      `Earlier assistant answers may contain prices, policies, or details that were changed or deleted. ` +
+      `The current knowledge base context and business profile are the only current source of truth. ` +
+      `Never repeat a detail from conversation history when it is missing from, or different in, the current context. ` +
+      `If the current context does not answer the question, use the standard not-available fallback.\n\n` +
+      promptInstructions;
+  }
+
   if (summary) {
     promptInstructions =
       `# SECONDARY CONVERSATION MEMORY\n` +

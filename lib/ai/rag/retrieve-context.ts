@@ -2,29 +2,14 @@ import "server-only";
 import { generateEmbedding } from "../engine/embeddings";
 import { createServiceClient } from "@/utils/supabase/service";
 import { classifyQueryIntent, type QueryIntent } from "../intent/classify-query";
-import { scoreChunkRelevance } from "./chunk-scoring";
+import { selectKnowledgeChunks } from "./select-chunks";
 import { formatContext } from "./build-context";
+import { filterCurrentKnowledgeChunks } from "@/lib/knowledge/lifecycle";
+import { type RetrievedChunk } from "./types";
 import { type FeatureSource } from "../logs/ai-logs";
 import { type ChatMessage } from "../engine/types";
 
-export interface RetrievedChunk {
-  id: string;
-  source_id: string;
-  content: string;
-  similarity: number;
-  metadata: {
-    source_type?: string;
-    source_title?: string;
-    source_url?: string | null;
-    page_url?: string | null;
-    page_title?: string | null;
-    section_heading?: string | null;
-    chunk_index?: number;
-    token_estimate?: number;
-    content_hash?: string;
-    [key: string]: any;
-  };
-}
+export type { RetrievedChunk } from "./types";
 
 export interface RetrievalDiagnostics {
   query: string;
@@ -35,6 +20,7 @@ export interface RetrievalDiagnostics {
   finalCount: number;
   topSimilarity: number;
   dynamicLimit: number;
+  staleExcluded?: number;
   retrievalError?: string;
 }
 
@@ -52,8 +38,6 @@ const FOLLOW_UP_PATTERN = new RegExp(
     "|\\b(?:it|that|they|them|this|those|these|there|the same)\\b",
   "i"
 );
-
-const COMPOUND_QUERY_PATTERN = /\b(?:and|also|plus|as well as|both)\b/i;
 
 /**
  * Builds the text sent to the embedding model. Short or referential follow-ups
@@ -117,7 +101,8 @@ export async function retrieveBusinessContext(params: RetrieveContextParams): Pr
     // 1. Generate query embedding
     const queryEmbedding = await generateEmbedding(expandedQuery, businessId, featureSource);
 
-    // 2. Query Supabase vector match
+    // 2. Query Supabase vector match. The RPC only returns chunks that belong
+    // to the source's current, successfully indexed version.
     const supabase = createServiceClient();
     const { data: dbChunks, error } = await supabase.rpc("match_knowledge_chunks", {
       query_embedding: queryEmbedding,
@@ -134,59 +119,34 @@ export async function retrieveBusinessContext(params: RetrieveContextParams): Pr
     const rawChunks = (dbChunks || []) as RetrievedChunk[];
     diagnostics.candidates = rawChunks.length;
 
-    // 3. Filter by similarity threshold
-    const filtered = rawChunks.filter((chunk) => chunk.similarity >= minSimilarity);
-    diagnostics.aboveThreshold = filtered.length;
+    // 3. Defence in depth: reject any row that does not describe the source's
+    // current ready version, even if it slipped through the database filter.
+    const currentChunks = filterCurrentKnowledgeChunks(rawChunks);
+    diagnostics.staleExcluded = rawChunks.length - currentChunks.length;
 
-    // 4. Deduplicate near-identical chunks
-    const seenContents = new Set<string>();
-    const deduplicated: RetrievedChunk[] = [];
-
-    for (const chunk of filtered) {
-      const normalizedContent = chunk.content.toLowerCase().replace(/\s+/g, " ").trim();
-      if (!seenContents.has(normalizedContent)) {
-        seenContents.add(normalizedContent);
-        deduplicated.push(chunk);
-      }
-    }
-
-    // 5. Score and rerank chunks based on intent alignment
-    const scored = deduplicated.map((chunk) => {
-      const boost = scoreChunkRelevance(chunk, intent, expandedQuery);
-      return {
-        ...chunk,
-        rerankScore: chunk.similarity + boost,
-      };
+    // 4. Apply threshold, deduplication, intent reranking, and dynamic limit.
+    const selection = selectKnowledgeChunks(currentChunks, {
+      minSimilarity,
+      intent,
+      query: expandedQuery,
     });
 
-    // Sort by boosted score
-    scored.sort((a, b) => b.rerankScore - a.rerankScore);
+    diagnostics.aboveThreshold = selection.aboveThreshold;
+    diagnostics.topSimilarity = selection.topSimilarity;
+    diagnostics.dynamicLimit = selection.dynamicLimit;
+    diagnostics.finalCount = selection.chunks.length;
 
-    // Dynamic RAG slicing for token optimization. Compound questions keep the
-    // wider window so each part of the question still has evidence.
-    const topSimilarity = scored.length > 0 ? scored[0].similarity : 0;
-    const isHighConfidence = topSimilarity >= 0.70;
-    const isCompound = COMPOUND_QUERY_PATTERN.test(expandedQuery) || (expandedQuery.match(/\?/g) || []).length > 1;
-    const dynamicLimit = isHighConfidence && !isCompound ? 2 : 5;
+    const formattedContext = formatContext(selection.chunks);
 
-    const finalChunks = scored.slice(0, dynamicLimit).map(({ rerankScore, ...rest }) => rest);
-
-    diagnostics.topSimilarity = topSimilarity;
-    diagnostics.dynamicLimit = dynamicLimit;
-    diagnostics.finalCount = finalChunks.length;
-
-    // 6. Format structured context
-    const formattedContext = formatContext(finalChunks);
-
-    if (finalChunks.length === 0) {
+    if (selection.chunks.length === 0) {
       console.warn(
         `[RAG] No chunks passed the ${minSimilarity} threshold for business ${businessId}. ` +
-          `Candidates: ${rawChunks.length}, query: "${expandedQuery}"`
+          `Candidates: ${rawChunks.length}, stale excluded: ${diagnostics.staleExcluded}, query: "${expandedQuery}"`
       );
     }
 
     return {
-      chunks: finalChunks,
+      chunks: selection.chunks,
       formattedContext,
       intent,
       diagnostics,

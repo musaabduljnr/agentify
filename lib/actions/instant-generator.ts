@@ -5,7 +5,7 @@ import { createServiceClient } from "@/utils/supabase/service";
 import { crawlWebsite } from "@/lib/scraper/crawl-website";
 import { assertPublicHttpUrl, normalizeUrl } from "@/lib/scraper/url-safety";
 import { cleanExtractedText, countWords } from "@/lib/scraper/text-cleaner";
-import { chunkText, estimateTokens } from "@/lib/embeddings/chunker";
+import { chunkText, estimateTokens, hashContent } from "@/lib/embeddings/chunker";
 import { generateEmbeddingsBatch } from "@/lib/ai/engine/embeddings";
 import { generateGeminiContent } from "@/lib/ai/providers/gemini";
 import { rateLimit } from "@/lib/security/rate-limit";
@@ -473,6 +473,7 @@ STRICT RULES:
           const chunkInserts = limitedChunks.map((content, idx) => ({
             business_id: placeholderBizId!,
             source_id: source.id,
+            source_version: 1,
             content,
             embedding: embeddings[idx],
             chunk_index: idx,
@@ -480,6 +481,10 @@ STRICT RULES:
             metadata: {
               source_type: "website",
               source_title: sourceTitle,
+              content_hash: hashContent(content),
+              chunk_index: idx,
+              source_version: 1,
+              indexed_at: new Date().toISOString(),
             },
           }));
 
@@ -490,13 +495,22 @@ STRICT RULES:
           if (chunkError) {
             console.warn("[InstantGenerator] Failed to insert knowledge chunks:", chunkError.message);
           } else {
+            const indexedAt = new Date().toISOString();
             await serviceClient
               .from("knowledge_sources")
               .update({
+                index_status: "ready",
+                content_version: 1,
+                indexed_version: 1,
+                indexed_at: indexedAt,
+                index_run_id: null,
+                index_started_at: null,
+                index_error: null,
                 metadata: {
                   ...sourceMetadata,
                   embedded: true,
-                  embedded_at: new Date().toISOString(),
+                  embedded_at: indexedAt,
+                  embedding_status: "completed",
                   chunk_count: limitedChunks.length,
                 },
               })

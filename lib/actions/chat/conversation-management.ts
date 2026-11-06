@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/utils/supabase/service";
+import { withConversationKnowledgeVersion } from "@/lib/knowledge/lifecycle";
 
 export class ConversationAccessError extends Error {
   constructor(message = "Conversation not found.") {
@@ -145,4 +146,37 @@ export async function resolveOrCreateConversation({
   }
 
   return { conversationId, conversation };
+}
+
+/**
+ * Records which business knowledge version the conversation has seen. On the
+ * next turn, a different version tells the assistant not to treat earlier
+ * answers as current.
+ */
+export async function recordConversationKnowledgeVersion(
+  conversationId: string,
+  businessId: string,
+  knowledgeVersion: number
+): Promise<void> {
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .select("metadata")
+    .eq("id", conversationId)
+    .eq("business_id", businessId)
+    .maybeSingle();
+
+  if (error || !data) return;
+
+  const metadata = withConversationKnowledgeVersion(
+    (data.metadata as Record<string, unknown> | null) || {},
+    knowledgeVersion
+  );
+
+  await supabase
+    .from("conversations")
+    .update({ metadata })
+    .eq("id", conversationId)
+    .eq("business_id", businessId);
 }

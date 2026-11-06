@@ -1,5 +1,5 @@
 import "server-only";
-import { type RetrievedChunk } from "./retrieve-context";
+import { type RetrievedChunk } from "./types";
 
 export const NO_KNOWLEDGE_CONTEXT = "No specific knowledge found for this query.";
 

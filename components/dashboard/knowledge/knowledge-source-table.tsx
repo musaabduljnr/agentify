@@ -27,6 +27,7 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
   const [viewPagesSource, setViewPagesSource] = useState<KnowledgeSource | null>(null);
   
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [crawlErrors, setCrawlErrors] = useState<Record<string, string>>({});
   const [crawlWarnings, setCrawlWarnings] = useState<Record<string, string>>({});
@@ -34,7 +35,9 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this knowledge source?")) return;
     setDeletingId(id);
-    await deleteKnowledgeSource(id);
+    setDeleteError(null);
+    const result = await deleteKnowledgeSource(id);
+    if (result?.error) setDeleteError(result.error);
     setDeletingId(null);
   };
 
@@ -84,6 +87,11 @@ export function KnowledgeSourceTable({ sources }: { sources: KnowledgeSource[] }
 
   return (
     <>
+      {deleteError && (
+        <div className="border-b border-red-100 bg-red-50 px-6 py-3 text-xs font-semibold text-red-600">
+          Could not delete knowledge source: {deleteError}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px]">
           <thead>

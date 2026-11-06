@@ -14,6 +14,12 @@ export type KnowledgeSource = {
   status: KnowledgeSourceStatus;
   error_message: string | null;
   metadata: Record<string, any>;
+  content_version?: number;
+  indexed_version?: number | null;
+  index_status?: "pending" | "indexing" | "ready" | "failed";
+  index_error?: string | null;
+  index_started_at?: string | null;
+  indexed_at?: string | null;
   created_at: string;
   updated_at: string;
   crawl_mode?: "single" | "crawl" | null;

@@ -1,7 +1,12 @@
 import { KnowledgeTabs } from "@/components/dashboard/knowledge/knowledge-tabs";
 import { KnowledgeSourceTable } from "@/components/dashboard/knowledge/knowledge-source-table";
+import { KnowledgeConsistencyPanel } from "@/components/dashboard/knowledge/knowledge-consistency-panel";
 import { TestKnowledgeSearch } from "@/components/dashboard/knowledge/test-knowledge-search";
-import { getKnowledgeSources, getCurrentBusiness } from "@/lib/actions/knowledge";
+import {
+  getKnowledgeSources,
+  getCurrentBusiness,
+  getKnowledgeConsistencyReport,
+} from "@/lib/actions/knowledge";
 import { getBusinessBillingContext } from "@/lib/queries/billing";
 import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { BrainCircuit } from "lucide-react";
@@ -12,6 +17,8 @@ export default async function KnowledgeBasePage() {
     getCurrentBusiness(),
     getBusinessBillingContext(),
   ]);
+
+  const consistency = await getKnowledgeConsistencyReport();
 
   // Filter warnings relevant to this page
   const relevantWarnings = (billing?.warnings || []).filter(
@@ -53,6 +60,8 @@ export default async function KnowledgeBasePage() {
       {sources.some(s => s.metadata?.embedded) && (
         <TestKnowledgeSearch businessId={business.id} />
       )}
+
+      <KnowledgeConsistencyPanel report={consistency} />
     </>
   );
 }

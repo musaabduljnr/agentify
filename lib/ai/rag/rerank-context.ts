@@ -1,5 +1,5 @@
 import "server-only";
-import { type RetrievedChunk } from "./retrieve-context";
+import { type RetrievedChunk } from "./types";
 import { type QueryIntent } from "../intent/classify-query";
 import { scoreChunkRelevance } from "./chunk-scoring";
 

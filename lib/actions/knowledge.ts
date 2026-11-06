@@ -25,6 +25,23 @@ import { validateFileUpload } from "@/lib/security/file-upload";
 import { getUserFriendlyError, logErrorSync } from "@/lib/monitoring/log-error";
 import { countWords } from "@/lib/scraper/text-cleaner";
 import { createBusinessNotification } from "@/lib/notifications/service";
+import { isChunkFromCurrentSource } from "@/lib/knowledge/lifecycle";
+
+export type KnowledgeConsistencyRow = {
+  source_id: string;
+  title: string;
+  source_status: string;
+  content_version: number;
+  indexed_version: number | null;
+  index_status: "pending" | "indexing" | "ready" | "failed";
+  indexed_at: string | null;
+  index_error: string | null;
+  chunk_count: number;
+  embedded_chunk_count: number;
+  current_version_chunk_count: number;
+  stale_chunk_count: number;
+  is_retrievable: boolean;
+};
 
 type KnowledgeActionResult = {
   success?: boolean;
@@ -403,17 +420,122 @@ export async function updateKnowledgeSource(formData: {
 
 export async function deleteKnowledgeSource(id: string) {
   const business = await getCurrentBusiness();
-  const supabase = await createClient();
+  const service = createServiceClient();
 
-  const { error } = await supabase
+  const { data: source, error: fetchError } = await service
+    .from("knowledge_sources")
+    .select("id, type, file_url, title")
+    .eq("id", id)
+    .eq("business_id", business.id)
+    .maybeSingle();
+
+  if (fetchError) return { error: fetchError.message };
+  if (!source) return { error: "Knowledge source not found." };
+
+  // Make the source ineligible before deleting anything. If the chunk cleanup
+  // fails, the source stays excluded instead of serving removed knowledge.
+  const { error: deactivateError } = await service
+    .from("knowledge_sources")
+    .update({
+      index_status: "pending",
+      index_run_id: null,
+      index_started_at: null,
+    })
+    .eq("id", id)
+    .eq("business_id", business.id);
+
+  if (deactivateError) return { error: deactivateError.message };
+
+  const { error: chunksError } = await service
+    .from("knowledge_chunks")
+    .delete()
+    .eq("source_id", id)
+    .eq("business_id", business.id);
+
+  const { error: sourceError } = await service
     .from("knowledge_sources")
     .delete()
     .eq("id", id)
     .eq("business_id", business.id);
 
-  if (error) return { error: error.message };
+  if (sourceError) return { error: sourceError.message };
+  if (chunksError) {
+    // The source row is gone, so the foreign-key cascade also removed them.
+    console.warn(
+      `[Knowledge] Explicit chunk cleanup failed for deleted source ${id}; cascade handled it:`,
+      chunksError.message
+    );
+  }
+
+  if (source.type === "document" && source.file_url) {
+    const { data: otherReferences } = await service
+      .from("knowledge_sources")
+      .select("id")
+      .eq("business_id", business.id)
+      .eq("file_url", source.file_url)
+      .limit(1);
+
+    if (!otherReferences || otherReferences.length === 0) {
+      const { error: storageError } = await service.storage
+        .from("business-documents")
+        .remove([source.file_url]);
+
+      if (storageError) {
+        console.warn(
+          `[Knowledge] Failed to remove stored file for deleted source ${id}:`,
+          storageError.message
+        );
+      }
+    }
+  }
+
   revalidatePath("/dashboard/knowledge");
   return { success: true };
+}
+
+// ── Diagnostics ──────────────────────────────────────────────────────────
+
+export async function getKnowledgeConsistencyReport() {
+  try {
+    const business = await getCurrentBusiness();
+    const service = createServiceClient();
+
+    const [consistency, orphaned] = await Promise.all([
+      service.rpc("get_knowledge_consistency", { p_business_id: business.id }),
+      service.rpc("count_orphaned_knowledge_chunks", { p_business_id: business.id }),
+    ]);
+
+    if (consistency.error) return { error: consistency.error.message };
+
+    const rows = ((consistency.data || []) as KnowledgeConsistencyRow[]).map((row) => ({
+      ...row,
+      chunk_count: Number(row.chunk_count || 0),
+      embedded_chunk_count: Number(row.embedded_chunk_count || 0),
+      current_version_chunk_count: Number(row.current_version_chunk_count || 0),
+      stale_chunk_count: Number(row.stale_chunk_count || 0),
+    }));
+
+    return {
+      rows,
+      orphanedChunks: orphaned.error ? null : Number(orphaned.data || 0),
+      totals: {
+        sources: rows.length,
+        retrievableSources: rows.filter((row) => row.is_retrievable).length,
+        pendingSources: rows.filter(
+          (row) => row.index_status === "pending" || row.index_status === "indexing"
+        ).length,
+        failedSources: rows.filter((row) => row.index_status === "failed").length,
+        sourcesWithStaleChunks: rows.filter((row) => row.stale_chunk_count > 0).length,
+        chunks: rows.reduce((sum, row) => sum + row.chunk_count, 0),
+        currentChunks: rows.reduce(
+          (sum, row) => sum + row.current_version_chunk_count,
+          0
+        ),
+      },
+    };
+  } catch (err: any) {
+    return { error: err.message || "Failed to load knowledge diagnostics." };
+  }
 }
 
 // ── Website Scraping ─────────────────────────────────────────────────────
@@ -878,7 +1000,10 @@ export async function searchKnowledge(query: string, businessId: string) {
     });
 
     if (error) throw new Error(error.message);
-    return { success: true, matches: data };
+    const matches = ((data || []) as Array<{ metadata?: Record<string, any> | null }>).filter(
+      (match) => isChunkFromCurrentSource(match.metadata)
+    );
+    return { success: true, matches };
   } catch (err: any) {
     return { error: err.message || "Search failed." };
   }
