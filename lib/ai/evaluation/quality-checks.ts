@@ -1,6 +1,6 @@
 import "server-only";
 
-const FALLBACK_MESSAGE = "I don’t have enough information to answer that accurately, but I can collect your details so the business can follow up.";
+const FALLBACK_MESSAGE = "I don’t have enough information to answer that accurately, but I can collect your details so our team can follow up.";
 
 interface Business {
   contact_email?: string | null;
